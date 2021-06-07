@@ -16,6 +16,7 @@ https://trello.com/b/MbwAxjd1/xobot-official
 
 ## Credits
 https://github.com/masteroncluster/py-censure - Profanity filter we used as a base
+https://github.com/MasterGroosha/telegram-report-bot - Reports system we used as a base
 
 ## Author
 
