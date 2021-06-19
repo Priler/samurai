@@ -12,4 +12,4 @@ class IsAdminFilter(BoundFilter):
 
     async def check(self, message: types.Message):
         member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
-        return member.is_chat_admin()
+        return member.is_chat_admin() == self.is_admin
