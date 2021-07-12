@@ -1,2 +1,7 @@
 venv
 .idea/
+censure/censure/lang/__pycache__
+censure/censure/lang/common/__pycache__
+censure/censure/lang/en/__pycache__
+censure/censure/lang/ru/__pycache__
+__pycache__
