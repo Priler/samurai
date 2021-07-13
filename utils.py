@@ -1,17 +1,19 @@
 import datetime
+import sys
 import typing
+
 import localization
 from configurator import config
 
-import sys
-sys.path.append("./censure") # allow module import from git submodule
+sys.path.append("./censure")  # allow module import from git submodule
 
 from censure import Censor
 
 censor_ru = Censor.get(lang='ru')
 censor_en = Censor.get(lang='en')
 
-def check_for_profanity(text, lang = "ru"):
+
+def check_for_profanity(text, lang="ru"):
     _profanity_detected = False
     _word = None
 
@@ -33,19 +35,21 @@ def check_for_profanity(text, lang = "ru"):
 
     return _profanity_detected, _word, line_info
 
+
 def check_for_profanity_all(text):
     _del = False
     _word = None
     _line = None
 
-      # Check for RUSSIAN
-    _del, _word, _line = check_for_profanity(text, lang = "ru")
+    # Check for RUSSIAN
+    _del, _word, _line = check_for_profanity(text, lang="ru")
 
     if not _del:
         # Check for ENGLISH
-        _del, _word, _line = check_for_profanity(text, lang = "en")
+        _del, _word, _line = check_for_profanity(text, lang="en")
 
     return _del, _word
+
 
 def user_mention(from_user):
     _s = from_user.full_name
@@ -53,11 +57,12 @@ def user_mention(from_user):
     if from_user.full_name != from_user.mention:
         _s += " (" + from_user.mention + ")"
     else:
-        _s += " (<a href=\""+from_user.url+"\">id"+str(from_user.id)+"</a>)"
+        _s += " (<a href=\"" + from_user.url + "\">id" + str(from_user.id) + "</a>)"
 
     return _s
 
-async def write_log(bot, message, log_type = "default"):
+
+async def write_log(bot, message, log_type="default"):
     now = datetime.datetime.now()
     current_time = now.strftime("%H:%M:%S")
 
@@ -65,6 +70,7 @@ async def write_log(bot, message, log_type = "default"):
     log_message += message
 
     return await bot.send_message(config.groups.logs, log_message)
+
 
 def get_restriction_time(string: str) -> typing.Optional[int]:
     """
@@ -121,7 +127,8 @@ def get_url_chat_id(chat_id: int) -> int:
     :param chat_id: chat_id to apply magic number to
     :return: chat_id for t.me links
     """
-    return abs(chat_id+1_000_000_000_000)
+    return abs(chat_id + 1_000_000_000_000)
+
 
 def remove_prefix(text, prefix):
     if text.startswith(prefix):
