@@ -29,4 +29,4 @@ class MemberCanRestrictFilter(BoundFilter):
         member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
 
         # I don't know why, but telegram thinks, if member is chat creator, he cant restrict member
-        return member.can_restrict_members == self.member_can_restrict or member.is_chat_creator()
+        return (member.is_chat_creator() or member.can_restrict_members) == self.member_can_restrict
