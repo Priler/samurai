@@ -238,6 +238,7 @@ class CensorBase:
     def clean_line(self, line, beep=constants.BEEP):
         detected_bad_words = []
         detected_bad_phrases = []
+        detected_pats = []
         bad_words_count = 0
         words = re.split(patterns.PAT_SPACE, line)
         for word in words:
@@ -246,6 +247,7 @@ class CensorBase:
                 bad_words_count += 1
                 line = line.replace(word, beep, 1)
                 detected_bad_words.append(word)
+                detected_pats.append(word_info['accuse'][0])
 
         bad_phrases_count = 0
         line_info = self.check_line_bad_phrases(line)
@@ -255,9 +257,10 @@ class CensorBase:
                 if line2 != line:
                     bad_phrases_count += 1
                     detected_bad_phrases.append(pat)
+                    detected_pats.append(pat)
                 line = line2
 
-        return line, bad_words_count, bad_phrases_count, detected_bad_words, detected_bad_phrases
+        return line, bad_words_count, bad_phrases_count, detected_bad_words, detected_bad_phrases, detected_pats
 
     def clean_html_line(self, line, beep=constants.BEEP_HTML):
         bad_words_count = start = 0

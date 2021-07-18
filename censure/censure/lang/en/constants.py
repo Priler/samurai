@@ -140,10 +140,9 @@ FOUL_CORE = {
     'dick': '^dick(([s]*$)|(bag)|(beaters)|(face)|(head)|(hole)|'
             '(juice)|(milk)|(monger)|(slap)|(suck(er|in))|'
             '(tickler)|(wad)|(weasel)|(weed)|(wod))',
-    'dumb': 'dum(b)*($|(ass)|(fuck)|(shit))',
+    'dumb': 'dum(b)*($|(ass)|(shit))',
 
     'fag': 'fag($|(bag)|(g[io]t)|(tard)|(ass))',
-    'fuck': 'fuck|(^fuk$)',
 
     'gay': 'gay((ass)|(bob)|(do)|(lord)|(tard)|(wad))',
 

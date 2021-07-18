@@ -22,7 +22,7 @@ config = Config()
 def check_config_file(filename: str) -> bool:
     required_structure = {
         "bot": ["owner", "token", "language"],
-        "groups": ["main", "reports", "new_users_nomedia"]
+        "groups": ["main", "reports", "logs", "new_users_nomedia"]
     }
 
     global config

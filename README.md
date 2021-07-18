@@ -8,9 +8,6 @@ More of that, the bot code & functions can be easily extended and/or limited as 
 
 *The code has NOT been polished and is provided "as is". There are a lot of code that are redundant and there are tons of improvements that can be made.*
 
-# Screenshot
-![Samurai Telegram Bot](https://i.imgur.com/cmaElpP.png)
-
 # ToDo
 https://trello.com/b/MbwAxjd1/xobot-official
 
