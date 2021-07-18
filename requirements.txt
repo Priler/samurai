@@ -2,3 +2,4 @@ aiogram
 asyncio
 aioschedule
 psutil
+easydict
