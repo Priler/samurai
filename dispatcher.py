@@ -2,19 +2,21 @@ import logging
 
 from aiogram import Bot, Dispatcher
 
-from configurator import config, check_config_file
+from configurator import config, make_config
 from filters import IsAdminFilter, MemberCanRestrictFilter
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
-if not check_config_file("config.ini"):
-    exit("Errors while parsing config file. Exiting.")
+if not make_config("config.ini"):
+    logging.error("Errors while parsing config file. Exiting.")
+    exit(1)
 
 import heroku_config
 
 if not config.bot.token:
-    exit("No token provided")
+    logging.error("No token provided")
+    exit(1)
 
 # Initialize bot and dispatcher
 bot = Bot(token=config.bot.token, parse_mode="HTML")

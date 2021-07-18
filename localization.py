@@ -33,7 +33,7 @@ strings = {
         "need_admins_attention": 'Dear admins, your presence in chat is needed!\n\n'
                                  '<a href="https://t.me/c/{chat_id}/{msg_id}">Go to message</a>',
 
-        "greetings_words": ["hi", "q", "hello", "hey"]  # Bot will react to short messages with these words
+        "greetings_words": ("hi", "q", "hello", "hey")  # Bot will react to short messages with these words
     },
     "ru": {
         "error_no_reply": "Эта команда должна быть ответом на какое-либо сообщение!",
@@ -106,9 +106,9 @@ strings = {
 
         "voice_message_reaction": "фу! ФУ Я СКАЗАЛ, НЕЛЬЗЯ. БРОСЬ КАКУ. ПИШИ ТЕКСТОМ.",
 
-        "greetings_words": ["привет", "хай", "ку", "здарова"],  # Бот среагирует на короткие сообщения с этими словами
+        "greetings_words": ("привет", "хай", "ку", "здарова"),  # Бот среагирует на короткие сообщения с этими словами
 
-        "announcements" : [
+        "announcements" : (
             {
                 "message" : "🌀 Участники чата, не забывайте про команду <b>!report</b> благодаря которой Вы можете обратить внимание администрации на нарушителя в чате.\n<i>Спам данной командой карается вечным баном.</i>",
                 "every" : 18000
@@ -121,7 +121,7 @@ strings = {
                 "message" : "<b>#оставайтесьдома 👾 играйте в игры, 👽 смотрите фильмы, 😴 больше отдыхайте.</b>\n\n✌️ Будьте здоровы",
                 "every" : 7200
             }
-        ]
+        )
     },
 }
 
@@ -133,16 +133,12 @@ def get_string(key):
     :param key: string name
     :return: localized string
     """
-    lang = strings.get(config.bot.language)
-    if not lang:
-        if not strings.get("en"):
-            raise KeyError(f'Neither "{config.bot.language}" nor "en" locales found')
-        else:
-            lang = strings.get("en")
+    localization_strings = strings.get(config.bot.language, strings.get('en'))
+
+    if localization_strings is None:
+        raise KeyError(f'Neither "{config.bot.language}" nor "en" locales found')
+
     try:
-        return lang[key]
+        return localization_strings[key]
     except KeyError:
-        try:
-            return strings.get("en")[key]
-        except Exception:
-            raise
+        raise
