@@ -14,6 +14,11 @@ async def cmd_report(message: types.Message):
         await message.reply(localization.get_string("error_no_reply"))
         return
 
+    # Check if command is sent to own message
+    if message.reply_to_message.from_user.id == message.from_user.id:
+        await message.reply(localization.get_string("error_report_self"))
+        return
+
     # Check if command is sent as reply to admin
     user = await message.bot.get_chat_member(config.groups.main, message.reply_to_message.from_user.id)
     if user.is_chat_admin():
@@ -62,6 +67,24 @@ async def cmd_report(message: types.Message):
     action_keyboard.add(types.InlineKeyboardButton(
         text=localization.get_string("action_false_alarm"),
         callback_data=f"dismiss_{message.reply_to_message.message_id}_{message.reply_to_message.from_user.id}"
+    ))
+
+    # Do nothing, false alarm + mute reporter for one day
+    action_keyboard.add(types.InlineKeyboardButton(
+        text=localization.get_string("action_false_alarm_2"),
+        callback_data=f"dismiss2_{message.message_id}_{message.from_user.id}"
+    ))
+
+    # Do nothing, false alarm + mute reporter for one week
+    action_keyboard.add(types.InlineKeyboardButton(
+        text=localization.get_string("action_false_alarm_3"),
+        callback_data=f"dismiss3_{message.message_id}_{message.from_user.id}"
+    ))
+
+    # Do nothing, false alarm + ban reporter
+    action_keyboard.add(types.InlineKeyboardButton(
+        text=localization.get_string("action_false_alarm_4"),
+        callback_data=f"dismiss4_{message.message_id}_{message.from_user.id}"
     ))
 
     await message.reply_to_message.forward(config.groups.reports)

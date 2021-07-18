@@ -16,39 +16,17 @@ async def on_user_join(message: types.Message):
 
     :param message: Service message "User joined group
     """
-    _del = False
-    _word = None
 
     # remove invite message
     await message.delete()
 
-    # Check for profanity
-    _del, _word = utils.check_for_profanity_all(message.from_user.full_name)
+    # restrict media for new users
+    '''await message.bot.restrict_chat_member(chat_id=config.groups.main,
+                                          user_id=message.from_user.id,
+                                          permissions=types.ChatPermissions(True),
+                                          until_date=int(time()) + int(config.groups.new_users_nomedia))'''
 
-    if _del:
-      # user full name contains profanity
-      await message.bot.kick_chat_member(chat_id=config.groups.main,
-                                      user_id=message.from_user.id,
-                                      until_date=int(time()) + 60); # for a minute
-
-      # await message.bot.send_message(chat_id=message.from_user.id,
-      #                               text=localization.get_string("profanity_user_kicked").format(word=_word))
-
-      log_msg = message.from_user.full_name
-      if _word:
-        log_msg = log_msg.replace(_word, '<u><b>'+_word+'</b></u>')
-      log_msg += "\n\n<i>Юзер:</i> "+utils.user_mention(message.from_user)
-
-      await utils.write_log(message.bot, log_msg, "КИК Антимат")
-
-    if not _del:
-      # restrict media for new users
-      await message.bot.restrict_chat_member(chat_id=config.groups.main,
-                                            user_id=message.from_user.id,
-                                            permissions=types.ChatPermissions(True),
-                                            until_date=int(time()) + int(config.groups.new_users_nomedia))
-
-      await utils.write_log(message.bot, "Присоединился пользователь "+utils.user_mention(message.from_user), "Новый участник")
+    await utils.write_log(message.bot, "Присоединился пользователь "+utils.user_mention(message.from_user), "Новый участник")
 
 @dp.message_handler(chat_id=config.groups.main)
 @dp.edited_message_handler(chat_id=config.groups.main)
@@ -73,6 +51,10 @@ async def on_user_message_censor_filter(message: types.Message):
     log_msg += "\n\n<i>Автор:</i> "+utils.user_mention(message.from_user)
 
     await utils.write_log(message.bot, log_msg, "Антимат")
+
+@dp.message_handler(chat_id=config.groups.main, content_types=["voice"])
+async def on_user_voice(message: types.Message):
+  await message.reply(localization.get_string("voice_message_reaction"))
 
 '''async def on_user_message(message: types.Message):
   """

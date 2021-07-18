@@ -11,6 +11,8 @@ logging.basicConfig(level=logging.INFO)
 if not check_config_file("config.ini"):
     exit("Errors while parsing config file. Exiting.")
 
+import heroku_config
+
 if not config.bot.token:
     exit("No token provided")
 

@@ -45,6 +45,7 @@ async def cmd_profanity_check(message: types.Message):
 	if user.is_chat_admin():
 		_del = False
 		_word = None
+		_pat = None
 
 		line_info_ru = censor_ru.clean_line(utils.remove_prefix(message.text, "!prof "))
 		line_info_en = censor_en.clean_line(utils.remove_prefix(message.text, "!prof "))
@@ -58,6 +59,7 @@ async def cmd_profanity_check(message: types.Message):
 			else:
 				_word = line_info_ru[4][0]
 
+			_pat = line_info_ru[5][0]
 			_del = True
 
 		# check ENG
@@ -67,8 +69,8 @@ async def cmd_profanity_check(message: types.Message):
 			else:
 				_word = line_info_en[4][0]
 
+			_pat = line_info_en[5][0]
 			_del = True
-
 
 		# process
 		if _del:
@@ -76,6 +78,7 @@ async def cmd_profanity_check(message: types.Message):
 			if _word:
 				log_msg = "❌ Profanity detected.\n\n"
 				log_msg += utils.remove_prefix(message.text, "!prof ").replace(_word, '<u><b>'+_word+'</b></u>')
+				log_msg += "\nПаттерн: " + _pat
 
 			await message.reply(log_msg)
 		else:
