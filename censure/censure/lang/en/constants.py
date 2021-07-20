@@ -164,7 +164,6 @@ FOUL_CORE = {
     'slut': '^slut($|bag)',
     'shiz': '^shiz(nit)*$',
     'twat': '^twat(lips|s|waffle|$)',
-    'vag': '^va((j)*$|g$|gina|(jay)*)',
     'vjay': '^vjayjay',
     'wank': '^wank(job|$)',
     'whore': '^whore(bag|face|$)',

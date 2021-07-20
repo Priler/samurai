@@ -21,7 +21,7 @@ async def cmd_report(message: types.Message):
 
     # Check if command is sent as reply to admin
     user = await message.bot.get_chat_member(config.groups.main, message.reply_to_message.from_user.id)
-    if user.is_chat_admin():
+    if user.is_chat_admin() and user.can_restrict_members:
         await message.reply(localization.get_string("error_report_admin"))
         return
 
