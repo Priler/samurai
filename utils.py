@@ -12,6 +12,7 @@ from censure import Censor
 censor_ru = Censor.get(lang='ru')
 censor_en = Censor.get(lang='en')
 
+print("TEST + " + str(config.groups.main))
 
 def check_for_profanity(text, lang="ru"):
     _profanity_detected = False
