@@ -28,8 +28,8 @@ async def on_user_join(message: types.Message):
 
     await utils.write_log(message.bot, "Присоединился пользователь "+utils.user_mention(message.from_user), "Новый участник")
 
-@dp.message_handler(chat_id=config.groups.main)
-@dp.edited_message_handler(chat_id=config.groups.main)
+@dp.message_handler(is_admin=False, chat_id=config.groups.main)
+@dp.edited_message_handler(is_admin=False, chat_id=config.groups.main)
 async def on_user_message_censor_filter(message: types.Message):
   """
   Removes messages, if they contain censored words.
