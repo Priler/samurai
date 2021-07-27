@@ -1,5 +1,5 @@
 from time import time
-from aiogram import types
+from aiogram import types, exceptions
 from configurator import config
 from dispatcher import dp
 import localization
@@ -7,20 +7,90 @@ import utils
 import psutil
 
 import sys
-sys.path.append("./censure") # allow module import from git submodule
+sys.path.append("./censure")  # allow module import from git submodule
 
 from censure import Censor
 
+
 censor_ru = Censor.get(lang='ru')
 censor_en = Censor.get(lang='en')
+
+
+@dp.message_handler(commands='start')
+async def on_start(message: types.Message):
+	user = await message.bot.get_chat_member(
+		config.groups.main, message.from_user.id
+	)
+
+	if user.is_chat_admin():
+		return await message.reply(
+			f'Привет, {message.from_user.first_name}!\n'
+			'Я S么MUR么I создан для ХО чата.\n'
+			'Вижу ты админ✅, в чате когото нужно забанить?\n!ban @somebody'
+		)
+	elif user.is_chat_creator():
+		return await message.reply(
+			'Здраствуйте, мой Господин...\n Вам что-то нужно?'
+		)
+
+	
+@dp.message_handler(commands='ban', commands_prefix='!/')
+async def ban_current_user(message: types.Message):
+	user = await message.bot.get_chat_member(
+		config.groups.main, 
+		message.from_user.id
+	)
+	
+	if user.is_chat_admin() or user.is_chat_creator():
+		split_message = message.text.split()
+		user_id = split_message[-1]
+
+		if len(split_message) == 2 and user_id.isdigit():
+			try:
+				await message.bot.kick_chat_member(config.groups.main, int(user_id))
+
+				return await message.reply(
+					f'Пользователь с ID:{user_id} забанен!👊'
+				)
+			except exceptions.InvalidUserId:
+				return await message.reply('User id не корректен!❌')
+			except exceptions.ChatAdminRequired:
+				return await message.reply('Жалко конечно, но нельзя забанить админа...❌')
+		return await message.reply('Комманда не корректна.❌')
+
+	
+@dp.message_handler(commands='unban', commands_prefix='!/')
+async def ban_current_user(message: types.Message):
+	user = await message.bot.get_chat_member(
+		config.groups.main, 
+		message.from_user.id
+	)
+	
+	if user.is_chat_admin() or user.is_chat_creator():
+		split_message = message.text.split()
+		user_id = split_message[-1]
+
+		if len(split_message) == 2 and user_id.isdigit():
+			try:
+				await message.bot.unban_chat_member(config.groups.main, int(user_id))
+
+				return await message.reply(
+					f'Пользователь с ID:{user_id} разбанен!✅'
+				)
+			except exceptions.InvalidUserId:
+				return await message.reply(f'User id не корректен!❌')
+		return await message.reply('Комманда не корректна.❌')
+
 
 @dp.message_handler(user_id = int(config.bot.owner), commands="msg", commands_prefix="!/")
 async def cmd_message_from_bot(message: types.Message):
 	await message.bot.send_message(config.groups.main, utils.remove_prefix(message.text, "!msg "))
 
+
 @dp.message_handler(user_id = int(config.bot.owner), commands="log", commands_prefix="!/")
 async def cmd_write_log_bot(message: types.Message):
 	await utils.write_log(message.bot, utils.remove_prefix(message.text, "!log "), "test")
+
 
 @dp.message_handler(commands="ping", commands_prefix="!")
 async def cmd_ping_bot(message: types.Message):
@@ -37,6 +107,7 @@ async def cmd_ping_bot(message: types.Message):
 		reply += "\n<b>Bot version:</b> <i>" + str(config.bot.version) + " codename «<b>" + config.bot.version_codename + "</b>»</i> 🌚"
 
 		await message.reply(reply)
+
 
 @dp.message_handler(commands="prof", commands_prefix="!")
 async def cmd_profanity_check(message: types.Message):

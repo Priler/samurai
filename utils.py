@@ -126,7 +126,7 @@ def get_url_chat_id(chat_id: int) -> int:
     :param chat_id: chat_id to apply magic number to
     :return: chat_id for t.me links
     """
-    return abs(chat_id + 1_000_000_000_000)
+    return abs(int(chat_id) + 1_000_000_000_000)
 
 
 def remove_prefix(text, prefix):
