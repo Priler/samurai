@@ -8,6 +8,12 @@ More of that, the bot code & functions can be easily extended and/or limited as 
 
 *The code has NOT been polished and is provided "as is". There are a lot of code that are redundant and there are tons of improvements that can be made.*
 
+# For Development
+1. git clone
+2. pip3 install -r requirements.txt
+3. Change config.ini
+4. python3 bot.py
+
 # ToDo
 https://trello.com/b/MbwAxjd1/xobot-official
 
