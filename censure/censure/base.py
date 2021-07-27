@@ -58,18 +58,21 @@ def _get_remained_tokens(tags_list):
             continue
         elif tag.token_type == 'tc':
             # can find in pre or in body
-            open_tags = [x for x in pre if x.tag == tag.tag and x.token_type == 'to']
+            open_tags = [x for x in pre if x.tag ==
+                         tag.tag and x.token_type == 'to']
             if len(open_tags):
                 pre.remove(open_tags[0])
                 continue
         else:
             # can be in body
-            close_tags = [x for x in body_tags if x.tag == tag.tag and x.token_type == 'tc']
+            close_tags = [x for x in body_tags if x.tag ==
+                          tag.tag and x.token_type == 'tc']
             if len(close_tags):
                 body_tags.remove(close_tags[0])
                 continue
             # can find in post
-            close_tags = [x for x in post if x.tag == tag.tag and x.token_type == 'tc']
+            close_tags = [x for x in post if x.tag ==
+                          tag.tag and x.token_type == 'tc']
             if len(close_tags):
                 post.remove(close_tags[0])
                 continue
@@ -100,13 +103,15 @@ class Token(object):
             token_type = 'sp'  # this is SPACER!!!
 
         self.value = value
-        self.token_type = token_type  # w - word(part of), t - tag, s - spacer, o - o
+        # w - word(part of), t - tag, s - spacer, o - o
+        self.token_type = token_type
 
         self.tag = head
         self.token_type = token_type
 
     def __repr__(self):
-        return 'Token({}) {} {}'.format(self.value, self.tag, self.token_type)  # .encode('utf-8')
+        # .encode('utf-8')
+        return 'Token({}) {} {}'.format(self.value, self.tag, self.token_type)
 
 
 class CensorException(Exception):
@@ -129,7 +134,8 @@ class CensorBase:
 
         # language-related constants data loading and preparations
         self.bad_phrases = prep_var(self.lang_lib.constants.BAD_PHRASES)
-        self.bad_semi_phrases = prep_var(self.lang_lib.constants.BAD_SEMI_PHRASES)
+        self.bad_semi_phrases = prep_var(
+            self.lang_lib.constants.BAD_SEMI_PHRASES)
         self.excludes_data = prep_var(self.lang_lib.constants.EXCLUDES_DATA)
         self.excludes_core = prep_var(self.lang_lib.constants.EXCLUDES_CORE)
         self.foul_data = prep_var(self.lang_lib.constants.FOUL_DATA)
@@ -154,7 +160,8 @@ class CensorBase:
                     if isinstance(v, "".__class__):
                         obj[k] = re.compile(v)
                     else:
-                        obj[k] = tuple((re.compile(v[i]) for i in range(0, len(v))))
+                        obj[k] = tuple((re.compile(v[i])
+                                       for i in range(0, len(v))))
                 setattr(self, attr, obj)
             else:
                 new_obj = []
@@ -224,9 +231,11 @@ class CensorBase:
 
         # Excusing word
         if not word_info['is_good']:
-            self._check_regexps(self.excludes_core, word_info, accuse=False)  # excusing
+            self._check_regexps(self.excludes_core,
+                                word_info, accuse=False)  # excusing
         if not word_info['is_good'] and fl in self.excludes_data:
-            self._check_regexps(self.excludes_data[fl], word_info, accuse=False)  # excusing
+            self._check_regexps(
+                self.excludes_data[fl], word_info, accuse=False)  # excusing
         return word_info
 
     @staticmethod
@@ -387,7 +396,8 @@ class CensorRu(CensorBase):
 
     def _split_line(self, line):
         buf, result = '', []
-        line = re.sub(patterns.PAT_PUNCT2, ' ', re.sub(patterns.PAT_PUNCT1, '', line))
+        line = re.sub(patterns.PAT_PUNCT2, ' ', re.sub(
+            patterns.PAT_PUNCT1, '', line))
         for word in re.split(patterns.PAT_SPACE, line):
             if len(word) < 3 and not re.match(self.lang_lib.patterns.PAT_PREP, word):
                 buf += word
@@ -407,7 +417,8 @@ class CensorEn(CensorBase):
     def _split_line(self, line):
         # have some differences from russian split_line
         buf, result = '', []
-        line = re.sub(patterns.PAT_PUNCT2, ' ', re.sub(patterns.PAT_PUNCT1, '', line))
+        line = re.sub(patterns.PAT_PUNCT2, ' ', re.sub(
+            patterns.PAT_PUNCT1, '', line))
         for word in re.split(patterns.PAT_SPACE, line):
             if len(word) < 3:
                 buf += word

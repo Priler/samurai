@@ -212,7 +212,8 @@ async def cmd_ban(message: types.Message):
         await message.reply(localization.get_string("error_ban_admin"))
         return
 
-    await message.bot.delete_message(config.groups.main, message.message_id)  # remove admin message
+    # remove admin message
+    await message.bot.delete_message(config.groups.main, message.message_id)
     await message.bot.kick_chat_member(chat_id=config.groups.main, user_id=message.reply_to_message.from_user.id)
 
     await message.reply_to_message.reply(localization.get_string("resolved_ban"))
@@ -231,7 +232,8 @@ async def cmd_unban(message: types.Message):
         await message.reply(localization.get_string("error_ban_admin"))
         return
 
-    await message.bot.delete_message(config.groups.main, message.message_id)  # remove admin message
+    # remove admin message
+    await message.bot.delete_message(config.groups.main, message.message_id)
     await message.bot.unban_chat_member(chat_id=config.groups.main, user_id=message.reply_to_message.from_user.id)
 
     await message.reply_to_message.reply(localization.get_string("resolved_unban"))

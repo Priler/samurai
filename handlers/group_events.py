@@ -9,6 +9,7 @@ import utils
 # blacklist = open("blacklist.txt", mode="r").read().split(',')
 # blacklist_regexp = re.compile(r'(?iu)\b((у|[нз]а|(хитро|не)?вз?[ыьъ]|с[ьъ]|(и|ра)[зс]ъ?|(о[тб]|под)[ьъ]?|(.\B)+?[оаеи])?-?([её]б(?!о[рй])|и[пб][ае][тц]).*?|(н[иеа]|[дп]о|ра[зс]|з?а|с(ме)?|о(т|дно)?|апч)?-?ху([яйиеёю]|ли(?!ган)).*?|(в[зы]|(три|два|четыре)жды|(н|сук)а)?-?бл(я(?!(х|ш[кн]|мб)[ауеыио]).*?|[еэ][дт]ь?)|(ра[сз]|[зн]а|[со]|вы?|п(р[ои]|од)|и[зс]ъ?|[ао]т)?п[иеё]зд.*?|(за)?п[ие]д[аое]?р((ас)?(и(ли)?[нщктл]ь?)?|(о(ч[еи])?)?к|юг)[ауеы]?|манд([ауеы]|ой|[ао]вошь?(е?к[ауе])?|юк(ов|[ауи])?)|муд([аио].*?|е?н([ьюия]|ей))|мля([тд]ь)?|лять|([нз]а|по)х|м[ао]л[ао]фь[яию])\b')
 
+
 @dp.message_handler(chat_id=config.groups.main, content_types=["new_chat_members"])
 async def on_user_join(message: types.Message):
     """
@@ -28,33 +29,35 @@ async def on_user_join(message: types.Message):
 
     await utils.write_log(message.bot, "Присоединился пользователь "+utils.user_mention(message.from_user), "Новый участник")
 
+
 @dp.message_handler(is_admin=False, chat_id=config.groups.main)
 @dp.edited_message_handler(is_admin=False, chat_id=config.groups.main)
 async def on_user_message_censor_filter(message: types.Message):
-  """
-  Removes messages, if they contain censored words.
+    """
+    Removes messages, if they contain censored words.
 
-  :param message: Message in group
-  """
-  _del = False
-  _word = None
+    :param message: Message in group
+    """
+    _del = False
+    _word = None
 
-  _del, _word = utils.check_for_profanity_all(message.text)
+    _del, _word = utils.check_for_profanity_all(message.text)
 
-  # process
-  if _del:
-    await message.delete()
+    # process
+    if _del:
+        await message.delete()
 
-    log_msg = message.text
-    if _word:
-      log_msg = log_msg.replace(_word, '<u><b>'+_word+'</b></u>')
-    log_msg += "\n\n<i>Автор:</i> "+utils.user_mention(message.from_user)
+        log_msg = message.text
+        if _word:
+            log_msg = log_msg.replace(_word, '<u><b>'+_word+'</b></u>')
+        log_msg += "\n\n<i>Автор:</i> "+utils.user_mention(message.from_user)
 
-    await utils.write_log(message.bot, log_msg, "Антимат")
+        await utils.write_log(message.bot, log_msg, "Антимат")
+
 
 @dp.message_handler(chat_id=config.groups.main, content_types=["voice"])
 async def on_user_voice(message: types.Message):
-  await message.reply(localization.get_string("voice_message_reaction"))
+    await message.reply(localization.get_string("voice_message_reaction"))
 
 '''async def on_user_message(message: types.Message):
   """

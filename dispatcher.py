@@ -1,3 +1,4 @@
+import heroku_config
 import logging
 
 from aiogram import Bot, Dispatcher
@@ -12,7 +13,6 @@ if not make_config("config.ini"):
     logging.error("Errors while parsing config file. Exiting.")
     exit(1)
 
-import heroku_config
 
 if not config.bot.token:
     logging.error("No token provided")

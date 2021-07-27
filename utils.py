@@ -1,3 +1,4 @@
+from censure import Censor
 import datetime
 import sys
 import typing
@@ -7,10 +8,10 @@ from configurator import config
 
 sys.path.append("./censure")  # allow module import from git submodule
 
-from censure import Censor
 
 censor_ru = Censor.get(lang='ru')
 censor_en = Censor.get(lang='en')
+
 
 def check_for_profanity(text, lang="ru"):
     _profanity_detected = False
@@ -56,7 +57,8 @@ def user_mention(from_user):
     if from_user.full_name != from_user.mention:
         _s += " (" + from_user.mention + ")"
     else:
-        _s += " (<a href=\"" + from_user.url + "\">id" + str(from_user.id) + "</a>)"
+        _s += " (<a href=\"" + from_user.url + \
+            "\">id" + str(from_user.id) + "</a>)"
 
     return _s
 
@@ -65,7 +67,8 @@ async def write_log(bot, message, log_type="default"):
     now = datetime.datetime.now()
     current_time = now.strftime("%H:%M:%S")
 
-    log_message = "🕥 <i>" + current_time + "</i> <b>[" + log_type.upper() + "]</b> "
+    log_message = "🕥 <i>" + current_time + \
+        "</i> <b>[" + log_type.upper() + "]</b> "
     log_message += message
 
     return await bot.send_message(config.groups.logs, log_message)
@@ -107,12 +110,14 @@ def get_report_comment(message_date: datetime.datetime, message_id: int, report_
     :return: A report message for admins in report chat
     """
     msg = localization.get_string("report_message").format(
-        date=message_date.strftime(localization.get_string("report_date_format")),
+        date=message_date.strftime(
+            localization.get_string("report_date_format")),
         chat_id=get_url_chat_id(config.groups.main),
         msg_id=message_id)
 
     if report_message:
-        msg += localization.get_string("report_note").format(note=report_message)
+        msg += localization.get_string(
+            "report_note").format(note=report_message)
     return msg
 
 
