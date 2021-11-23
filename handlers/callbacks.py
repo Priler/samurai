@@ -8,6 +8,7 @@ from contextlib import suppress
 from aiogram.utils.exceptions import (MessageToEditNotFound, MessageCantBeEdited, MessageCantBeDeleted,
                                       MessageToDeleteNotFound)
 
+
 @dp.callback_query_handler()
 async def callback_handler(call: types.CallbackQuery):
     """
@@ -52,7 +53,7 @@ async def callback_handler(call: types.CallbackQuery):
     elif call.data.startswith("mute2_"):
         with suppress(MessageCantBeDeleted, MessageToDeleteNotFound):
             await call.message.bot.delete_message(config.groups.main, int(call.data.split("_")[1]))
-            
+
         await call.message.bot.restrict_chat_member(chat_id=config.groups.main, user_id=call.data.split("_")[2],
                                                     permissions=types.ChatPermissions(),
                                                     until_date=int(time()) + ((3600 * 24) * 7))  # 7 days from now

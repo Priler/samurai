@@ -87,7 +87,7 @@ class Token(object):
             head = head[0].lower()[1:]
 
         if not token_type:
-            token_type = 'to'   # open type ie <a...>
+            token_type = 'to'  # open type ie <a...>
             # should derive from value
             if head[0] == '/':
                 head = head[1:]
