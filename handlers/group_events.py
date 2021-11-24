@@ -29,7 +29,7 @@ async def on_user_join(message: types.Message):
                                           permissions=types.ChatPermissions(True),
                                           until_date=int(time()) + int(config.groups.new_users_nomedia))'''
 
-    await database.add_user(str(message.from_user.id))
+    await database.add_user(message.from_user.id)
     await utils.write_log(message.bot, "Присоединился пользователь " + utils.user_mention(message.from_user),
                           "Новый участник")
 
