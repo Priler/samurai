@@ -69,7 +69,7 @@ async def callback_handler(call: types.CallbackQuery):
                                                      "action_dismissed"))
         await call.answer(text="Done")
 
-    elif call.data.startswith("dismiss_2"):
+    elif call.data.startswith("dismiss2_"):
         with suppress(MessageCantBeDeleted, MessageToDeleteNotFound):
             await call.message.bot.delete_message(config.groups.main, int(call.data.split("_")[1]))
 
@@ -81,7 +81,7 @@ async def callback_handler(call: types.CallbackQuery):
                                                  text=call.message.text + localization.get_string(
                                                      "action_deleted_dismissed2"))
         await call.answer(text="Done")
-    elif call.data.startswith("dismiss_3"):
+    elif call.data.startswith("dismiss3_"):
         with suppress(MessageCantBeDeleted, MessageToDeleteNotFound):
             await call.message.bot.delete_message(config.groups.main, int(call.data.split("_")[1]))
 
@@ -93,7 +93,7 @@ async def callback_handler(call: types.CallbackQuery):
                                                  text=call.message.text + localization.get_string(
                                                      "action_deleted_dismissed3"))
         await call.answer(text="Done")
-    elif call.data.startswith("dismiss_4"):
+    elif call.data.startswith("dismiss4_"):
         with suppress(MessageCantBeDeleted, MessageToDeleteNotFound):
             await call.message.bot.delete_message(config.groups.main, int(call.data.split("_")[1]))
 
