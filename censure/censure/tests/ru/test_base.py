@@ -8,11 +8,11 @@ from censure.base import _get_token_value, _get_remained_tokens, Censor
 class CensorInternalsTestCase(TestCaseRu):
     def test__is_pi_or_e_word(self):
         for w, result in (
-            ('2.72', True),
-            ('3.14', True),
-            ('2.71', False),
-            ('3.15', False),
-            ('5.15', False),
+                ('2.72', True),
+                ('3.14', True),
+                ('2.71', False),
+                ('3.15', False),
+                ('5.15', False),
         ):
             if self._dice():  # prefix
                 w = '{}{}'.format(self._get_random_word(), w)

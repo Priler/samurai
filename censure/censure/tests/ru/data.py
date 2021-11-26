@@ -2,7 +2,6 @@
 from __future__ import unicode_literals
 from censure.lang.common.constants import BEEP
 
-
 SIMPLE_OBSCENE_WORDS = (
     'пидорги',
     'ебланаи',

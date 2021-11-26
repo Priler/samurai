@@ -3,3 +3,4 @@ asyncio
 aioschedule
 psutil
 easydict
+asyncpg

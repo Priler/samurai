@@ -7,6 +7,7 @@ import localization
 import utils
 import random
 
+
 @dp.message_handler(chat_id=config.groups.main, commands="report", commands_prefix="/!")
 async def cmd_report(message: types.Message):
     # Check if command is sent as reply to some message
@@ -97,6 +98,7 @@ async def cmd_report(message: types.Message):
         ),
         reply_markup=action_keyboard)
     await message.reply(localization.get_string("report_delivered"))
+
 
 @dp.message_handler(Text(startswith="@admin", ignore_case=True), chat_id=config.groups.main)
 async def calling_all_units(message: types.Message):

@@ -3,11 +3,9 @@
 
 from __future__ import unicode_literals
 
-
 EXCLUDES_DATA = {
 
 }
-
 
 EXCLUDES_CORE = {
 
@@ -127,7 +125,6 @@ FOUL_CORE = {
     'bullshit': '^bullshit$',
     'butt': '^butt((plug)|(pirate)|($))',
 
-
     'clit': '^clit(($)|(or)|(face))',
     'cum': '^cum(($)|(bubble)|(dumpster)|(guzzler)|(jockey)|(slut)|(tart))',
     'cunni': '^cunni(($)|(e)|(lingus))',
@@ -168,7 +165,6 @@ FOUL_CORE = {
     'wank': '^wank(job|$)',
     'whore': '^whore(bag|face|$)',
 }
-
 
 BAD_SEMI_PHRASES = (
     'suckmydick',

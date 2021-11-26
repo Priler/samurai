@@ -9,6 +9,7 @@ from importlib import import_module
 
 from censure.base import Censor, CensorException
 from censure.lang.common import constants, patterns
+
 # from censure.tests.data import (
 #     SIMPLE_OBSCENE_WORDS, E_OBSCENE_WORDS, PI_OBSCENE_WORDS,
 #     OBSCENE_HTML_LINES,
