@@ -24,10 +24,12 @@ class TestCase(CoreTestCase):
     def _get_random_word_base(
             cls, letters=None, min_chars=3, max_chars=10, assert_good=True, russian_only=False):
         letters = letters or ENGLISH_LOWERCASE
-        word = ''.join((random.choice(letters) for _ in range(min_chars, max_chars)))
+        word = ''.join((random.choice(letters)
+                       for _ in range(min_chars, max_chars)))
         if assert_good:
             if not cls.censor.check_word(word)['is_good']:
-                word = cls._get_random_word(min_chars=min_chars, max_chars=max_chars)
+                word = cls._get_random_word(
+                    min_chars=min_chars, max_chars=max_chars)
         return word
 
     @classmethod

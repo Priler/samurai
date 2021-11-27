@@ -4,6 +4,7 @@ import logging
 
 config = edict()
 
+
 def make_config(filename):
     parser = ConfigParser()
     parser.read(filename)

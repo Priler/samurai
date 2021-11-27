@@ -19,7 +19,8 @@ class CensorHelper:
         count = 0
         result = []
         for line in text.splitlines():
-            new_line, bad_words_count, bad_phrases_count = self.c.clean_line(line)
+            new_line, bad_words_count, bad_phrases_count = self.c.clean_line(
+                line)
             count += bad_words_count + bad_phrases_count
             result.append(new_line)
         return '\n'.join(result), count
@@ -57,12 +58,14 @@ def show_examples():
     line = 'ебанамат бляд'
     print('Checking line: "{}"'.format(line))
     line_info = censor_ru.check_line(line)
-    print('Does the line contain obscene words? - {}'.format(not line_info['is_good']))
+    print(
+        'Does the line contain obscene words? - {}'.format(not line_info['is_good']))
     print('First bad word: {}, bad word pattern: {}'.format(
         line_info['bad_word_info']['word'], line_info['bad_word_info']['accuse'][0]))
 
     print('Cleaning line with beep word={}'.format(line, beep))
-    cleaned_line, bad_words_count, bad_phrases_count = censor_ru.clean_line(line, beep=beep)
+    cleaned_line, bad_words_count, bad_phrases_count = censor_ru.clean_line(
+        line, beep=beep)
     print('resulted cleaned line: "{}", bad words count: {}, bad phrases count: {}'.format(
         cleaned_line, bad_words_count, bad_phrases_count))
     print('\n')
@@ -73,12 +76,14 @@ def show_examples():
     censor_en = Censor.get(lang='en', do_compile=False)
     line = 'fucken shit'
     line_info = censor_en.check_line(line)
-    print('Does the line contain obscene words? - {}'.format(not line_info['is_good']))
+    print(
+        'Does the line contain obscene words? - {}'.format(not line_info['is_good']))
     print('First bad word: {}, bad word pattern: {}'.format(
         line_info['bad_word_info']['word'], line_info['bad_word_info']['accuse'][0]))
 
     print('cleaning line: {} with beep word={}'.format(line, beep))
-    cleaned_line, bad_words_count, bad_phrases_count = censor_en.clean_line(line, beep=beep)
+    cleaned_line, bad_words_count, bad_phrases_count = censor_en.clean_line(
+        line, beep=beep)
     print('Resulted cleaned line: "{}", bad words count: {}, bad phrases count: {}'.format(
         cleaned_line, bad_words_count, bad_phrases_count))
 
@@ -86,13 +91,15 @@ def show_examples():
     line = 'camel toe towel'
     print('English bad phrase line example: "{}"'.format(line))
     line_info = censor_en.check_line(line)
-    print('Does the line contain obscene words/phrases? - {}'.format(not line_info['is_good']))
+    print(
+        'Does the line contain obscene words/phrases? - {}'.format(not line_info['is_good']))
 
     print('First accuse pattern: {}'.format(
         line_info['accuse'][0]))
 
     print('Cleaning bad phrases line with beep word={}'.format(beep))
-    cleaned_line, bad_words_count, bad_phrases_count = censor_en.clean_line(line, beep=beep)
+    cleaned_line, bad_words_count, bad_phrases_count = censor_en.clean_line(
+        line, beep=beep)
     print('Resulted cleaned line: "{}", bad words count: {}, bad phrases count: {}'.format(
         cleaned_line, bad_words_count, bad_phrases_count))
 
