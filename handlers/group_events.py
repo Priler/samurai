@@ -58,12 +58,17 @@ async def on_user_message_censor_filter(message: types.Message):
 async def on_user_voice(message: types.Message):
   await message.reply(localization.get_string("voice_message_reaction"))
 
-@dp.message_handler(is_admin=False, chat_id=config.groups.main, content_types=["text"])
-async def delete_reply_comments(message: types.Message):
+@dp.message_handler(is_admin=False, chat_id=config.groups.main)
+async def on_user_message_delete_woman(message: types.Message):
+    print(f"test: {config.groups.linked_channel}")
+    print(message.reply_to_message)
+    print(message.reply_to_message.forward_from_chat)
+    print(message.reply_to_message.forward_from_chat.id)
+    print("===")
     if message.reply_to_message and message.reply_to_message.forward_from_chat and message.reply_to_message.forward_from_chat.id == config.groups.linked_channel:
         forward_time = datetime.datetime.fromtimestamp(message.reply_to_message.forward_date)
 
-        if (message.date - forward_time).seconds <= 15:
+        if (message.date - forward_time).seconds <= 60: #test
             try:
                 await message.delete()
                 await utils.write_log(message.bot, f"Удалено сообщение: {message.text}", "Антибот")
