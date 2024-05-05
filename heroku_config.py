@@ -11,3 +11,4 @@ if is_heroku:
     config.groups.main = int(os.environ.get('GROUPS_MAIN', None))
     config.groups.reports = int(os.environ.get('GROUPS_REPORTS', None))
     config.groups.logs = int(os.environ.get('GROUPS_LOGS', None))
+    config.groups.linked_channel = int(os.environ.get('LINKED_CHANNEL', None))
