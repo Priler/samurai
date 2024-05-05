@@ -60,15 +60,11 @@ async def on_user_voice(message: types.Message):
 
 @dp.message_handler(is_admin=False, chat_id=config.groups.main)
 async def on_user_message_delete_woman(message: types.Message):
-    print(f"test: {config.groups.linked_channel}")
-    print(message.reply_to_message)
-    print(message.reply_to_message.forward_from_chat)
-    print(message.reply_to_message.forward_from_chat.id)
-    print("===")
-    if message.reply_to_message and message.reply_to_message.forward_from_chat and message.reply_to_message.forward_from_chat.id == config.groups.linked_channel:
+    if message.reply_to_message and message.reply_to_message.forward_from_chat and message.reply_to_message.is_automatic_forward and message.reply_to_message.forward_from_chat.id == config.groups.linked_channel:
+        message_time = datetime.datetime.fromtimestamp(message.date)
         forward_time = datetime.datetime.fromtimestamp(message.reply_to_message.forward_date)
 
-        if (message.date - forward_time).seconds <= 60: #test
+        if (message_time - forward_time).seconds <= 60: #test
             try:
                 await message.delete()
                 await utils.write_log(message.bot, f"Удалено сообщение: {message.text}", "Антибот")
