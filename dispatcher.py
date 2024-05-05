@@ -21,6 +21,7 @@ if not config.bot.token:
 # Initialize bot and dispatcher
 bot = Bot(token=config.bot.token, parse_mode="HTML")
 dp = Dispatcher(bot)
+dp.message_handlers.once = False
 
 # Activate filters
 dp.filters_factory.bind(IsAdminFilter)
