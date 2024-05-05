@@ -5,6 +5,8 @@ import localization
 from time import time
 import re
 import utils
+import datetime
+from aiogram.utils import exceptions
 
 # blacklist = open("blacklist.txt", mode="r").read().split(',')
 # blacklist_regexp = re.compile(r'(?iu)\b((у|[нз]а|(хитро|не)?вз?[ыьъ]|с[ьъ]|(и|ра)[зс]ъ?|(о[тб]|под)[ьъ]?|(.\B)+?[оаеи])?-?([её]б(?!о[рй])|и[пб][ае][тц]).*?|(н[иеа]|[дп]о|ра[зс]|з?а|с(ме)?|о(т|дно)?|апч)?-?ху([яйиеёю]|ли(?!ган)).*?|(в[зы]|(три|два|четыре)жды|(н|сук)а)?-?бл(я(?!(х|ш[кн]|мб)[ауеыио]).*?|[еэ][дт]ь?)|(ра[сз]|[зн]а|[со]|вы?|п(р[ои]|од)|и[зс]ъ?|[ао]т)?п[иеё]зд.*?|(за)?п[ие]д[аое]?р((ас)?(и(ли)?[нщктл]ь?)?|(о(ч[еи])?)?к|юг)[ауеы]?|манд([ауеы]|ой|[ао]вошь?(е?к[ауе])?|юк(ов|[ауи])?)|муд([аио].*?|е?н([ьюия]|ей))|мля([тд]ь)?|лять|([нз]а|по)х|м[ао]л[ао]фь[яию])\b')
@@ -55,6 +57,18 @@ async def on_user_message_censor_filter(message: types.Message):
 @dp.message_handler(chat_id=config.groups.main, content_types=["voice"])
 async def on_user_voice(message: types.Message):
   await message.reply(localization.get_string("voice_message_reaction"))
+
+@dp.message_handler(is_admin=False, chat_id=config.groups.main, content_types=["text"])
+async def delete_reply_comments(message: types.Message):
+    if message.reply_to_message and message.reply_to_message.forward_from_chat and message.reply_to_message.forward_from_chat.id == config.groups.linked_channel:
+        forward_time = datetime.datetime.fromtimestamp(message.reply_to_message.forward_date)
+
+        if (message.date - forward_time).seconds <= 15:
+            try:
+                await message.delete()
+                await utils.write_log(message.bot, f"Удалено сообщение: {message.text}", "Антибот")
+            except exceptions.MessageCantBeDeleted:
+                pass
 
 '''async def on_user_message(message: types.Message):
   """
