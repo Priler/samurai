@@ -118,7 +118,7 @@ strings = {
                 "every" : 10800
             },
             {
-                "message" : "<b>👾 #RLM\n✌️ Мы поддерживаем демократию!\n👽 НЛО периодически посещает наш чат</b>\n\n⭐️ Наш Boosty: https://boosty.to/howdyho\n✨ Наш Patreon: https://www.patreon.com/user?u=22843414\nНаш Discord: https://discord.gg/6khaudi-kho-1123002520072097953",
+                "message" : "<b>👾 #RLM\n✌️ Мы поддерживаем демократию!\n👽 НЛО периодически посещает этот чат</b>\n\n<i>Наш Boosty:</i> https://boosty.to/howdyho\n<i>Наш Patreon:</i> <a href='https://www.patreon.com/user?u=22843414'>https://www.patreon.com/howdyho</a>\n<i>Наш Discord:</i> <a href='https://discord.gg/6khaudi-kho-1123002520072097953'>https://discord.gg/howdyho</a>",
                 "every" : 7200
             }
         )
