@@ -22,7 +22,7 @@ async def cmd_message_from_bot(message: types.Message):
 async def cmd_write_log_bot(message: types.Message):
 	await utils.write_log(message.bot, utils.remove_prefix(message.text, "!log "), "test")
 
-@dp.message_handler(is_admin=True, commands="ping", commands_prefix="!")
+@dp.message_handler(commands="ping", commands_prefix="!")
 async def cmd_ping_bot(message: types.Message):
 	# Check if command is sent by group admin
 	user = await message.bot.get_chat_member(config.groups.main, message.from_user.id)
@@ -38,7 +38,7 @@ async def cmd_ping_bot(message: types.Message):
 
 		await message.reply(reply)
 
-@dp.message_handler(is_admin=True, commands="prof", commands_prefix="!")
+@dp.message_handler(commands="prof", commands_prefix="!")
 async def cmd_profanity_check(message: types.Message):
 	# Check if command is sent by group admin
 	user = await message.bot.get_chat_member(config.groups.main, message.from_user.id)
