@@ -78,7 +78,7 @@ async def cmd_profanity_check(message: types.Message):
 			if _word:
 				log_msg = "❌ Profanity detected.\n\n"
 				log_msg += utils.remove_prefix(message.text, "!prof ").replace(_word, '<u><b>'+_word+'</b></u>')
-				log_msg += "\nПаттерн: " + _pat.pattern
+				log_msg += "\nПаттерн: " + _pat
 
 			await message.reply(log_msg)
 		else:
