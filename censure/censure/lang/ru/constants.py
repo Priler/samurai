@@ -1034,6 +1034,6 @@ BAD_SEMI_PHRASES = (
 BAD_PHRASES = ()
 
 TRANS_TAB = dict((ord(a), b) for a, b in zip(
-    'gcxyaeopkhbtmnu 036 ёdiz',
-    'дсхуаеоркнвтмпи озб едиз'
+    '@gcxyaeopkhbtmnu 036 ёdiz',
+    'адсхуаеоркнвтмпи озб едиз'
 ))
