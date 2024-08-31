@@ -5,7 +5,7 @@ import asyncio
 import aioschedule as schedule
 
 async def announce(message):
-	await dispatcher.dp.bot.send_message(configurator.config.groups.main, message)
+    await dispatcher.dp.bot.send_message(configurator.config.groups.main, message)
 
 async def scheduler():
     for i in localization.get_string('announcements'):

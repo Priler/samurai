@@ -1,5 +1,10 @@
-aiogram
+#aiogram=2.14.3
+aiogram==2.25.2
 asyncio
 aioschedule
 psutil
 easydict
+
+uvloop
+ujson
+aiohttp[speedups]
