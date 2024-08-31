@@ -8,6 +8,8 @@ import utils
 import datetime
 from aiogram.utils import exceptions
 
+import random
+
 # blacklist = open("blacklist.txt", mode="r").read().split(',')
 # blacklist_regexp = re.compile(r'(?iu)\b((у|[нз]а|(хитро|не)?вз?[ыьъ]|с[ьъ]|(и|ра)[зс]ъ?|(о[тб]|под)[ьъ]?|(.\B)+?[оаеи])?-?([её]б(?!о[рй])|и[пб][ае][тц]).*?|(н[иеа]|[дп]о|ра[зс]|з?а|с(ме)?|о(т|дно)?|апч)?-?ху([яйиеёю]|ли(?!ган)).*?|(в[зы]|(три|два|четыре)жды|(н|сук)а)?-?бл(я(?!(х|ш[кн]|мб)[ауеыио]).*?|[еэ][дт]ь?)|(ра[сз]|[зн]а|[со]|вы?|п(р[ои]|од)|и[зс]ъ?|[ао]т)?п[иеё]зд.*?|(за)?п[ие]д[аое]?р((ас)?(и(ли)?[нщктл]ь?)?|(о(ч[еи])?)?к|юг)[ауеы]?|манд([ауеы]|ой|[ао]вошь?(е?к[ауе])?|юк(ов|[ауи])?)|муд([аио].*?|е?н([ьюия]|ей))|мля([тд]ь)?|лять|([нз]а|по)х|м[ао]л[ао]фь[яию])\b')
 
@@ -53,6 +55,7 @@ async def on_user_message_censor_filter(message: types.Message):
     log_msg += "\n\n<i>Автор:</i> "+utils.user_mention(message.from_user)
 
     await utils.write_log(message.bot, log_msg, "Антимат")
+    await message.bot.send_message(chat_id=config.groups.main, text=f"{utils.user_mention(message.from_user)}, следи за языком!")
 
 @dp.message_handler(chat_id=config.groups.main, content_types=["voice"])
 async def on_user_voice(message: types.Message):
@@ -67,6 +70,10 @@ async def on_user_message_delete_woman(message: types.Message):
                 await utils.write_log(message.bot, f"Удалено сообщение: {message.text}", "Антибот")
             except exceptions.MessageCantBeDeleted:
                 pass
+
+@dp.message_handler(chat_id=config.groups.main, commands="бу", commands_prefix="!")
+async def on_bu(message: types.Message):
+  await message.reply(random.choice(["Не пугай так!"]))
 
 '''async def on_user_message(message: types.Message):
   """
