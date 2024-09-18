@@ -1,0 +1,29 @@
+{
+  "_name_or_path": "RUSpam/spam_deberta_v4",
+  "architectures": [
+    "DebertaForSequenceClassification"
+  ],
+  "attention_probs_dropout_prob": 0.1,
+  "hidden_act": "gelu",
+  "hidden_dropout_prob": 0.1,
+  "hidden_size": 768,
+  "initializer_range": 0.02,
+  "intermediate_size": 3072,
+  "layer_norm_eps": 1e-07,
+  "max_position_embeddings": 512,
+  "max_relative_positions": -1,
+  "model_type": "deberta",
+  "num_attention_heads": 12,
+  "num_hidden_layers": 6,
+  "pad_token_id": 0,
+  "pooler_dropout": 0,
+  "pooler_hidden_act": "gelu",
+  "pooler_hidden_size": 768,
+  "pos_att_type": null,
+  "position_biased_input": true,
+  "relative_attention": false,
+  "torch_dtype": "float32",
+  "transformers_version": "4.44.2",
+  "type_vocab_size": 0,
+  "vocab_size": 50265
+}
