@@ -1,3 +1,4 @@
+import ormar
 from aiogram import types
 from configurator import config
 from dispatcher import dp
@@ -9,6 +10,8 @@ import datetime
 from aiogram.utils import exceptions
 
 import random
+
+from models.member import Member
 
 # blacklist = open("blacklist.txt", mode="r").read().split(',')
 # blacklist_regexp = re.compile(r'(?iu)\b((у|[нз]а|(хитро|не)?вз?[ыьъ]|с[ьъ]|(и|ра)[зс]ъ?|(о[тб]|под)[ьъ]?|(.\B)+?[оаеи])?-?([её]б(?!о[рй])|и[пб][ае][тц]).*?|(н[иеа]|[дп]о|ра[зс]|з?а|с(ме)?|о(т|дно)?|апч)?-?ху([яйиеёю]|ли(?!ган)).*?|(в[зы]|(три|два|четыре)жды|(н|сук)а)?-?бл(я(?!(х|ш[кн]|мб)[ауеыио]).*?|[еэ][дт]ь?)|(ра[сз]|[зн]а|[со]|вы?|п(р[ои]|од)|и[зс]ъ?|[ао]т)?п[иеё]зд.*?|(за)?п[ие]д[аое]?р((ас)?(и(ли)?[нщктл]ь?)?|(о(ч[еи])?)?к|юг)[ауеы]?|манд([ауеы]|ой|[ао]вошь?(е?к[ауе])?|юк(ов|[ауи])?)|муд([аио].*?|е?н([ьюия]|ей))|мля([тд]ь)?|лять|([нз]а|по)х|м[ао]л[ао]фь[яию])\b')
@@ -32,14 +35,35 @@ async def on_user_join(message: types.Message):
 
     await utils.write_log(message.bot, "Присоединился пользователь "+utils.user_mention(message.from_user), "Новый участник")
 
-@dp.message_handler(is_admin=False, chat_id=config.groups.main)
-@dp.edited_message_handler(is_admin=False, chat_id=config.groups.main)
-async def on_user_message_censor_filter(message: types.Message):
+# is_admin=False,
+@dp.message_handler(chat_id=config.groups.main)
+@dp.edited_message_handler( chat_id=config.groups.main)
+async def on_user_message(message: types.Message):
   """
-  Removes messages, if they contain censored words.
+  Process every user message.
+  I.e. remove, if profanity is detected.
+  Or remove, if spam is detected.
+  Also log every user to database.
 
   :param message: Message in group
   """
+  ###
+  ###   DB stuff
+  ###
+  try:
+      # increase messages count
+      member = await Member.objects.get(user_id=message.from_user.id)
+      print("member exists")
+      member.messages_count += 1
+      await member.update()
+  except ormar.NoMatch:
+      # create new record
+      print("member created")
+      await Member.objects.create(user_id=message.from_user.id, messages_count=1)
+
+  ###
+  ###   CHECK FOR PROFANITY
+  ###
   _del = False
   _word = None
 
