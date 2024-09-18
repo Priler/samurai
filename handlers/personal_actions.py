@@ -38,7 +38,7 @@ async def cmd_ping_bot(message: types.Message):
 
 		await message.reply(reply)
 
-@dp.message_handler(is_admin=True, commands="prof", commands_prefix="!")
+@dp.message_handler(lambda message: message.chat.type == 'private', commands=["prof", "мат"], commands_prefix="!")
 async def cmd_profanity_check(message: types.Message):
 	# Check if command is sent by group admin
 	user = await message.bot.get_chat_member(config.groups.main, message.from_user.id)
@@ -52,6 +52,8 @@ async def cmd_profanity_check(message: types.Message):
 
 		# line, bad_words_count, bad_phrases_count, detected_bad_words, detected_bad_phrases
 
+		_det_lang = None
+
 		# check RU
 		if line_info_ru[1] or line_info_ru[2]:
 			if line_info_ru[1]:
@@ -61,6 +63,7 @@ async def cmd_profanity_check(message: types.Message):
 
 			_pat = line_info_ru[5][0]
 			_del = True
+			_det_lang = 'ru'
 
 		# check ENG
 		if line_info_en[1] or line_info_en[2]:
@@ -71,6 +74,7 @@ async def cmd_profanity_check(message: types.Message):
 
 			_pat = line_info_en[5][0]
 			_del = True
+			_det_lang = 'en'
 
 		# process
 		if _del:
@@ -79,6 +83,7 @@ async def cmd_profanity_check(message: types.Message):
 				log_msg = "❌ Profanity detected.\n\n"
 				log_msg += utils.remove_prefix(message.text, "!prof ").replace(_word, '<u><b>'+_word+'</b></u>')
 				log_msg += "\nПаттерн: " + _pat
+				log_msg += "\nЯзык: " + _det_lang
 
 			await message.reply(log_msg)
 		else:

@@ -7,7 +7,7 @@ import localization
 import utils
 import random
 
-@dp.message_handler(chat_id=config.groups.main, commands="report", commands_prefix="/!")
+@dp.message_handler(chat_id=config.groups.main, commands=["report", "репорт"], commands_prefix="!/")
 async def cmd_report(message: types.Message):
     # Check if command is sent as reply to some message
     if not message.reply_to_message:
