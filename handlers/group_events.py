@@ -13,6 +13,8 @@ import random
 
 from models.member import Member
 
+from ruspam import predict as ruspam_predict
+
 # blacklist = open("blacklist.txt", mode="r").read().split(',')
 # blacklist_regexp = re.compile(r'(?iu)\b((у|[нз]а|(хитро|не)?вз?[ыьъ]|с[ьъ]|(и|ра)[зс]ъ?|(о[тб]|под)[ьъ]?|(.\B)+?[оаеи])?-?([её]б(?!о[рй])|и[пб][ае][тц]).*?|(н[иеа]|[дп]о|ра[зс]|з?а|с(ме)?|о(т|дно)?|апч)?-?ху([яйиеёю]|ли(?!ган)).*?|(в[зы]|(три|два|четыре)жды|(н|сук)а)?-?бл(я(?!(х|ш[кн]|мб)[ауеыио]).*?|[еэ][дт]ь?)|(ра[сз]|[зн]а|[со]|вы?|п(р[ои]|од)|и[зс]ъ?|[ао]т)?п[иеё]зд.*?|(за)?п[ие]д[аое]?р((ас)?(и(ли)?[нщктл]ь?)?|(о(ч[еи])?)?к|юг)[ауеы]?|манд([ауеы]|ой|[ао]вошь?(е?к[ауе])?|юк(ов|[ауи])?)|муд([аио].*?|е?н([ьюия]|ей))|мля([тд]ь)?|лять|([нз]а|по)х|м[ао]л[ао]фь[яию])\b')
 
@@ -35,9 +37,9 @@ async def on_user_join(message: types.Message):
 
     await utils.write_log(message.bot, "Присоединился пользователь "+utils.user_mention(message.from_user), "Новый участник")
 
-# is_admin=False,
-@dp.message_handler(chat_id=config.groups.main)
-@dp.edited_message_handler( chat_id=config.groups.main)
+
+@dp.message_handler(is_admin=False, chat_id=config.groups.main)
+@dp.edited_message_handler(is_admin=False, chat_id=config.groups.main)
 async def on_user_message(message: types.Message):
   """
   Process every user message.
@@ -59,10 +61,10 @@ async def on_user_message(message: types.Message):
   except ormar.NoMatch:
       # create new record
       print("member created")
-      await Member.objects.create(user_id=message.from_user.id, messages_count=1)
+      member = await Member.objects.create(user_id=message.from_user.id, messages_count=1)
 
   ###
-  ###   CHECK FOR PROFANITY
+  ###   CHECK FOR PROFANITY & SPAM
   ###
   _del = False
   _word = None
@@ -71,6 +73,7 @@ async def on_user_message(message: types.Message):
 
   # process
   if _del:
+    # PROFANITY DETECTED
     await message.delete()
 
     log_msg = message.text
@@ -80,6 +83,14 @@ async def on_user_message(message: types.Message):
 
     await utils.write_log(message.bot, log_msg, "Антимат")
     await message.bot.send_message(chat_id=config.groups.main, text=f"{utils.user_mention(message.from_user)}, следи за языком!")
+  else:
+    # NO PROFANITY, GO CHECK FOR SPAM
+    if member.messages_count < int(config.spam.member_messages_threshold) and ruspam_predict(message.text):
+        log_msg = message.text
+        log_msg += "\n\n<i>Автор:</i> " + utils.user_mention(message.from_user)
+
+        await utils.write_log(message.bot, log_msg, "АнтиСПАМ")
+        await message.reply("❌ Спам обнаружен :3")
 
 @dp.message_handler(chat_id=config.groups.main, content_types=["voice"])
 async def on_user_voice(message: types.Message):
