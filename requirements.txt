@@ -4,6 +4,7 @@ asyncio==3.4.3
 aioschedule==0.5.2
 psutil==6.0.0
 easydict
+python-dotenv
 
 uvloop==0.20.0; sys_platform != 'windows'
 ujson==5.10.0
@@ -14,14 +15,5 @@ aiosqlite
 aiomysql
 pymysql
 
-datasets
-idna
-nlpaug
-nltk
-numpy
-safetensors
-scikit-learn
-scipy
-tokenizers
 torch
 transformers

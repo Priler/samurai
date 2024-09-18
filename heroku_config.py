@@ -1,10 +1,12 @@
+from dotenv import load_dotenv
 import os
-is_heroku = os.environ.get('IS_HEROKU', None)
 
-if is_heroku:
+if os.path.isfile('.env'):
+    load_dotenv('.env')
+
     from configurator import config
 
-    # override config with heroku env vars
+    # override config with dev env vars
     config.bot.owner = int(os.environ.get('BOT_OWNER', None))
     config.bot.token = os.environ.get('BOT_TOKEN', None)
 

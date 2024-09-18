@@ -4,6 +4,8 @@
 .idea/dictionaries
 .idea/vcs.xml
 .idea/jsLibraryMappings.xml
+pipsize.py
+Dockerfile
 
 # Sensitive or high-churn files:
 .idea/dataSources.ids
