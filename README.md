@@ -14,8 +14,9 @@ https://trello.com/b/MbwAxjd1/xobot-official
 ## Credits
 https://github.com/masteroncluster/py-censure - Profanity filter we used as a base  
 https://github.com/MasterGroosha/telegram-report-bot - Reports system we used as a base
+https://huggingface.co/RUSpam/spam_deberta_v4 - Anti-Spam AI model we used as a base
 
 ## Author
 
-(C) 2021 Abraham Tugalov.
+(C) 2024 Abraham Tugalov.
 http://howdyho.net
