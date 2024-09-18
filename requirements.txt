@@ -6,10 +6,13 @@ psutil
 easydict
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 uvloop
 ujson
 aiohttp[speedups]
 =======
+=======
+>>>>>>> feeae41 (WIP anti-spam AI (db support added))
 uvloop==0.20.0; sys_platform != 'windows'
 ujson==5.10.0
 aiohttp[speedups]==3.8.6
@@ -30,4 +33,12 @@ scipy
 tokenizers
 torch
 transformers
+<<<<<<< HEAD
 >>>>>>> 7b231b9 (.gitattributes added for LFS)
+=======
+=======
+uvloop
+ujson
+aiohttp[speedups]
+>>>>>>> parent of c8a1ce3 (WIP anti-spam AI (db support added))
+>>>>>>> feeae41 (WIP anti-spam AI (db support added))
