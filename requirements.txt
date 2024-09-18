@@ -5,17 +5,6 @@ aioschedule==0.5.2
 psutil==6.0.0
 easydict
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-uvloop
-ujson
-aiohttp[speedups]
-=======
-=======
->>>>>>> feeae41 (WIP anti-spam AI (db support added))
-=======
->>>>>>> d23c682 (WIP anti-spam AI (db support added))
 uvloop==0.20.0; sys_platform != 'windows'
 ujson==5.10.0
 aiohttp[speedups]==3.8.6
@@ -35,17 +24,4 @@ scikit-learn
 scipy
 tokenizers
 torch
-<<<<<<< HEAD
 transformers
-<<<<<<< HEAD
->>>>>>> 7b231b9 (.gitattributes added for LFS)
-=======
-=======
-uvloop
-ujson
-aiohttp[speedups]
->>>>>>> parent of c8a1ce3 (WIP anti-spam AI (db support added))
->>>>>>> feeae41 (WIP anti-spam AI (db support added))
-=======
-transformers
->>>>>>> d23c682 (WIP anti-spam AI (db support added))
