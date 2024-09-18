@@ -1,5 +1,8 @@
 import ormar
 from aiogram import types
+from aiogram.types import ChatMemberAdministrator, ChatMemberOwner
+from sympy.strategies.core import switch
+
 from configurator import config
 from dispatcher import dp
 import localization
@@ -35,11 +38,11 @@ async def on_user_join(message: types.Message):
                                           permissions=types.ChatPermissions(True),
                                           until_date=int(time()) + int(config.groups.new_users_nomedia))'''
 
-    await utils.write_log(message.bot, "Присоединился пользователь "+utils.user_mention(message.from_user), "Новый участник")
+    await utils.write_log(message.bot, "Присоединился пользователь "+utils.user_mention(message.from_user), "➕ Новый участник")
 
 
-@dp.message_handler(is_admin=False, chat_id=config.groups.main)
-@dp.edited_message_handler(is_admin=False, chat_id=config.groups.main)
+@dp.message_handler(chat_id=config.groups.main)
+@dp.edited_message_handler(chat_id=config.groups.main)
 async def on_user_message(message: types.Message):
   """
   Process every user message.
@@ -49,23 +52,26 @@ async def on_user_message(message: types.Message):
 
   :param message: Message in group
   """
-  ###
-  ###   DB stuff
-  ###
-  try:
-      # increase messages count
-      member = await Member.objects.get(user_id=message.from_user.id)
-      print("member exists")
-      member.messages_count += 1
-      await member.update()
-  except ormar.NoMatch:
-      # create new record
-      print("member created")
-      member = await Member.objects.create(user_id=message.from_user.id, messages_count=1)
+  if message.is_automatic_forward:
+      await message.reply(random.choice(["Ну и кто теперь тут первый 😎", "Я не первый, не второй, я таких баню :3",
+                                         "Заходи не бойся, выходи не плачь :3", "Топ",
+                                         "Ооо а вот и новый пост подъехал", "Постим живем", "🚔 Ало это полиция ..."]))
+      return # auto-forward channel messages should not be checked
 
-  ###
+  ### Retrieve member record from DB
+  try:
+    # retrieve existing record
+    member = await Member.objects.get(user_id=message.from_user.id)
+    member.messages_count += 1
+    await member.update()
+  except ormar.NoMatch:
+    # create new record
+    member = await Member.objects.create(user_id=message.from_user.id, messages_count=1)
+
+  # Retrieve tg member object
+  tg_member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
+
   ###   CHECK FOR PROFANITY & SPAM
-  ###
   _del = False
   _word = None
 
@@ -74,27 +80,34 @@ async def on_user_message(message: types.Message):
   # process
   if _del:
     # PROFANITY DETECTED
-    await message.delete()
+    if not (tg_member.is_chat_admin() and tg_member.can_restrict_members):
+        await message.delete()
 
     log_msg = message.text
     if _word:
       log_msg = log_msg.replace(_word, '<u><b>'+_word+'</b></u>')
     log_msg += "\n\n<i>Автор:</i> "+utils.user_mention(message.from_user)
 
-    await utils.write_log(message.bot, log_msg, "Антимат")
-    await message.bot.send_message(chat_id=config.groups.main, text=f"{utils.user_mention(message.from_user)}, следи за языком!")
+    await utils.write_log(message.bot, log_msg, "🤬 Антимат")
+    # await message.bot.send_message(chat_id=config.groups.main, text=f"{utils.user_mention(message.from_user)}, следи за языком!")
   else:
-    # NO PROFANITY, GO CHECK FOR SPAM
+    ### NO PROFANITY, GO CHECK FOR SPAM
+
     if member.messages_count < int(config.spam.member_messages_threshold) and ruspam_predict(message.text):
+        # SPAM DETECTED
+        if not (tg_member.is_chat_admin() and tg_member.can_restrict_members):
+            await message.delete()
+
         log_msg = message.text
         log_msg += "\n\n<i>Автор:</i> " + utils.user_mention(message.from_user)
 
-        await utils.write_log(message.bot, log_msg, "АнтиСПАМ")
-        await message.reply("❌ Спам обнаружен :3")
+        await utils.write_log(message.bot, log_msg, "❌ АнтиСПАМ")
+        # await message.reply("❌ Спам обнаружен :3")
 
 @dp.message_handler(chat_id=config.groups.main, content_types=["voice"])
 async def on_user_voice(message: types.Message):
   await message.reply(localization.get_string("voice_message_reaction"))
+
 
 @dp.message_handler(is_admin=False, chat_id=config.groups.main)
 async def on_user_message_delete_woman(message: types.Message):
@@ -102,13 +115,76 @@ async def on_user_message_delete_woman(message: types.Message):
         if (message.date - message.reply_to_message.forward_date).seconds <= 20: #test
             try:
                 await message.delete()
-                await utils.write_log(message.bot, f"Удалено сообщение: {message.text}", "Антибот")
+                await utils.write_log(message.bot, f"Удалено сообщение: {message.text}", "🤖 Антибот")
             except exceptions.MessageCantBeDeleted:
                 pass
 
-@dp.message_handler(chat_id=config.groups.main, commands="бу", commands_prefix="!")
+
+@dp.message_handler(chat_id=config.groups.main, commands="бу", commands_prefix="!/")
 async def on_bu(message: types.Message):
   await message.reply(random.choice(["Не пугай так!", "Бл я аж вздрогнул ...", "Та за шо :3", "Страшна вырубай", "Не смешно :3", "Так и сердешный приступ можно словить!", "Сам ты б/у пон"]))
+
+
+@dp.message_handler(chat_id=config.groups.main, commands=["me", "я", "info", "инфо", "lvl", "лвл"], commands_prefix="!/")
+async def on_me(message: types.Message):
+    if message.reply_to_message:
+        user_id = message.reply_to_message.from_user.id
+    else:
+        user_id = message.from_user.id
+
+    ### Retrieve member record from DB
+    try:
+        # retrieve existing record
+        member = await Member.objects.get(user_id=user_id)
+    except ormar.NoMatch:
+        return
+
+    tg_member = await message.bot.get_chat_member(message.chat.id, user_id)
+
+    member_level = None
+    if isinstance(tg_member, (ChatMemberAdministrator, ChatMemberOwner)) and (tg_member.is_chat_creator() or tg_member.can_restrict_members):
+        member_level = "⭐️ Админ"
+    else:
+        if member.messages_count < 100:
+            member_level = "🥷 Ноунейм"
+        elif 100 <= member.messages_count < 500:
+            member_level = "🌚 Новичок"
+        elif 500 <= member.messages_count < 1000:
+            member_level = "😎 Опытный"
+        elif 1000 <= member.messages_count < 2000:
+            member_level = "😈 Ветеран"
+        else:
+            member_level = "⭐️ Мастер"
+
+    answer = f"{random.choice(['👩‍🦰','👨‍🦳','🧔','👩','👱‍♀️','🧑','👨','🧔‍♂️','🤖','😼','🧑‍🦰','🧑‍🦱','👨‍🦰','👦'])} <b>Участник чата:</b> {utils.user_mention(tg_member.user)}"
+    answer += f"\n<b><i>{member_level}</i></b> <i>(<tg-spoiler>{member.messages_count}</tg-spoiler>)</i>"
+
+    await message.reply(answer)
+
+
+@dp.message_handler(is_admin = True, chat_id=config.groups.main, commands=["setlvl"], commands_prefix="!")
+async def on_me(message: types.Message):
+    if not message.reply_to_message:
+        await message.reply("Чего ты от меня хочешь :3")
+        return
+
+    ### Retrieve member record from DB
+    try:
+        # retrieve existing record
+        member = await Member.objects.get(user_id=message.reply_to_message.from_user.id)
+    except ormar.NoMatch:
+        return
+
+    try:
+        member.messages_count = abs(int(utils.remove_prefix(message.text, "!setlvl")))
+
+        if member.messages_count > 100000:
+            await message.reply("Что куришь, другалёк? :3")
+        else:
+            await member.update()
+            await message.reply("Ладно :3")
+    except ValueError:
+        await message.reply("O_o Мда")
 
 '''async def on_user_message(message: types.Message):
   """
