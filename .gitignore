@@ -24,6 +24,7 @@
 
 # Environments
 .env
+dev.env
 .venv
 env/
 venv/
@@ -34,8 +35,10 @@ venv.bak/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
+__pycache__/*
 *.py[cod]
 *$py.class
+*.pyc
 
 # Visual Studio cache directory
 .vs/
