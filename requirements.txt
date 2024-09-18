@@ -5,6 +5,29 @@ aioschedule
 psutil
 easydict
 
+<<<<<<< HEAD
 uvloop
 ujson
 aiohttp[speedups]
+=======
+uvloop==0.20.0; sys_platform != 'windows'
+ujson==5.10.0
+aiohttp[speedups]==3.8.6
+
+ormar
+aiosqlite
+aiomysql
+pymysql
+
+datasets
+idna
+nlpaug
+nltk
+numpy
+safetensors
+scikit-learn
+scipy
+tokenizers
+torch
+transformers
+>>>>>>> 7b231b9 (.gitattributes added for LFS)
