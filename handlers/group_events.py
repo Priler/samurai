@@ -62,8 +62,6 @@ async def on_user_message(message: types.Message):
   try:
     # retrieve existing record
     member = await Member.objects.get(user_id=message.from_user.id)
-    member.messages_count += 1
-    await member.update()
   except ormar.NoMatch:
     # create new record
     member = await Member.objects.create(user_id=message.from_user.id, messages_count=1)
@@ -92,7 +90,6 @@ async def on_user_message(message: types.Message):
     # await message.bot.send_message(chat_id=config.groups.main, text=f"{utils.user_mention(message.from_user)}, следи за языком!")
   else:
     ### NO PROFANITY, GO CHECK FOR SPAM
-
     if member.messages_count < int(config.spam.member_messages_threshold) and ruspam_predict(message.text):
         # SPAM DETECTED
         if not (tg_member.is_chat_admin() and tg_member.can_restrict_members):
@@ -103,6 +100,9 @@ async def on_user_message(message: types.Message):
 
         await utils.write_log(message.bot, log_msg, "❌ АнтиСПАМ")
         # await message.reply("❌ Спам обнаружен :3")
+    else:
+        member.messages_count += 1
+        await member.update()
 
 @dp.message_handler(chat_id=config.groups.main, content_types=["voice"])
 async def on_user_voice(message: types.Message):
