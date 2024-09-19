@@ -81,13 +81,16 @@ async def on_user_message(message: types.Message):
     if not (tg_member.is_chat_admin() and tg_member.can_restrict_members):
         await message.delete()
 
+        # increase member violations count
+        member.violations_count_profanity += 1
+        await member.update()
+
     log_msg = message.text
     if _word:
       log_msg = log_msg.replace(_word, '<u><b>'+_word+'</b></u>')
     log_msg += "\n\n<i>Автор:</i> "+utils.user_mention(message.from_user)
 
     await utils.write_log(message.bot, log_msg, "🤬 Антимат")
-    # await message.bot.send_message(chat_id=config.groups.main, text=f"{utils.user_mention(message.from_user)}, следи за языком!")
   else:
     ### NO PROFANITY, GO CHECK FOR SPAM
     if member.messages_count < int(config.spam.member_messages_threshold) and ruspam_predict(message.text):
@@ -95,12 +98,16 @@ async def on_user_message(message: types.Message):
         if not (tg_member.is_chat_admin() and tg_member.can_restrict_members):
             await message.delete()
 
+            # increase member violations count
+            member.violations_count_spam += 1
+            await member.update()
+
         log_msg = message.text
         log_msg += "\n\n<i>Автор:</i> " + utils.user_mention(message.from_user)
 
         await utils.write_log(message.bot, log_msg, "❌ АнтиСПАМ")
-        # await message.reply("❌ Спам обнаружен :3")
     else:
+        # increase members messages count (only if message doesn't contain any violations)
         member.messages_count += 1
         await member.update()
 
