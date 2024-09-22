@@ -41,8 +41,8 @@ async def on_user_join(message: types.Message):
     await utils.write_log(message.bot, "Присоединился пользователь "+utils.user_mention(message.from_user), "➕ Новый участник")
 
 
-@dp.message_handler(chat_id=config.groups.main)
-@dp.edited_message_handler(chat_id=config.groups.main)
+@dp.message_handler(chat_id=config.groups.main, content_types=[types.ContentType.TEXT, types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO])
+@dp.edited_message_handler(chat_id=config.groups.main, content_types=[types.ContentType.TEXT, types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO])
 async def on_user_message(message: types.Message):
   """
   Process every user message.
@@ -116,7 +116,7 @@ async def on_user_voice(message: types.Message):
   await message.reply(localization.get_string("voice_message_reaction"))
 
 
-@dp.message_handler(is_admin=False, chat_id=config.groups.main)
+@dp.message_handler(is_admin=False, chat_id=config.groups.main, content_types=[types.ContentType.TEXT, types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO])
 async def on_user_message_delete_woman(message: types.Message):
     if message.reply_to_message and message.reply_to_message.forward_from_chat and message.reply_to_message.forward_from_chat.id == config.groups.linked_channel:
         if (message.date - message.reply_to_message.forward_date).seconds <= 20: #test
