@@ -69,11 +69,23 @@ async def on_user_message(message: types.Message):
   # Retrieve tg member object
   tg_member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
 
+  # Define message text
+  msg_text = None
+
+  if message.content_type == types.ContentType.TEXT:
+      msg_text = message.text
+  elif message.content_type in [types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO]:
+      msg_text = message.caption
+
+  # Quit, if no message to check
+  if msg_text is None:
+      return
+
   ###   CHECK FOR PROFANITY & SPAM
   _del = False
   _word = None
 
-  _del, _word = utils.check_for_profanity_all(message.text)
+  _del, _word = utils.check_for_profanity_all(msg_text)
 
   # process
   if _del:
@@ -85,7 +97,7 @@ async def on_user_message(message: types.Message):
         member.violations_count_profanity += 1
         await member.update()
 
-    log_msg = message.text
+    log_msg = msg_text
     if _word:
       log_msg = log_msg.replace(_word, '<u><b>'+_word+'</b></u>')
     log_msg += "\n\n<i>Автор:</i> "+utils.user_mention(message.from_user)
@@ -93,7 +105,7 @@ async def on_user_message(message: types.Message):
     await utils.write_log(message.bot, log_msg, "🤬 Антимат")
   else:
     ### NO PROFANITY, GO CHECK FOR SPAM
-    if member.messages_count < int(config.spam.member_messages_threshold) and ruspam_predict(message.text):
+    if member.messages_count < int(config.spam.member_messages_threshold) and ruspam_predict(msg_text):
         # SPAM DETECTED
         if not (tg_member.is_chat_admin() and tg_member.can_restrict_members):
             await message.delete()
@@ -102,7 +114,7 @@ async def on_user_message(message: types.Message):
             member.violations_count_spam += 1
             await member.update()
 
-        log_msg = message.text
+        log_msg = msg_text
         log_msg += "\n\n<i>Автор:</i> " + utils.user_mention(message.from_user)
 
         await utils.write_log(message.bot, log_msg, "❌ АнтиСПАМ")

@@ -198,7 +198,6 @@ async def cmd_checkperms(message: types.Message):
 
     await message.reply(msg)'''
 
-
 @dp.message_handler(member_can_restrict=True, chat_id=config.groups.main, commands=["ban"], commands_prefix="!/")
 async def cmd_ban(message: types.Message):
     # Check if command is sent as reply to some message
