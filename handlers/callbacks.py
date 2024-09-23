@@ -119,7 +119,7 @@ async def callback_handler(call: types.CallbackQuery):
         await Spam.objects.delete(id=int(call.data.split("_")[2]))
 
         # increase member messages count, cuz is not a spam :3
-        member = Member.objects.get(id=int(call.data.split("_")[3]))
+        member = await Member.objects.get(id=int(call.data.split("_")[3]))
         member.messages_count += 1
         await member.update()
 
