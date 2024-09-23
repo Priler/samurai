@@ -15,6 +15,7 @@ from aiogram.utils import exceptions
 import random
 
 from models.member import Member
+from models.spam import Spam
 
 from ruspam import predict as ruspam_predict
 
@@ -117,7 +118,35 @@ async def on_user_message(message: types.Message):
         log_msg = msg_text
         log_msg += "\n\n<i>Автор:</i> " + utils.user_mention(message.from_user)
 
-        await utils.write_log(message.bot, log_msg, "❌ АнтиСПАМ")
+        # Create DB record on spam message
+        spam_rec = await Spam.objects.create(message=msg_text, is_spam=True) # assume is spam by default
+
+        # Generate keyboard with some actions for detected spam
+        spam_keyboard = types.InlineKeyboardMarkup()
+
+        # is spam + block user
+        spam_keyboard.add(types.InlineKeyboardButton(
+            text="❌ Это спам + заблокировать пользователя",
+            callback_data=f"spam_ban_{message.from_user.id}")
+        )
+
+        # not a spam
+        spam_keyboard.add(types.InlineKeyboardButton(
+            text="❎ Это НЕ спам",
+            callback_data=f"spam_invert_{spam_rec.id}")
+        )
+
+        # test msg, remove from db
+        spam_keyboard.add(types.InlineKeyboardButton(
+            text="Убрать из БД, это тест",
+            callback_data=f"spam_test_{spam_rec.id}_{member.id}")
+        )
+
+        # send message with a keyboard to log channel
+        await message.bot.send_message(
+            config.groups.logs,
+            utils.generate_log_message(log_msg, "❌ АнтиСПАМ"),
+            reply_markup=spam_keyboard)
     else:
         # increase members messages count (only if message doesn't contain any violations)
         member.messages_count += 1

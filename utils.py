@@ -61,14 +61,18 @@ def user_mention(from_user):
     return _s
 
 
-async def write_log(bot, message, log_type="default"):
+def generate_log_message(message, log_type="default"):
     now = datetime.datetime.now()
     current_time = now.strftime("%H:%M:%S")
 
     log_message = "🕥 <i>" + current_time + "</i> <b>[" + log_type.upper() + "]</b> "
     log_message += message
 
-    return await bot.send_message(config.groups.logs, log_message)
+    return log_message
+
+
+async def write_log(bot, message, log_type="default"):
+    return await bot.send_message(config.groups.logs, generate_log_message(message, log_type))
 
 
 def get_restriction_time(string: str) -> typing.Optional[int]:

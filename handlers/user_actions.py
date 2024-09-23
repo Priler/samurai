@@ -96,7 +96,7 @@ async def cmd_report(message: types.Message):
             report_message
         ),
         reply_markup=action_keyboard)
-    await message.reply(localization.get_string("report_delivered"))
+    await message.reply(random.choice(["<i>Репорт отправлен.</i>", "<i>Админы посмотрят.</i>", "<i>Полиция уже в пути :3</i>", "<i>SWAT уже выехал :3</i>", "<i>Щасб кто-нибудь глянет :3</i>"]))
 
 @dp.message_handler(Text(startswith="@admin", ignore_case=True), chat_id=config.groups.main)
 async def calling_all_units(message: types.Message):

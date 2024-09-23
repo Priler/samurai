@@ -1,5 +1,3 @@
-from email.policy import default
-
 import ormar
 from db import ormar_config
 
