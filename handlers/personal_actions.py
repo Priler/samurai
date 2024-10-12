@@ -38,7 +38,8 @@ async def cmd_ping_bot(message: types.Message):
 
 		await message.reply(reply)
 
-@dp.message_handler(lambda message: message.chat.type == 'private', commands=["prof", "мат"], commands_prefix="!")
+# @dp.message_handler(lambda message: message.chat.type == 'private', commands=["prof", "мат"], commands_prefix="!")
+@dp.message_handler(is_admin=True, commands=["prof", "мат"], commands_prefix="!")
 async def cmd_profanity_check(message: types.Message):
 	# Check if command is sent by group admin
 	user = await message.bot.get_chat_member(config.groups.main, message.from_user.id)
