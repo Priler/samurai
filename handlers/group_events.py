@@ -175,7 +175,7 @@ async def on_user_message_delete_woman(message: types.Message):
 
 @dp.message_handler(chat_id=config.groups.main, commands="бу", commands_prefix="!/")
 async def on_bu(message: types.Message):
-  await message.reply(random.choice(["Не пугай так!", "Бл я аж вздрогнул ...", "Та за шо :3", "Страшна вырубай", "Не смешно :3", "Так и сердешный приступ можно словить!", "Сам ты б/у пон"]))
+  await message.reply(random.choice(["Не пугай так!", "Боже ..", "Не мешай мне делать сложные компьютерные вычисления :3", "Хватит!", "Ладно ...", "Бл я аж вздрогнул ...", "Та за шо :3", "Страшна вырубай", "Не смешно :3", "Так и сердешный приступ можно словить!", "Сам ты б/у пон"]))
 
 
 @dp.message_handler(chat_id=config.groups.main, commands=["me", "я", "info", "инфо", "lvl", "лвл"], commands_prefix="!/")
@@ -216,7 +216,7 @@ async def on_me(message: types.Message):
 
 
 @dp.message_handler(is_admin = True, chat_id=config.groups.main, commands=["setlvl"], commands_prefix="!")
-async def on_me(message: types.Message):
+async def on_setlvl(message: types.Message):
     if not message.reply_to_message:
         await message.reply("Чего ты от меня хочешь :3")
         return
