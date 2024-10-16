@@ -215,7 +215,7 @@ async def on_me(message: types.Message):
     await message.reply(answer)
 
 
-@dp.message_handler(is_admin = True, chat_id=config.groups.main, commands=["setlvl"], commands_prefix="!")
+@dp.message_handler(is_owner = True, chat_id=config.groups.main, commands=["setlvl"], commands_prefix="!")
 async def on_setlvl(message: types.Message):
     if not message.reply_to_message:
         await message.reply("Чего ты от меня хочешь :3")
