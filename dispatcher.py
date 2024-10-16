@@ -3,7 +3,7 @@ import logging
 from aiogram import Bot, Dispatcher
 
 from configurator import config, make_config
-from filters import IsAdminFilter, MemberCanRestrictFilter
+from filters import IsAdminFilter, MemberCanRestrictFilter, IsOwnerFilter
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,4 +25,5 @@ dp.message_handlers.once = False
 
 # Activate filters
 dp.filters_factory.bind(IsAdminFilter)
+dp.filters_factory.bind(IsOwnerFilter)
 dp.filters_factory.bind(MemberCanRestrictFilter)
