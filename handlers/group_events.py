@@ -159,7 +159,11 @@ async def on_user_message(message: types.Message):
 
 @dp.message_handler(chat_id=config.groups.main, content_types=["voice"])
 async def on_user_voice(message: types.Message):
-  await message.reply(localization.get_string("voice_message_reaction"))
+    if random.random() < 0.75: # 75% chance to react
+        await message.reply(random.choice(["фу! ФУ Я СКАЗАЛ, НЕЛЬЗЯ. БРОСЬ КАКУ. ПИШИ ТЕКСТОМ.", "Давай без резких движений! Положи телефон на пол ... и больше не записывай ГСки :3",
+                                           "ГСки - бич современного общества. Делай выводы, макарошка :3", "А вот в моё время люди писали текстом ...",
+                                           "ТЫ ПРИШЕЛ В ЭТОТ ЧАТ! Но ты пришел без уважения ...", "Сэр, вынужден сообщить вам, что общаться ГСками это признак отсутствия интеллекта.",
+                                           "ГСки бож ... выйди с чата, не позорься.", "Фу! ФУ Я СКАЗАЛ! Пиши текстом."]))
 
 
 @dp.message_handler(is_admin=False, chat_id=config.groups.main, content_types=[types.ContentType.TEXT, types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO])
