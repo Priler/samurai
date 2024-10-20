@@ -184,7 +184,7 @@ async def on_bu(message: types.Message):
 
 @dp.message_handler(chat_id=config.groups.main, commands=["me", "я", "info", "инфо", "lvl", "лвл"], commands_prefix="!/")
 async def on_me(message: types.Message):
-    if message.reply_to_message:
+    if message.reply_to_message and not message.reply_to_message.is_automatic_forward:
         user_id = message.reply_to_message.from_user.id
     else:
         user_id = message.from_user.id
