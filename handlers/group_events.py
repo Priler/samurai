@@ -207,7 +207,7 @@ async def on_me(message: types.Message):
 
     member_level = None
     if isinstance(tg_member, (ChatMemberAdministrator, ChatMemberOwner)) and (tg_member.is_chat_creator() or tg_member.can_restrict_members):
-        member_level = random.choice(["⭐️🎃 Главная тыковка чата", "⭐️🎃 Безголовый всадник", "⭐️🎃 Повелитель ночи", "⭐️🎃 Тыквенный властелин"])
+        member_level = random.choice(["🎃 Главная тыковка чата", "🎃 Безголовый всадник", "🎃 Повелитель ночи", "🎃 Тыквенный властелин"])
         # member_rep = "🛡 Неприкосновенный"
     else:
         # if member.messages_count < 100:
@@ -250,8 +250,8 @@ async def on_me(message: types.Message):
         member_rep = "😇 Добрейший добряк"
 
     answer = f"{random.choice(['👩‍🦰','👨‍🦳','🧔','👩','👱‍♀️','🧑','👨','🧔‍♂️','🤖','😼','🧑‍🦰','🧑‍🦱','👨‍🦰','👦'])} <b>Участник чата:</b> {utils.user_mention(tg_member.user)}"
-    answer += f"\n<b><i>{member_level}</i></b> <i>(<tg-spoiler>{member.messages_count}</tg-spoiler>)</i>"
-    answer += f"\n<b><i>{member_rep}</i></b> <i>(<tg-spoiler>{member.reputation_points}</tg-spoiler>)</i>"
+    answer += f"\n\n<i>{member_level}</i> <i>(<tg-spoiler>{member.messages_count}</tg-spoiler>)</i>"
+    answer += f"\n<i>{member_rep}</i> <i>(<tg-spoiler>{member.reputation_points}</tg-spoiler>)</i>"
 
     await message.reply(answer)
 
