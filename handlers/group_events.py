@@ -257,6 +257,30 @@ async def on_setlvl(message: types.Message):
     except ValueError:
         await message.reply("O_o Мда")
 
+@dp.message_handler(is_owner = True, chat_id=config.groups.main, commands=["reward"], commands_prefix="!")
+async def on_reward(message: types.Message):
+    if not message.reply_to_message:
+        await message.reply("Чего ты от меня хочешь :3")
+        return
+
+    ### Retrieve member record from DB
+    try:
+        # retrieve existing record
+        member = await Member.objects.get(user_id=message.reply_to_message.from_user.id)
+    except ormar.NoMatch:
+        return
+
+    try:
+        member.messages_count += abs(int(utils.remove_prefix(message.text, "!setlvl")))
+
+        if member.messages_count > abs(int(utils.remove_prefix(message.text, "!setlvl"))):
+            await message.reply("Нетб :3")
+        else:
+            await member.update()
+            await message.reply("🎃 Слушаюсь, повелитель!")
+    except ValueError:
+        await message.reply("O_o Мда")
+
 '''async def on_user_message(message: types.Message):
   """
   Removes messages, if they contain black listed words.
