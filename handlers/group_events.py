@@ -101,6 +101,7 @@ async def on_user_message(message: types.Message):
 
         # increase member violations count
         member.violations_count_profanity += 1
+        member.reputation_points -= 10 # every profanity message removes some reputation points from user
         await member.update()
 
     log_msg = msg_text
@@ -207,6 +208,7 @@ async def on_me(message: types.Message):
     member_level = None
     if isinstance(tg_member, (ChatMemberAdministrator, ChatMemberOwner)) and (tg_member.is_chat_creator() or tg_member.can_restrict_members):
         member_level = random.choice(["⭐️🎃 Главная тыковка чата", "⭐️🎃 Безголовый всадник", "⭐️🎃 Повелитель ночи", "⭐️🎃 Тыквенный властелин"])
+        member_rep = "🛡 Неприкосновенный"
     else:
         # if member.messages_count < 100:
         #     member_level = "🥷 Ноунейм"
@@ -230,8 +232,26 @@ async def on_me(message: types.Message):
         else:
             member_level = "⭐️🎃 Тыквенный мастер"
 
+        if -2000 <= member.reputation_points < -1500:
+            member_rep = "⭐️⭐️⭐️⭐️⭐️ Пять звёзд розыска"
+        elif -1500 <= member.reputation_points < -1000:
+            member_rep = "☠️ Особо опасный"
+        elif -1000 <= member.reputation_points < -500:
+            member_rep = "💀 Тёмная личность"
+        elif -500 <= member.reputation_points < 0:
+            member_rep = "👿 Плохая печенька</i>"
+        elif 0 <= member.reputation_points < 100:
+            member_rep = "😐 Нейтральный"
+        elif 100 <= member.reputation_points < 500:
+            member_rep = "🙂 Хорошая печенька"
+        elif 500 <= member.reputation_points < 1000:
+            member_rep = "😎 Звезда чата"
+        else:
+            member_rep = "😇 Добрейший добряк"
+
     answer = f"{random.choice(['👩‍🦰','👨‍🦳','🧔','👩','👱‍♀️','🧑','👨','🧔‍♂️','🤖','😼','🧑‍🦰','🧑‍🦱','👨‍🦰','👦'])} <b>Участник чата:</b> {utils.user_mention(tg_member.user)}"
     answer += f"\n<b><i>{member_level}</i></b> <i>(<tg-spoiler>{member.messages_count}</tg-spoiler>)</i>"
+    answer += f"\n<b><i>{member_rep}</i></b> <i>(<tg-spoiler>{member.reputation_points}</tg-spoiler>)</i>"
 
     await message.reply(answer)
 
@@ -276,7 +296,7 @@ async def on_reward(message: types.Message):
         return
 
     try:
-        member.messages_count += points
+        member.reputation_points += points
 
         if points > 100_000:
             await message.reply("Нетб :3")
