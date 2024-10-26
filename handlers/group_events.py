@@ -271,9 +271,9 @@ async def on_reward(message: types.Message):
         return
 
     try:
-        member.messages_count += abs(int(utils.remove_prefix(message.text, "!setlvl")))
+        member.messages_count += abs(int(utils.remove_prefix(message.text, "!reward")))
 
-        if member.messages_count > abs(int(utils.remove_prefix(message.text, "!setlvl"))):
+        if member.messages_count > abs(int(utils.remove_prefix(message.text, "!reward"))):
             await message.reply("Нетб :3")
         else:
             await member.update()
