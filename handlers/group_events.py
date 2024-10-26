@@ -217,7 +217,7 @@ async def on_me(message: types.Message):
         #     member_level = "⭐️ Мастер"
 
         if member.messages_count < 100:
-            member_level = "🧛 Неизвестный вампир"
+            member_level = random.choice(["🧛 Неизвестный вампир", "🎃 Неизвестная тыква", "🐺 Безымянный оборотень"])
         elif 100 <= member.messages_count < 500:
             member_level = "🌚 Восходящая луна"
         elif 500 <= member.messages_count < 1000:
