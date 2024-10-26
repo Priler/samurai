@@ -184,10 +184,41 @@ async def on_bu(message: types.Message):
 
 @dp.message_handler(chat_id=config.groups.main, commands=["конфеты", "sweets", "сладкое", "хэлоуин", "сладости"], commands_prefix="!/")
 async def on_sweets(message: types.Message):
+    ### Retrieve member record from DB
+    try:
+        # retrieve existing record
+        member = await Member.objects.get(user_id=user_id)
+    except ormar.NoMatch:
+        return
+
     if random.random() < 0.05:  # 5% chance to get golden ticket
         await message.reply("Поздравляю, в твоей шоколадке оказался <u>золотой билет</u> 🎫")
+        member.halloween_golden_tickets += 1
+        await member.update()
     else:
-        await message.reply(random.choice(["Хватит с тебя, сладкоежка :3", "Гадости тебе, а не сладости пон :3\n<i>пхпхпп</i>", f"На тебе 🍬 <i>({random.randrange(1, 100)}шт.)</i>", "Держи шоколадку 🍫", "Печеньку, сэр 🍪", "Вотб тебе пирог 🥧", "Вотб 🍭", "Сладкое вредно для зубов!", "Хватит жрать сладости пон :3", "Будешь много кушатб сладостей, код не будет компилиться пхпхпх :3"]))
+        if random.random() < 0.25: # 25% to get sweets
+            sweets_random = random.randrange(1, 100)
+            await member.reply(f"На тебе 🍬 <i>({sweets_random}шт.)</i>")
+            member.halloween_sweets += sweets_random
+            await member.update()
+        else:
+            if random.random() < 0.5: # 50% to get anything sweet
+                await message.reply(random.choice(["Держи шоколадку 🍫", "Печеньку, сэр 🍪", "Вотб тебе пирог 🥧", "Вотб 🍭"]))
+                member.halloween_sweets += 1
+                await member.update()
+
+            else:
+                if random.random() < 0.01: # 1% chance to get a pumpkin
+                    await message.reply("🎃 Вотб тебе тыква!")
+                    member.halloween_sweets += 100 # 1 pumpkin = 100 sweets
+                    await member.update()
+
+                else:
+                    # no sweets this time :(
+                    await message.reply(
+                        random.choice(["Хватит с тебя, сладкоежка :3", "Гадости тебе, а не сладости пон :3\n<i>пхпхпп</i>",
+                                       "Сладкое вредно для зубов!", "Хватит жрать сладости пон :3",
+                                       "Будешь много кушатб сладостей, код не будет компилиться пхпхпх :3"]))
 
 @dp.message_handler(chat_id=config.groups.main, commands=["me", "я", "info", "инфо", "lvl", "лвл"], commands_prefix="!/")
 async def on_me(message: types.Message):
