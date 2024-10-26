@@ -198,7 +198,7 @@ async def on_sweets(message: types.Message):
     else:
         if random.random() < 0.25: # 25% to get sweets
             sweets_random = random.randrange(1, 100)
-            await member.reply(f"На тебе 🍬 <i>({sweets_random}шт.)</i>")
+            await message.reply(f"На тебе 🍬 <i>({sweets_random}шт.)</i>")
             member.halloween_sweets += sweets_random
             await member.update()
         else:
