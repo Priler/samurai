@@ -273,7 +273,7 @@ async def on_reward(message: types.Message):
     try:
         member.messages_count += abs(int(utils.remove_prefix(message.text, "!reward")))
 
-        if member.messages_count > abs(int(utils.remove_prefix(message.text, "!reward"))):
+        if abs(int(utils.remove_prefix(message.text, "!reward"))) > 100_000:
             await message.reply("Нетб :3")
         else:
             await member.update()
