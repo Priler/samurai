@@ -187,7 +187,7 @@ async def on_sweets(message: types.Message):
     ### Retrieve member record from DB
     try:
         # retrieve existing record
-        member = await Member.objects.get(user_id=user_id)
+        member = await Member.objects.get(user_id=message.from_user.id)
     except ormar.NoMatch:
         return
 
