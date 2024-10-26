@@ -263,6 +263,8 @@ async def on_reward(message: types.Message):
         await message.reply("Чего ты от меня хочешь :3")
         return
 
+    points = abs(int(utils.remove_prefix(message.text, "!reward")))
+
     ### Retrieve member record from DB
     try:
         # retrieve existing record
@@ -271,13 +273,13 @@ async def on_reward(message: types.Message):
         return
 
     try:
-        member.messages_count += abs(int(utils.remove_prefix(message.text, "!reward")))
+        member.messages_count += points
 
-        if abs(int(utils.remove_prefix(message.text, "!reward"))) > 100_000:
+        if points > 100_000:
             await message.reply("Нетб :3")
         else:
             await member.update()
-            await message.reply("🎃 Слушаюсь, повелитель!")
+            await message.reply(f"🎃 Слушаюсь, повелитель!\nУчастник чата благословлён вашей милостью, ему начислено f{points} очков репутации.")
     except ValueError:
         await message.reply("O_o Мда")
 
