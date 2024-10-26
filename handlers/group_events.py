@@ -232,10 +232,9 @@ async def on_me(message: types.Message):
         else:
             member_level = "⭐️🎃 Тыквенный мастер"
 
-
-    if -2000 <= member.reputation_points < -1500:
+    if member.reputation_points < -2000:
         member_rep = "⭐️⭐️⭐️⭐️⭐️ Пять звёзд розыска"
-    elif -1500 <= member.reputation_points < -1000:
+    elif -2000 <= member.reputation_points < -1000:
         member_rep = "☠️ Особо опасный"
     elif -1000 <= member.reputation_points < -500:
         member_rep = "💀 Тёмная личность"
