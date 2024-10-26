@@ -203,7 +203,7 @@ async def on_me(message: types.Message):
 
     member_level = None
     if isinstance(tg_member, (ChatMemberAdministrator, ChatMemberOwner)) and (tg_member.is_chat_creator() or tg_member.can_restrict_members):
-        member_level = "⭐️🎃 Главная тыковка чата"
+        member_level = random.choice(["⭐️🎃 Главная тыковка чата", "⭐️🎃 Безголовый всадник", "⭐️🎃 Повелитель ночи", "⭐️🎃 Тыквенный властелин"])
     else:
         # if member.messages_count < 100:
         #     member_level = "🥷 Ноунейм"
