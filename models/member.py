@@ -10,3 +10,5 @@ class Member(ormar.Model):
     reputation_points: int = ormar.Integer(default=0)
     violations_count_profanity: int = ormar.Integer(default=0)
     violations_count_spam: int = ormar.Integer(default=0)
+    halloween_sweets: int = ormar.Integer(default=0)
+    halloween_golden_tickets: int = ormar.Integer(default=0)
