@@ -179,8 +179,11 @@ async def on_user_message_delete_woman(message: types.Message):
 
 @dp.message_handler(chat_id=config.groups.main, commands="бу", commands_prefix="!/")
 async def on_bu(message: types.Message):
-  await message.reply(random.choice(["Не пугай так!", "Боже ..", "Не мешай мне делать сложные компьютерные вычисления :3", "Хватит!", "Ладно ...", "Бл я аж вздрогнул ...", "Та за шо :3", "Страшна вырубай", "Не смешно :3", "Так и сердешный приступ можно словить!", "Сам ты б/у пон"]))
+  await message.reply(random.choice(["Бугага!", "Не пугай так!", "Боже ..", "Не мешай мне делать сложные компьютерные вычисления :3", "Хватит!", "Ладно ...", "Бл я аж вздрогнул ...", "Та за шо :3", "Страшна вырубай", "Не смешно :3", "Так и сердешный приступ можно словить!", "Сам ты б/у пон"]))
 
+@dp.message_handler(chat_id=config.groups.main, commands=["конфеты", "sweets", "сладкое", "хэлоуин"], commands_prefix="!/")
+async def on_bu(message: types.Message):
+  await message.reply(random.choice([f"На тебе 🍬 ({random.randrange(1, 100)}шт.)", "Держи шоколадку 🍫", "Печеньку, сэр 🍪", "Вотб тебе пирог 🥧", "Вотб 🍭", "Сладкое вредно для зубов!", "Хватит жрать сладости пон :3", "Будешь много кушатб сладостей, код не будет компилиться пхпхпх :3"]))
 
 @dp.message_handler(chat_id=config.groups.main, commands=["me", "я", "info", "инфо", "lvl", "лвл"], commands_prefix="!/")
 async def on_me(message: types.Message):
@@ -200,18 +203,29 @@ async def on_me(message: types.Message):
 
     member_level = None
     if isinstance(tg_member, (ChatMemberAdministrator, ChatMemberOwner)) and (tg_member.is_chat_creator() or tg_member.can_restrict_members):
-        member_level = "⭐️ Админ"
+        member_level = "⭐️🎃 Главная тыковка чата"
     else:
+        # if member.messages_count < 100:
+        #     member_level = "🥷 Ноунейм"
+        # elif 100 <= member.messages_count < 500:
+        #     member_level = "🌚 Новичок"
+        # elif 500 <= member.messages_count < 1000:
+        #     member_level = "😎 Опытный"
+        # elif 1000 <= member.messages_count < 2000:
+        #     member_level = "😈 Ветеран"
+        # else:
+        #     member_level = "⭐️ Мастер"
+
         if member.messages_count < 100:
-            member_level = "🥷 Ноунейм"
+            member_level = "🧛 Неизвестный вампир"
         elif 100 <= member.messages_count < 500:
-            member_level = "🌚 Новичок"
+            member_level = "🌚 Восходящая луна"
         elif 500 <= member.messages_count < 1000:
-            member_level = "😎 Опытный"
+            member_level = "🎃 Тыковка"
         elif 1000 <= member.messages_count < 2000:
-            member_level = "😈 Ветеран"
+            member_level = "👻 Ветеран искусства запугивания"
         else:
-            member_level = "⭐️ Мастер"
+            member_level = "⭐️🎃 Тыквенный мастер"
 
     answer = f"{random.choice(['👩‍🦰','👨‍🦳','🧔','👩','👱‍♀️','🧑','👨','🧔‍♂️','🤖','😼','🧑‍🦰','🧑‍🦱','👨‍🦰','👦'])} <b>Участник чата:</b> {utils.user_mention(tg_member.user)}"
     answer += f"\n<b><i>{member_level}</i></b> <i>(<tg-spoiler>{member.messages_count}</tg-spoiler>)</i>"
