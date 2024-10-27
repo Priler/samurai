@@ -302,6 +302,7 @@ async def on_setlvl(message: types.Message):
 
     try:
         member.messages_count = abs(int(utils.remove_prefix(message.text, "!setlvl")))
+        member.reputation_points += abs(int(utils.remove_prefix(message.text, "!setlvl")))
 
         if member.messages_count > 100000:
             await message.reply("Что куришь, другалёк? :3")
