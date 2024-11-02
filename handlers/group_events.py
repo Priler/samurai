@@ -268,7 +268,7 @@ async def on_me(message: types.Message):
             member_level = "🌟 Легенда"
 
         if member.reputation_points < -2000:
-            member_rep = "пять звёзд розыска"
+            member_rep = "⭐️⭐️⭐️⭐️⭐️ пять звёзд розыска"
         elif -2000 <= member.reputation_points < -1000:
             member_rep = "особо опасный"
         elif -1000 <= member.reputation_points < -500:
@@ -371,6 +371,28 @@ async def on_reward(message: types.Message):
             await member.update()
             # await message.reply(f"🎃 <b>Слушаюсь, повелитель!</b>\nУчастник чата благословлён вашей милостью, ему начислено <i><b>{points} очков репутации.</b></i>")
             await message.reply(f"<b>Слушаюсь, сэр!</b>\nУчастник чата получает <i><b>{points}</b> очков репутации.</i>")
+    except ValueError:
+        await message.reply("O_o Мда")
+
+
+@dp.message_handler(is_owner = True, chat_id=config.groups.main, commands=["rreset"], commands_prefix="!")
+async def on_rep_reset(message: types.Message):
+    if not message.reply_to_message:
+        await message.reply("Чего ты от меня хочешь :3")
+        return
+
+    ### Retrieve member record from DB
+    try:
+        # retrieve existing record
+        member = await Member.objects.get(user_id=message.reply_to_message.from_user.id)
+    except ormar.NoMatch:
+        return
+
+    try:
+        member.reputation_points = member.messages_count
+
+        await member.update()
+        await message.reply(f"<b>Слушаюсь, сэр!</b>\nУровень репутации участника <i><b>сброшен</b>.</i>")
     except ValueError:
         await message.reply("O_o Мда")
 
