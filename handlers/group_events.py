@@ -314,9 +314,9 @@ async def on_me(message: types.Message):
         # else:
         #     member_rep = "😇 Добрейший добряк"
 
-    answer = f"{member_avatar} <b>Участник чата:</b> {utils.user_mention(tg_member.user)}"
+    answer = f"{member_avatar} <b>{tg_member.user.full_name.strip()}</b>"
     # answer += f"\n\n<b>Репутация: </b>{member_level} <i>(<tg-spoiler>{member.messages_count}</tg-spoiler>)</i>"
-    answer += f"\n\n<b>Репутация: </b>{member_level} <i> •『{member_rep} (<tg-spoiler>{member.reputation_points}</tg-spoiler>)』</i>"
+    answer += f"\n<b>Репутация: </b>{member_level} <i> • 『{member_rep} (<tg-spoiler>{member.reputation_points}</tg-spoiler>)』</i>"
 
     await message.reply(answer)
 
