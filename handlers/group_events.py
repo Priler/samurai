@@ -96,12 +96,13 @@ async def on_user_message(message: types.Message):
   # process
   if _del:
     # PROFANITY DETECTED
-    if not (tg_member.is_chat_admin() and tg_member.can_restrict_members):
+    # if not (tg_member.is_chat_admin() and tg_member.can_restrict_members):
+    if not tg_member.is_chat_admin():
         await message.delete()
 
         # increase member violations count
         member.violations_count_profanity += 1
-        member.reputation_points -= 10 # every profanity message removes some reputation points from user
+        member.reputation_points -= 50 # every profanity message removes some reputation points from user
         await member.update()
 
     log_msg = msg_text
@@ -114,7 +115,8 @@ async def on_user_message(message: types.Message):
     ### NO PROFANITY, GO CHECK FOR SPAM
     if member.messages_count < int(config.spam.member_messages_threshold) and ruspam_predict(msg_text):
         # SPAM DETECTED
-        if not (tg_member.is_chat_admin() and tg_member.can_restrict_members):
+        # if not (tg_member.is_chat_admin() and tg_member.can_restrict_members):
+        if not tg_member.is_chat_admin():
             await message.delete()
 
             # increase member violations count
@@ -182,45 +184,46 @@ async def on_user_message_delete_woman(message: types.Message):
 async def on_bu(message: types.Message):
   await message.reply(random.choice(["Бугага!", "Не пугай так!", "Боже ..", "Не мешай мне делать сложные компьютерные вычисления :3", "Хватит!", "Ладно ...", "Бл я аж вздрогнул ...", "Та за шо :3", "Страшна вырубай", "Не смешно :3", "Так и сердешный приступ можно словить!", "Сам ты б/у пон"]))
 
-@dp.message_handler(chat_id=config.groups.main, commands=["конфеты", "sweets", "сладкое", "хэлоуин", "сладости"], commands_prefix="!/")
-async def on_sweets(message: types.Message):
-    ### Retrieve member record from DB
-    try:
-        # retrieve existing record
-        member = await Member.objects.get(user_id=message.from_user.id)
-    except ormar.NoMatch:
-        return
 
-    if random.random() < 0.05:  # 5% chance to get golden ticket
-        await message.reply("Поздравляю, в твоей шоколадке оказался <u>золотой билет</u> 🎫")
-        member.halloween_golden_tickets += 1
-        await member.update()
-    else:
-        if random.random() < 0.25: # 25% to get sweets
-            sweets_random = random.randrange(1, 100)
-            await message.reply(f"На тебе 🍬 <i>({sweets_random}шт.)</i>")
-            member.halloween_sweets += sweets_random
-            await member.update()
-        else:
-            if random.random() < 0.5: # 50% to get anything sweet
-                await message.reply(random.choice(["Держи шоколадку 🍫", "Печеньку, сэр 🍪", "Вотб тебе пирог 🥧", "Вотб 🍭"]))
-                member.halloween_sweets += 1
-                await member.update()
+# @dp.message_handler(chat_id=config.groups.main, commands=["конфеты", "sweets", "сладкое", "хэлоуин", "сладости"], commands_prefix="!/")
+# async def on_sweets(message: types.Message):
+#     ### Retrieve member record from DB
+#     try:
+#         # retrieve existing record
+#         member = await Member.objects.get(user_id=message.from_user.id)
+#     except ormar.NoMatch:
+#         return
+#
+#     if random.random() < 0.05:  # 5% chance to get golden ticket
+#         await message.reply("Поздравляю, в твоей шоколадке оказался <u>золотой билет</u> 🎫")
+#         member.halloween_golden_tickets += 1
+#         await member.update()
+#     else:
+#         if random.random() < 0.25: # 25% to get sweets
+#             sweets_random = random.randrange(1, 100)
+#             await message.reply(f"На тебе 🍬 <i>({sweets_random}шт.)</i>")
+#             member.halloween_sweets += sweets_random
+#             await member.update()
+#         else:
+#             if random.random() < 0.5: # 50% to get anything sweet
+#                 await message.reply(random.choice(["Держи шоколадку 🍫", "Печеньку, сэр 🍪", "Вотб тебе пирог 🥧", "Вотб 🍭"]))
+#                 member.halloween_sweets += 1
+#                 await member.update()
+#
+#             else:
+#                 if random.random() < 0.01: # 1% chance to get a pumpkin
+#                     await message.reply("🎃 Вотб тебе тыква!")
+#                     member.halloween_sweets += 100 # 1 pumpkin = 100 sweets
+#                     await member.update()
+#
+#                 else:
+#                     # no sweets this time :(
+#                     await message.reply(
+#                         random.choice(["Хватит с тебя, сладкоежка :3", "Гадости тебе, а не сладости пон :3\n<i>пхпхпп</i>",
+#                                        "Сладкое вредно для зубов!", "Хватит жрать сладости пон :3",
+#                                        "Будешь много кушатб сладостей, код не будет компилиться пхпхпх :3"]))
 
-            else:
-                if random.random() < 0.01: # 1% chance to get a pumpkin
-                    await message.reply("🎃 Вотб тебе тыква!")
-                    member.halloween_sweets += 100 # 1 pumpkin = 100 sweets
-                    await member.update()
-
-                else:
-                    # no sweets this time :(
-                    await message.reply(
-                        random.choice(["Хватит с тебя, сладкоежка :3", "Гадости тебе, а не сладости пон :3\n<i>пхпхпп</i>",
-                                       "Сладкое вредно для зубов!", "Хватит жрать сладости пон :3",
-                                       "Будешь много кушатб сладостей, код не будет компилиться пхпхпх :3"]))
-
-@dp.message_handler(chat_id=config.groups.main, commands=["me", "я", "info", "инфо", "lvl", "лвл"], commands_prefix="!/")
+@dp.message_handler(chat_id=config.groups.main, commands=["me", "я", "info", "инфо", "lvl", "лвл", "whoami", "neofetch"], commands_prefix="!/")
 async def on_me(message: types.Message):
     if message.reply_to_message and not message.reply_to_message.is_automatic_forward:
         user_id = message.reply_to_message.from_user.id
@@ -237,52 +240,83 @@ async def on_me(message: types.Message):
     tg_member = await message.bot.get_chat_member(message.chat.id, user_id)
 
     member_level = None
-    if isinstance(tg_member, (ChatMemberAdministrator, ChatMemberOwner)) and (tg_member.is_chat_creator() or tg_member.can_restrict_members):
-        member_level = random.choice(["🎃 Главная тыковка чата", "🎃 Безголовый всадник", "🎃 Повелитель ночи", "🎃 Тыквенный властелин"])
-        # member_rep = "🛡 Неприкосновенный"
-    else:
-        # if member.messages_count < 100:
-        #     member_level = "🥷 Ноунейм"
-        # elif 100 <= member.messages_count < 500:
-        #     member_level = "🌚 Новичок"
-        # elif 500 <= member.messages_count < 1000:
-        #     member_level = "😎 Опытный"
-        # elif 1000 <= member.messages_count < 2000:
-        #     member_level = "😈 Ветеран"
-        # else:
-        #     member_level = "⭐️ Мастер"
-
-        if member.messages_count < 100:
-            member_level = random.choice(["🧛 Неизвестный вампир", "🎃 Неизвестная тыква", "🐺 Безымянный оборотень"])
-        elif 100 <= member.messages_count < 500:
-            member_level = "🌚 Восходящая луна"
-        elif 500 <= member.messages_count < 1000:
-            member_level = "🎃 Тыковка"
-        elif 1000 <= member.messages_count < 2000:
-            member_level = "👻 Ветеран искусства запугивания"
-        else:
-            member_level = "⭐️🎃 Тыквенный мастер"
-
-    if member.reputation_points < -2000:
+    if isinstance(tg_member, (ChatMemberAdministrator, ChatMemberOwner)) and tg_member.is_chat_creator():
+        # owner
+        member_level = "👑 Король"
         member_rep = "⭐️⭐️⭐️⭐️⭐️ Пять звёзд розыска"
-    elif -2000 <= member.reputation_points < -1000:
-        member_rep = "☠️ Особо опасный"
-    elif -1000 <= member.reputation_points < -500:
-        member_rep = "💀 Тёмная личность"
-    elif -500 <= member.reputation_points < 0:
-        member_rep = "👿 Плохая печенька</i>"
-    elif 0 <= member.reputation_points < 100:
-        member_rep = "😐 Нейтральный"
-    elif 100 <= member.reputation_points < 500:
-        member_rep = "🙂 Хорошая печенька"
-    elif 500 <= member.reputation_points < 1000:
-        member_rep = "😎 Звезда чата"
+        member_avatar = "✖️"
+    elif isinstance(tg_member, (ChatMemberAdministrator, ChatMemberOwner)) and tg_member.can_restrict_members:
+        # admin (actual)
+        # member_level = random.choice(["🎃 Главная тыковка чата", "🎃 Безголовый всадник", "🎃 Повелитель ночи", "🎃 Тыквенный властелин"])
+        member_level = random.choice(["Полицейский", "S.W.A.T.", "Агент ФБР", "Мститель", "Модератор", "Длань правосудия"])
+        member_rep = "🛡"
+        member_avatar = random.choice(['👮','👮‍♂️','👮‍♀️','🚔','⚖️','🤖','😼','⚔️'])
     else:
-        member_rep = "😇 Добрейший добряк"
+        if member.messages_count < 100:
+            member_level = "🥷 Ноунейм"
+        elif 100 <= member.messages_count < 500:
+            member_level = "🌚 Новичок"
+        elif 500 <= member.messages_count < 1000:
+            member_level = "😎 Опытный"
+        elif 1000 <= member.messages_count < 2000:
+            member_level = "🤵 Профессионал"
+        elif 2000 <= member.messages_count < 3000:
+            member_level = "😈 Ветеран"
+        elif 3000 <= member.messages_count < 5000:
+            member_level = "⭐️ Мастер"
+        else:
+            member_level = "🌟 Легенда"
 
-    answer = f"{random.choice(['👩‍🦰','👨‍🦳','🧔','👩','👱‍♀️','🧑','👨','🧔‍♂️','🤖','😼','🧑‍🦰','🧑‍🦱','👨‍🦰','👦'])} <b>Участник чата:</b> {utils.user_mention(tg_member.user)}"
-    answer += f"\n\n<i>{member_level}</i> <i>(<tg-spoiler>{member.messages_count}</tg-spoiler>)</i>"
-    answer += f"\n<i>{member_rep}</i> <i>(<tg-spoiler>{member.reputation_points}</tg-spoiler>)</i>"
+        if member.reputation_points < -2000:
+            member_rep = "пять звёзд розыска"
+        elif -2000 <= member.reputation_points < -1000:
+            member_rep = "особо опасный"
+        elif -1000 <= member.reputation_points < -500:
+            member_rep = "тёмная личность"
+        elif -500 <= member.reputation_points < 0:
+            member_rep = "нарушитель"
+        elif 0 <= member.reputation_points < 100:
+            member_rep = "нейтральный"
+        elif 100 <= member.reputation_points < 500:
+            member_rep = "хороший"
+        elif 500 <= member.reputation_points < 1000:
+            member_rep = "очень хороший"
+        else:
+            member_rep = "великодушный"
+
+        member_avatar = random.choice(['👩‍🦰', '👨‍🦳', '🧔', '👩', '👱‍♀️', '🧑', '👨', '🧔‍♂️', '🤖', '😼', '🧑‍🦰', '🧑‍🦱', '👨‍🦰', '👦'])
+
+        # if member.messages_count < 100:
+        #     member_level = random.choice(["🧛 Неизвестный вампир", "🎃 Неизвестная тыква", "🐺 Безымянный оборотень"])
+        # elif 100 <= member.messages_count < 500:
+        #     member_level = "🌚 Восходящая луна"
+        # elif 500 <= member.messages_count < 1000:
+        #     member_level = "🎃 Тыковка"
+        # elif 1000 <= member.messages_count < 2000:
+        #     member_level = "👻 Ветеран искусства запугивания"
+        # else:
+        #     member_level = "⭐️🎃 Тыквенный мастер"
+
+        # if member.reputation_points < -2000:
+        #     member_rep = "⭐️⭐️⭐️⭐️⭐️ Пять звёзд розыска"
+        # elif -2000 <= member.reputation_points < -1000:
+        #     member_rep = "☠️ Особо опасный"
+        # elif -1000 <= member.reputation_points < -500:
+        #     member_rep = "💀 Тёмная личность"
+        # elif -500 <= member.reputation_points < 0:
+        #     member_rep = "👿 Плохая печенька"
+        # elif 0 <= member.reputation_points < 100:
+        #     member_rep = "😐 Нейтральный"
+        # elif 100 <= member.reputation_points < 500:
+        #     member_rep = "🙂 Хорошая печенька"
+        # elif 500 <= member.reputation_points < 1000:
+        #     member_rep = "😎 Звезда чата"
+        # else:
+        #     member_rep = "😇 Добрейший добряк"
+
+    answer = f"{member_avatar} <b>Участник чата:</b> {utils.user_mention(tg_member.user)}"
+    # answer += f"\n\n<b>Репутация: </b>{member_level} <i>(<tg-spoiler>{member.messages_count}</tg-spoiler>)</i>"
+    answer += f"\n\n<b>Репутация: </b>{member_level} <i> •『{member_rep} (<tg-spoiler>{member.reputation_points}</tg-spoiler>)』</i>"
 
     await message.reply(answer)
 
