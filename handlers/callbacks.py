@@ -141,6 +141,11 @@ async def callback_handler(call: types.CallbackQuery):
         spam_rec.is_spam = False
         await spam_rec.update()
 
+        # increase member messages count, cuz is not a spam :3
+        member = await Member.objects.get(id=int(call.data.split("_")[3]))
+        member.messages_count += 1
+        await member.update()
+
         await call.message.bot.edit_message_text(chat_id=config.groups.logs,
                                                  message_id=call.message.message_id,
                                                  text=call.message.text + "\n\n❎ <b>Сообщение помечено как НЕ СПАМ</b>")
