@@ -316,7 +316,8 @@ async def on_me(message: types.Message):
 
     answer = f"{member_avatar} <b>{tg_member.user.full_name.strip()}</b>"
     # answer += f"\n\n<b>Репутация: </b>{member_level} <i>(<tg-spoiler>{member.messages_count}</tg-spoiler>)</i>"
-    answer += f"\n<b>Репутация: </b>{member_level} <i> • 『{member_rep} (<tg-spoiler>{member.reputation_points}</tg-spoiler>)』</i>"
+    # answer += f"\n<b>Репутация: </b>{member_level} <i> • 『{member_rep} (<tg-spoiler>{member.reputation_points}</tg-spoiler>)』</i>"
+    answer += f"\n<b>Репутация: </b>{member_level} <i> 『{member_rep} (<tg-spoiler>{member.reputation_points}</tg-spoiler>)』</i>"
 
     await message.reply(answer)
 
@@ -392,7 +393,7 @@ async def on_rep_reset(message: types.Message):
         member.reputation_points = member.messages_count
 
         await member.update()
-        await message.reply(f"<b>Слушаюсь, сэр!</b>\nУровень репутации участника <i><b>сброшен</b>.</i>")
+        await message.reply(f"<b>Слушаюсь, сэр!</b>\n☯ Уровень репутации участника <i><b>сброшен</b>.</i>")
     except ValueError:
         await message.reply("O_o Мда")
 
