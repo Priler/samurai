@@ -376,7 +376,7 @@ async def on_reward(message: types.Message):
 
 
 @dp.message_handler(is_owner = True, chat_id=config.groups.main, commands=["punish"], commands_prefix="!")
-async def on_reward(message: types.Message):
+async def on_punish(message: types.Message):
     if not message.reply_to_message:
         await message.reply("Чего ты от меня хочешь :3")
         return
