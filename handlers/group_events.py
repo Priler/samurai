@@ -371,7 +371,7 @@ async def on_reward(message: types.Message):
         else:
             await member.update()
             # await message.reply(f"🎃 <b>Слушаюсь, повелитель!</b>\nУчастник чата благословлён вашей милостью, ему начислено <i><b>{points} очков репутации.</b></i>")
-            await message.reply(f"<b>Слушаюсь, сэр!</b>\nУчастник чата получает <i><b>{points}</b> очков репутации.</i>")
+            await message.reply(f"➕ Участник чата получает <i><b>{points}</b> очков репутации.</i>")
     except ValueError:
         await message.reply("O_o Мда")
 
@@ -393,7 +393,7 @@ async def on_rep_reset(message: types.Message):
         member.reputation_points = member.messages_count
 
         await member.update()
-        await message.reply(f"<b>Слушаюсь, сэр!</b>\n☯ Уровень репутации участника <i><b>сброшен</b>.</i>")
+        await message.reply(f"☯ Уровень репутации участника <i><b>сброшен</b>.</i>")
     except ValueError:
         await message.reply("O_o Мда")
 
@@ -420,7 +420,7 @@ async def on_punish(message: types.Message):
             await message.reply("Нетб :3")
         else:
             await member.update()
-            await message.reply(f"<b>Слушаюсь, сэр!</b>\nУчастник чата теряет <i><b>{points}</b> очков репутации.</i>")
+            await message.reply(f"➖ Участник чата теряет <i><b>{points}</b> очков репутации.</i>")
     except ValueError:
         await message.reply("O_o Мда")
 
