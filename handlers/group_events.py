@@ -346,6 +346,7 @@ async def on_setlvl(message: types.Message):
     except ValueError:
         await message.reply("O_o Мда")
 
+
 @dp.message_handler(is_owner = True, chat_id=config.groups.main, commands=["reward"], commands_prefix="!")
 async def on_reward(message: types.Message):
     if not message.reply_to_message:
@@ -368,7 +369,35 @@ async def on_reward(message: types.Message):
             await message.reply("Нетб :3")
         else:
             await member.update()
-            await message.reply(f"🎃 <b>Слушаюсь, повелитель!</b>\nУчастник чата благословлён вашей милостью, ему начислено <i><b>{points} очков репутации.</b></i>")
+            # await message.reply(f"🎃 <b>Слушаюсь, повелитель!</b>\nУчастник чата благословлён вашей милостью, ему начислено <i><b>{points} очков репутации.</b></i>")
+            await message.reply(f"<b>Слушаюсь, сэр!</b>\nУчастник чата получает <i><b>{points}</b> очков репутации.</i>")
+    except ValueError:
+        await message.reply("O_o Мда")
+
+
+@dp.message_handler(is_owner = True, chat_id=config.groups.main, commands=["punish"], commands_prefix="!")
+async def on_reward(message: types.Message):
+    if not message.reply_to_message:
+        await message.reply("Чего ты от меня хочешь :3")
+        return
+
+    points = abs(int(utils.remove_prefix(message.text, "!punish")))
+
+    ### Retrieve member record from DB
+    try:
+        # retrieve existing record
+        member = await Member.objects.get(user_id=message.reply_to_message.from_user.id)
+    except ormar.NoMatch:
+        return
+
+    try:
+        member.reputation_points -= points
+
+        if points > 100_000:
+            await message.reply("Нетб :3")
+        else:
+            await member.update()
+            await message.reply(f"<b>Слушаюсь, сэр!</b>\nУчастник чата теряет <i><b>{points}</b> очков репутации.</i>")
     except ValueError:
         await message.reply("O_o Мда")
 
