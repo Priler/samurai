@@ -6,7 +6,7 @@ import localization
 
 from contextlib import suppress
 from aiogram.utils.exceptions import (MessageToEditNotFound, MessageCantBeEdited, MessageCantBeDeleted,
-                                      MessageToDeleteNotFound, CantRestrictChatOwner)
+                                      MessageToDeleteNotFound, CantRestrictChatOwner, BadRequest)
 
 from models.member import Member
 from models.spam import Spam
@@ -128,7 +128,7 @@ async def callback_handler(call: types.CallbackQuery):
                                                  text=call.message.text + "\n\n<b>Удалено из базы, вероятно тест.</b>")
         await call.answer(text="Done")
     elif call.data.startswith("spam_ban_"):
-        with suppress(CantRestrictChatOwner):
+        with suppress(CantRestrictChatOwner, BadRequest):
             await call.message.bot.kick_chat_member(chat_id=config.groups.main, user_id=call.data.split("_")[2])
 
         await call.message.bot.edit_message_text(chat_id=config.groups.logs,
