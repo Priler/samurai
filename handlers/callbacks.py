@@ -141,11 +141,14 @@ async def callback_handler(call: types.CallbackQuery):
         spam_rec.is_spam = False
         await spam_rec.update()
 
-        # increase member messages count, cuz is not a spam :3
-        member = await Member.objects.get(id=int(call.data.split("_")[3]))
-        member.messages_count += 1
-        member.reputation_points += 10 # add rep. points for not-a-spam reaction
-        await member.update()
+        try:
+            # increase member messages count, cuz is not a spam :3
+            member = await Member.objects.get(id=int(call.data.split("_")[3]))
+            member.messages_count += 1
+            member.reputation_points += 10 # add rep. points for not-a-spam reaction
+            await member.update()
+        except IndexError:
+            pass
 
         await call.message.bot.edit_message_text(chat_id=config.groups.logs,
                                                  message_id=call.message.message_id,
