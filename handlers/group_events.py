@@ -113,7 +113,7 @@ async def on_user_message(message: types.Message):
     await utils.write_log(message.bot, log_msg, "🤬 Антимат")
   else:
     ### NO PROFANITY, GO CHECK FOR SPAM
-    if member.messages_count < int(config.spam.member_messages_threshold) and ruspam_predict(msg_text):
+    if (member.messages_count < int(config.spam.member_messages_threshold) or member.reputation_points < int(config.spam.member_reputation_threshold)) and ruspam_predict(msg_text):
         # SPAM DETECTED
         # if not (tg_member.is_chat_admin() and tg_member.can_restrict_members):
         if not tg_member.is_chat_admin():
@@ -141,7 +141,7 @@ async def on_user_message(message: types.Message):
         # not a spam
         spam_keyboard.add(types.InlineKeyboardButton(
             text="❎ Это НЕ спам",
-            callback_data=f"spam_invert_{spam_rec.id}")
+            callback_data=f"spam_invert_{spam_rec.id}_{member.id}")
         )
 
         # test msg, remove from db

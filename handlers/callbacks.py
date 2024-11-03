@@ -144,6 +144,7 @@ async def callback_handler(call: types.CallbackQuery):
         # increase member messages count, cuz is not a spam :3
         member = await Member.objects.get(id=int(call.data.split("_")[3]))
         member.messages_count += 1
+        member.reputation_points += 10 # add rep. points for not-a-spam reaction
         await member.update()
 
         await call.message.bot.edit_message_text(chat_id=config.groups.logs,
