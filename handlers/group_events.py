@@ -268,9 +268,11 @@ async def on_me(message: types.Message):
         # admin (actual)
         # member_level = random.choice(["🎃 Главная тыковка чата", "🎃 Безголовый всадник", "🎃 Повелитель ночи", "🎃 Тыквенный властелин"])
         member_level = random.choice(["Полицейский", "S.W.A.T.", "Агент ФБР", "Мститель", "Модератор", "Длань правосудия"])
-        member_rep = "🛡"
+        member_rep = "🛡 "
         member_avatar = random.choice(['👮','👮‍♂️','👮‍♀️','🚔','⚖️','🤖','😼','⚔️'])
     else:
+        member_rep = ""
+
         if member.messages_count < 100:
             member_level = "🥷 Ноунейм"
         elif 100 <= member.messages_count < 500:
@@ -286,22 +288,22 @@ async def on_me(message: types.Message):
         else:
             member_level = "🌟 Легенда"
 
-        if member.reputation_points < -2000:
-            member_rep = "⭐️⭐️⭐️⭐️⭐️ пять звёзд розыска"
-        elif -2000 <= member.reputation_points < -1000:
-            member_rep = "особо опасный"
-        elif -1000 <= member.reputation_points < -500:
-            member_rep = "тёмная личность"
-        elif -500 <= member.reputation_points < 0:
-            member_rep = "нарушитель"
-        elif 0 <= member.reputation_points < 100:
-            member_rep = "нейтральный"
-        elif 100 <= member.reputation_points < 500:
-            member_rep = "хороший"
-        elif 500 <= member.reputation_points < 1000:
-            member_rep = "очень хороший"
-        else:
-            member_rep = "великодушный"
+    if member.reputation_points < -2000:
+        member_rep_label = "⭐️⭐️⭐️⭐️⭐️ пять звёзд розыска"
+    elif -2000 <= member.reputation_points < -1000:
+        member_rep_label = "особо опасный"
+    elif -1000 <= member.reputation_points < -500:
+        member_rep_label = "тёмная личность"
+    elif -500 <= member.reputation_points < 0:
+        member_rep_label = "нарушитель"
+    elif 0 <= member.reputation_points < 100:
+        member_rep_label = "нейтральный"
+    elif 100 <= member.reputation_points < 500:
+        member_rep_label = "хороший"
+    elif 500 <= member.reputation_points < 1000:
+        member_rep_label = "очень хороший"
+    else:
+        member_rep_label = "великодушный"
 
         member_avatar = random.choice(['👩‍🦰', '👨‍🦳', '🧔', '👩', '👱‍♀️', '🧑', '👨', '🧔‍♂️', '🤖', '😼', '🧑‍🦰', '🧑‍🦱', '👨‍🦰', '👦'])
 
@@ -336,7 +338,7 @@ async def on_me(message: types.Message):
     answer = f"{member_avatar} <b>{tg_member.user.full_name.strip()}</b>"
     # answer += f"\n\n<b>Репутация: </b>{member_level} <i>(<tg-spoiler>{member.messages_count}</tg-spoiler>)</i>"
     # answer += f"\n<b>Репутация: </b>{member_level} <i> • 『{member_rep} (<tg-spoiler>{member.reputation_points}</tg-spoiler>)』</i>"
-    answer += f"\n<b>Репутация: </b>{member_level} <i> 『{member_rep} (<tg-spoiler>{member.reputation_points}</tg-spoiler>)』</i>"
+    answer += f"\n<b>Репутация: </b>{member_level} <i> 『{member_rep}{member_rep_label} (<tg-spoiler>{member.reputation_points}</tg-spoiler>)』</i>"
 
     await message.reply(answer)
 
