@@ -34,10 +34,17 @@ async def cmd_ping_bot(message: types.Message):
 		ram = psutil.virtual_memory()
 
 		reply = "<b>👊 Самурай на месте!</b>\n\n"
-		reply += "<b>CPU:</b> <i>" + str(psutil.cpu_count()) + " cores (" + str(psutil.cpu_freq().max) + "MHz) with " + str(psutil.cpu_percent()) + "% current usage</i>\n"
-		reply += "<b>RAM:</b> <i>" + str(ram.used >> 20) +"mb / "+ str(ram.total >> 20) + "mb</i>\n";
+		reply += "<b>CPU:</b> <i>{} cores ({}MHz) with {}% current usage</i>\n".format(
+			psutil.cpu_count(),
+			utils.get_cpu_freq(),
+			psutil.cpu_percent()
+		)
+		reply += "<b>RAM:</b> <i>{}mb / {}mb</i>\n".format(
+			ram.used >> 20,
+			ram.total >> 20
+		)
 
-		reply += "\n<b>Bot version:</b> <i>" + str(config.bot.version) + " codename «<b>" + config.bot.version_codename + "</b>»</i> 🌚"
+		reply += "\n<b>Версия бота:</b> <i>" + str(config.bot.version) + " codename «<b>" + config.bot.version_codename + "</b>»</i>"
 
 		await message.reply(reply)
 
