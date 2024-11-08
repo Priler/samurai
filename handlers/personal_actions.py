@@ -1,3 +1,4 @@
+import random
 from time import time
 from aiogram import types
 from configurator import config
@@ -33,13 +34,13 @@ async def cmd_ping_bot(message: types.Message):
 
 		ram = psutil.virtual_memory()
 
-		reply = "<b>👊 Самурай на месте!</b>\n\n"
+		reply = f"<b>{random.choice(['👊 Самурай на месте!', '🫰 Нужно больше золота', '🫡 Тута я, бож :3', '✊ Железо говн@, но я держусь!'])}</b>\n\n"
 		reply += "<b>CPU:</b> <i>{} ядро ({} MHz) загружено на {}%</i>\n".format(
 			psutil.cpu_count(),
 			int(utils.get_cpu_freq_from_proc()),
 			psutil.cpu_percent()
 		)
-		reply += "<b>RAM:</b> <i>{}мб / {}мб</i>\n".format(
+		reply += "<b>RAM:</b> <i>{}ГБ / {}ГБ</i>\n".format(
 			ram.used >> 20,
 			ram.total >> 20
 		)
