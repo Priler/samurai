@@ -40,7 +40,7 @@ async def cmd_ping_bot(message: types.Message):
 			int(utils.get_cpu_freq_from_proc()),
 			psutil.cpu_percent()
 		)
-		reply += "<b>RAM:</b> <i>{}ГБ / {}ГБ</i>\n".format(
+		reply += "<b>RAM:</b> <i>{}мб / {}мб</i>\n".format(
 			ram.used >> 20,
 			ram.total >> 20
 		)
@@ -52,7 +52,7 @@ async def cmd_ping_bot(message: types.Message):
 		disk_total_gb = disk.total // (2 ** 30)  # or (1024**3)
 		disk_free_gb = disk.free // (2 ** 30)
 
-		reply += "<b>SSD:</b> <i>{}гб / {}гб ({}% занято)</i>\n".format(
+		reply += "<b>SSD:</b> <i>{}ГБ / {}ГБ ({}% занято)</i>\n".format(
 			disk_free_gb,
 			disk_total_gb,
 			int(disk.percent)
