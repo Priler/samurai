@@ -34,14 +34,27 @@ async def cmd_ping_bot(message: types.Message):
 		ram = psutil.virtual_memory()
 
 		reply = "<b>👊 Самурай на месте!</b>\n\n"
-		reply += "<b>CPU:</b> <i>{} cores ({} MHz) with {}% current usage</i>\n".format(
+		reply += "<b>CPU:</b> <i>{} ядро ({} MHz) загружено на {}%</i>\n".format(
 			psutil.cpu_count(),
-			utils.get_cpu_freq_from_proc(),
+			int(utils.get_cpu_freq_from_proc()),
 			psutil.cpu_percent()
 		)
-		reply += "<b>RAM:</b> <i>{}mb / {}mb</i>\n".format(
+		reply += "<b>RAM:</b> <i>{}мб / {}мб</i>\n".format(
 			ram.used >> 20,
 			ram.total >> 20
+		)
+		reply += "<b>GPU:</b> <i>N/A</i>\n"
+
+		# Get disk info for root partition
+		disk = psutil.disk_usage('/')
+		# Convert bytes to GB
+		disk_total_gb = disk.total // (2 ** 30)  # or (1024**3)
+		disk_free_gb = disk.free // (2 ** 30)
+
+		reply += "<b>SSD:</b> <i>{}гб / {}гб ({}% занято)</i>\n".format(
+			disk_free_gb,
+			disk_total_gb,
+			int(disk.percent)
 		)
 
 		reply += "\n<b>Версия бота:</b> <i>" + str(config.bot.version) + " codename «<b>" + config.bot.version_codename + "</b>»</i>"
