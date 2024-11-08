@@ -188,8 +188,11 @@ async def on_user_media(message: types.Message):
     ### Retrieve member record from DB
     member = await lru_cache.retrieve_or_create_member(message.from_user.id)
 
+    tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
+
     # User is not allowed to post media type messages, until he reaches required reputation points
-    if member.reputation_points < int(config.spam.allow_media_threshold):
+    # exceptions: admins
+    if not tg_member.is_chat_admin() and member.reputation_points < int(config.spam.allow_media_threshold):
         await message.delete()
 
 
