@@ -14,13 +14,16 @@ from censure import Censor
 censor_ru = Censor.get(lang='ru')
 censor_en = Censor.get(lang='en')
 
+
 @dp.message_handler(user_id = int(config.bot.owner), commands="msg", commands_prefix="!/")
 async def cmd_message_from_bot(message: types.Message):
 	await message.bot.send_message(config.groups.main, utils.remove_prefix(message.text, "!msg "))
 
+
 @dp.message_handler(user_id = int(config.bot.owner), commands="log", commands_prefix="!/")
 async def cmd_write_log_bot(message: types.Message):
 	await utils.write_log(message.bot, utils.remove_prefix(message.text, "!log "), "test")
+
 
 @dp.message_handler(is_admin=True, commands="ping", commands_prefix="!")
 async def cmd_ping_bot(message: types.Message):
@@ -30,13 +33,14 @@ async def cmd_ping_bot(message: types.Message):
 
 		ram = psutil.virtual_memory()
 
-		reply = "<b>👊 Up & Running!</b>\n\n"
+		reply = "<b>👊 Самурай на месте!</b>\n\n"
 		reply += "<b>CPU:</b> <i>" + str(psutil.cpu_count()) + " cores (" + str(psutil.cpu_freq().max) + "MHz) with " + str(psutil.cpu_percent()) + "% current usage</i>\n"
 		reply += "<b>RAM:</b> <i>" + str(ram.used >> 20) +"mb / "+ str(ram.total >> 20) + "mb</i>\n";
 
 		reply += "\n<b>Bot version:</b> <i>" + str(config.bot.version) + " codename «<b>" + config.bot.version_codename + "</b>»</i> 🌚"
 
 		await message.reply(reply)
+
 
 # @dp.message_handler(lambda message: message.chat.type == 'private', commands=["prof", "мат"], commands_prefix="!")
 @dp.message_handler(is_admin=True, commands=["prof", "мат"], commands_prefix="!")
