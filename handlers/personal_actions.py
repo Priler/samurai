@@ -34,9 +34,9 @@ async def cmd_ping_bot(message: types.Message):
 		ram = psutil.virtual_memory()
 
 		reply = "<b>👊 Самурай на месте!</b>\n\n"
-		reply += "<b>CPU:</b> <i>{} cores ({}MHz) with {}% current usage</i>\n".format(
+		reply += "<b>CPU:</b> <i>{} cores ({} MHz) with {}% current usage</i>\n".format(
 			psutil.cpu_count(),
-			utils.get_cpu_freq(),
+			utils.get_cpu_freq_from_proc(),
 			psutil.cpu_percent()
 		)
 		reply += "<b>RAM:</b> <i>{}mb / {}mb</i>\n".format(
