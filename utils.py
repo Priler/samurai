@@ -3,6 +3,8 @@ import sys
 import typing
 from typing import final
 
+import psutil
+
 import localization
 from configurator import config
 
@@ -139,3 +141,22 @@ def remove_prefix(text, prefix):
     if text.startswith(prefix):
         return text[len(prefix):]
     return text  # or whatever
+
+
+def get_cpu_freq():
+    try:
+        freq = psutil.cpu_freq()
+        return freq.max if freq and freq.max > 0 else "N/A"
+    except Exception:
+        return "N/A"
+
+
+def get_cpu_freq_from_proc():
+    try:
+        with open('/proc/cpuinfo') as f:
+            for line in f:
+                if line.startswith('cpu MHz'):
+                    return float(line.split(':')[1].strip())
+    except:
+        return "N/A"
+    return "N/A"
