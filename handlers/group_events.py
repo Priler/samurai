@@ -1,6 +1,5 @@
-import ormar
 from aiogram import types
-from aiogram.types import ChatMemberAdministrator, ChatMemberOwner
+from aiogram.types import ChatMemberAdministrator, ChatMemberOwner, ContentType
 from sympy.strategies.core import switch
 
 from configurator import config
@@ -14,6 +13,7 @@ from aiogram.utils import exceptions
 
 import random
 
+import ormar
 from models.member import Member
 from models.spam import Spam
 
@@ -59,18 +59,15 @@ async def on_user_message(message: types.Message):
                                          "Самурай на страже порядке 🫡", "Постим живем :3", "Ладно", "Пока ты читаешь, я уже коммент оставил! Успевай 😈",
                                          "Кто на чем пишет? Я вот на Python :3", "Самурай на месте 😎", "Самурай без меча, как бот без токена :3",
                                          "Нулевой тутб :3", "Ох, умбаса ..", "Минутка полезной инфы. Сейчас принято считать, что 1МБ = 1000КБ. А 1МиБ = 1024 КиБ. Живи с этим.",
-                                         "✌️ Здоровья и мира тебе, читающий это :3", "Вышел ёжик из тумана ... вынул <tg-spoiler>пайтон</tg-spoiler> из кармана :3",
+                                         "✌️ Здоровья и мира тебе, читающий это :3", f"Вышел ёжик из тумана ... вынул <tg-spoiler>{random.choice(['пайтон', 'раст', 'ЖС', 'джаву', 'катану', 'бананчики'])}</tg-spoiler> из кармана :3",
                                          "жаль, что далеко не все поймут в чем же дело))) действительно тонко))))) не так уж много и образованных в наше время, кто знает, почему это так интересно и необычно))))",
-                                         "С великой силой приходит великая безответственность."]))
+                                         "С великой силой приходит великая безответственность.", "Где-то однажды появился на свет\nС лаем и мяуканьем зверь, каких нет\nИ тут же сбежал, оставив вопрос,\nСобаче-кошачий малыш Котопес\nКотопес, котопес ...\nЕдинственный в мире малыш котопес.",
+                                         "Его не признали в городе родном\nИ все его шпыняют и ночью и днем\nНе стоит огорчаться, не стоит робеть\nА лучше эту песенку вместе пропеть Котопес, котопес,\nЕдинственный в мире малыш котопес!",
+                                         "Есть программисты, а есть ЖСеры пхпхпх"]))
       return # auto-forward channel messages should not be checked
 
   ### Retrieve member record from DB
-  try:
-    # retrieve existing record
-    member = await Member.objects.get(user_id=message.from_user.id)
-  except ormar.NoMatch:
-    # create new record
-    member = await Member.objects.create(user_id=message.from_user.id, messages_count=1)
+  member = await utils.retrieve_or_create_member(message.from_user.id)
 
   # Retrieve tg member object
   tg_member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
@@ -156,17 +153,43 @@ async def on_user_message(message: types.Message):
             utils.generate_log_message(log_msg, "❌ АнтиСПАМ"),
             reply_markup=spam_keyboard)
     else:
-        # increase members messages count (only if message doesn't contain any violations)
-        member.messages_count += 1
+        # only if message doesn't contain any violations
+        member.messages_count += 1 # increase members messages count
+        member.reputation_points += 1 # increase members reputation points
         await member.update()
 
 @dp.message_handler(chat_id=config.groups.main, content_types=["voice"])
 async def on_user_voice(message: types.Message):
     if random.random() < 0.75: # 75% chance to react
+        ### Retrieve member record from DB
+        member = await utils.retrieve_or_create_member(message.from_user)
+
         await message.reply(random.choice(["фу! ФУ Я СКАЗАЛ, НЕЛЬЗЯ. БРОСЬ КАКУ. ПИШИ ТЕКСТОМ.", "Давай без резких движений! Положи телефон на пол ... и больше не записывай ГСки :3",
                                            "ГСки - бич современного общества. Делай выводы, макарошка :3", "А вот в моё время люди писали текстом ...",
                                            "ТЫ ПРИШЕЛ В ЭТОТ ЧАТ! Но ты пришел без уважения ...", "Сэр, вынужден сообщить вам, что общаться ГСками это признак отсутствия интеллекта.",
                                            "ГСки бож ... выйди с чата, не позорься.", "Фу! ФУ Я СКАЗАЛ! Пиши текстом."]))
+
+        member.reputation_points -= 10 # every voice message removes some reputation points
+        await member.update()
+
+
+media_content_types = [
+    ContentType.PHOTO,
+    ContentType.VIDEO,
+    ContentType.AUDIO,
+    ContentType.DOCUMENT,
+    # ContentType.VOICE,
+    ContentType.VIDEO_NOTE,
+    ContentType.ANIMATION
+]
+@dp.message_handler(chat_id=config.groups.main, content_types=media_content_types)
+async def on_user_media(message: types.Message):
+    ### Retrieve member record from DB
+    member = await utils.retrieve_or_create_member(message.from_user.id)
+
+    # User is not allowed to post media type messages, until he reaches required reputation points
+    if member.reputation_points < int(config.spam.allow_media_threshold):
+        await message.delete()
 
 
 @dp.message_handler(is_admin=False, chat_id=config.groups.main, content_types=[types.ContentType.TEXT, types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO])
@@ -231,11 +254,7 @@ async def on_me(message: types.Message):
         user_id = message.from_user.id
 
     ### Retrieve member record from DB
-    try:
-        # retrieve existing record
-        member = await Member.objects.get(user_id=user_id)
-    except ormar.NoMatch:
-        return
+    member = await utils.retrieve_or_create_member(user_id)
 
     tg_member = await message.bot.get_chat_member(message.chat.id, user_id)
 
@@ -329,11 +348,7 @@ async def on_setlvl(message: types.Message):
         return
 
     ### Retrieve member record from DB
-    try:
-        # retrieve existing record
-        member = await Member.objects.get(user_id=message.reply_to_message.from_user.id)
-    except ormar.NoMatch:
-        return
+    member = await utils.retrieve_or_create_member(message.reply_to_message.from_user.id)
 
     try:
         member.messages_count = abs(int(utils.remove_prefix(message.text, "!setlvl")))
@@ -357,11 +372,7 @@ async def on_reward(message: types.Message):
     points = abs(int(utils.remove_prefix(message.text, "!reward")))
 
     ### Retrieve member record from DB
-    try:
-        # retrieve existing record
-        member = await Member.objects.get(user_id=message.reply_to_message.from_user.id)
-    except ormar.NoMatch:
-        return
+    member = await utils.retrieve_or_create_member(message.reply_to_message.from_user.id)
 
     try:
         member.reputation_points += points
@@ -383,11 +394,7 @@ async def on_rep_reset(message: types.Message):
         return
 
     ### Retrieve member record from DB
-    try:
-        # retrieve existing record
-        member = await Member.objects.get(user_id=message.reply_to_message.from_user.id)
-    except ormar.NoMatch:
-        return
+    member = await utils.retrieve_or_create_member(message.reply_to_message.from_user.id)
 
     try:
         member.reputation_points = member.messages_count
@@ -407,11 +414,7 @@ async def on_punish(message: types.Message):
     points = abs(int(utils.remove_prefix(message.text, "!punish")))
 
     ### Retrieve member record from DB
-    try:
-        # retrieve existing record
-        member = await Member.objects.get(user_id=message.reply_to_message.from_user.id)
-    except ormar.NoMatch:
-        return
+    member = await utils.retrieve_or_create_member(message.reply_to_message.from_user.id)
 
     try:
         member.reputation_points -= points

@@ -5,6 +5,7 @@ aioschedule==0.5.2
 psutil==6.0.0
 easydict
 python-dotenv
+cachetools
 
 uvloop==0.20.0; sys_platform != 'windows'
 ujson==5.10.0
