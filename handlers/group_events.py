@@ -8,6 +8,7 @@ import localization
 from time import time
 import re
 import utils
+import lru_cache
 import datetime
 from aiogram.utils import exceptions
 
@@ -67,10 +68,10 @@ async def on_user_message(message: types.Message):
       return # auto-forward channel messages should not be checked
 
   ### Retrieve member record from DB
-  member = await utils.retrieve_or_create_member(message.from_user.id)
+  member = await lru_cache.retrieve_or_create_member(message.from_user.id)
 
   # Retrieve tg member object
-  tg_member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
+  tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
 
   # Define message text
   msg_text = None
@@ -162,7 +163,7 @@ async def on_user_message(message: types.Message):
 async def on_user_voice(message: types.Message):
     if random.random() < 0.75: # 75% chance to react
         ### Retrieve member record from DB
-        member = await utils.retrieve_or_create_member(message.from_user)
+        member = await lru_cache.retrieve_or_create_member(message.from_user)
 
         await message.reply(random.choice(["фу! ФУ Я СКАЗАЛ, НЕЛЬЗЯ. БРОСЬ КАКУ. ПИШИ ТЕКСТОМ.", "Давай без резких движений! Положи телефон на пол ... и больше не записывай ГСки :3",
                                            "ГСки - бич современного общества. Делай выводы, макарошка :3", "А вот в моё время люди писали текстом ...",
@@ -185,7 +186,7 @@ media_content_types = [
 @dp.message_handler(chat_id=config.groups.main, content_types=media_content_types)
 async def on_user_media(message: types.Message):
     ### Retrieve member record from DB
-    member = await utils.retrieve_or_create_member(message.from_user.id)
+    member = await lru_cache.retrieve_or_create_member(message.from_user.id)
 
     # User is not allowed to post media type messages, until he reaches required reputation points
     if member.reputation_points < int(config.spam.allow_media_threshold):
@@ -254,9 +255,9 @@ async def on_me(message: types.Message):
         user_id = message.from_user.id
 
     ### Retrieve member record from DB
-    member = await utils.retrieve_or_create_member(user_id)
+    member = await lru_cache.retrieve_or_create_member(user_id)
 
-    tg_member = await message.bot.get_chat_member(message.chat.id, user_id)
+    tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, user_id)
 
     member_level = None
     if isinstance(tg_member, (ChatMemberAdministrator, ChatMemberOwner)) and tg_member.is_chat_creator():
@@ -352,7 +353,7 @@ async def on_setlvl(message: types.Message):
         return
 
     ### Retrieve member record from DB
-    member = await utils.retrieve_or_create_member(message.reply_to_message.from_user.id)
+    member = await lru_cache.retrieve_or_create_member(message.reply_to_message.from_user.id)
 
     try:
         member.messages_count = abs(int(utils.remove_prefix(message.text, "!setlvl")))
@@ -376,7 +377,7 @@ async def on_reward(message: types.Message):
     points = abs(int(utils.remove_prefix(message.text, "!reward")))
 
     ### Retrieve member record from DB
-    member = await utils.retrieve_or_create_member(message.reply_to_message.from_user.id)
+    member = await lru_cache.retrieve_or_create_member(message.reply_to_message.from_user.id)
 
     try:
         member.reputation_points += points
@@ -398,7 +399,7 @@ async def on_rep_reset(message: types.Message):
         return
 
     ### Retrieve member record from DB
-    member = await utils.retrieve_or_create_member(message.reply_to_message.from_user.id)
+    member = await lru_cache.retrieve_or_create_member(message.reply_to_message.from_user.id)
 
     try:
         member.reputation_points = member.messages_count
@@ -418,7 +419,7 @@ async def on_punish(message: types.Message):
     points = abs(int(utils.remove_prefix(message.text, "!punish")))
 
     ### Retrieve member record from DB
-    member = await utils.retrieve_or_create_member(message.reply_to_message.from_user.id)
+    member = await lru_cache.retrieve_or_create_member(message.reply_to_message.from_user.id)
 
     try:
         member.reputation_points -= points

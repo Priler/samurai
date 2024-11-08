@@ -10,45 +10,9 @@ sys.path.append("./censure")  # allow module import from git submodule
 
 from censure import Censor
 
-import ormar
-from models.member import Member
-
-import cachetools
-from cachetools import LRUCache
-from functools import wraps
-
-# Create LRU-cache with size of 1000 elements
-cache = LRUCache(maxsize=1000)
-
 # create censor instances
 censor_ru = Censor.get(lang='ru')
 censor_en = Censor.get(lang='en')
-
-def cache_async(func):
-    @wraps(func)
-    async def wrapper(user_id):
-        # check if it's in cache already
-        if user_id in cache:
-            return cache[user_id]
-
-        # Call function and cache result
-        result = await func(user_id)
-        cache[user_id] = result
-        return result
-
-    return wrapper
-
-@cache_async
-async def retrieve_or_create_member(user_id):
-    member = None
-
-    try:
-        member = await Member.objects.get(user_id=user_id)
-    except ormar.NoMatch:
-        member = await Member.objects.create(user_id=user_id, messages_count=1)
-    finally:
-        return member
-
 
 def check_for_profanity(text, lang="ru"):
     _profanity_detected = False
