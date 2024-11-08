@@ -100,7 +100,7 @@ async def on_user_message(message: types.Message):
 
         # increase member violations count
         member.violations_count_profanity += 1
-        member.reputation_points -= 50 # every profanity message removes some reputation points from user
+        member.reputation_points -= 20 # every profanity message removes some reputation points from user
         await member.update()
 
     log_msg = msg_text
@@ -119,6 +119,7 @@ async def on_user_message(message: types.Message):
 
             # increase member violations count
             member.violations_count_spam += 1
+            member.reputation_points -= 5  # every spam message removes some reputation points from user
             await member.update()
 
         log_msg = msg_text
