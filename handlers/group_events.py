@@ -288,23 +288,6 @@ async def on_me(message: types.Message):
         else:
             member_level = "🌟 Легенда"
 
-    if member.reputation_points < -2000:
-        member_rep_label = "⭐️⭐️⭐️⭐️⭐️ пять звёзд розыска"
-    elif -2000 <= member.reputation_points < -1000:
-        member_rep_label = "особо опасный"
-    elif -1000 <= member.reputation_points < -500:
-        member_rep_label = "тёмная личность"
-    elif -500 <= member.reputation_points < 0:
-        member_rep_label = "нарушитель"
-    elif 0 <= member.reputation_points < 100:
-        member_rep_label = "нейтральный"
-    elif 100 <= member.reputation_points < 500:
-        member_rep_label = "хороший"
-    elif 500 <= member.reputation_points < 1000:
-        member_rep_label = "очень хороший"
-    else:
-        member_rep_label = "великодушный"
-
         member_avatar = random.choice(['👩‍🦰', '👨‍🦳', '🧔', '👩', '👱‍♀️', '🧑', '👨', '🧔‍♂️', '🤖', '😼', '🧑‍🦰', '🧑‍🦱', '👨‍🦰', '👦'])
 
         # if member.messages_count < 100:
@@ -334,6 +317,23 @@ async def on_me(message: types.Message):
         #     member_rep = "😎 Звезда чата"
         # else:
         #     member_rep = "😇 Добрейший добряк"
+
+    if member.reputation_points < -2000:
+        member_rep_label = "⭐️⭐️⭐️⭐️⭐️ пять звёзд розыска"
+    elif -2000 <= member.reputation_points < -1000:
+        member_rep_label = "особо опасный"
+    elif -1000 <= member.reputation_points < -500:
+        member_rep_label = "тёмная личность"
+    elif -500 <= member.reputation_points < 0:
+        member_rep_label = "нарушитель"
+    elif 0 <= member.reputation_points < 100:
+        member_rep_label = "нейтральный"
+    elif 100 <= member.reputation_points < 500:
+        member_rep_label = "хороший"
+    elif 500 <= member.reputation_points < 1000:
+        member_rep_label = "очень хороший"
+    else:
+        member_rep_label = "великодушный"
 
     answer = f"{member_avatar} <b>{tg_member.user.full_name.strip()}</b>"
     # answer += f"\n\n<b>Репутация: </b>{member_level} <i>(<tg-spoiler>{member.messages_count}</tg-spoiler>)</i>"
