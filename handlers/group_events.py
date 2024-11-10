@@ -279,10 +279,12 @@ async def on_me(message: types.Message):
     else:
         user_id = message.from_user.id
 
-    ### Retrieve member record from DB
+    ### Retrieve member
     member = await lru_cache.retrieve_or_create_member(user_id)
-
     tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, user_id)
+
+    # Try detect member gender
+    member__gender = utils.detect_gender(tg_member.user.first_name)
 
     member_level = None
     if isinstance(tg_member, (ChatMemberAdministrator, ChatMemberOwner)) and tg_member.is_chat_creator():
@@ -314,7 +316,12 @@ async def on_me(message: types.Message):
         else:
             member_level = "🌟 Легенда"
 
-        member_avatar = random.choice(['👩‍🦰', '👨‍🦳', '🧔', '👩', '👱‍♀️', '🧑', '👨', '🧔‍♂️', '🤖', '😼', '🧑‍🦰', '🧑‍🦱', '👨‍🦰', '👦'])
+        if member__gender == Gender.FEMALE:
+            member_avatar = random.choice(['👩‍🦰', '👩', '👱‍♀️', '👧', '👩‍🦱', '👩‍🦱', '🤵‍♀️', '👩‍🦳'])
+        elif member__gender == Gender.MALE:
+            member_avatar = random.choice(['👨‍🦳', '🧔', '🧑', '👨', '🧔‍♂️', '🧑‍🦰', '🧑‍🦱', '👨‍🦰', '👦', '🤵‍♂️'])
+        else:
+            member_avatar = random.choice(['🤖', '😼', '👻', '😺'])
 
         # if member.messages_count < 100:
         #     member_level = random.choice(["🧛 Неизвестный вампир", "🎃 Неизвестная тыква", "🐺 Безымянный оборотень"])
