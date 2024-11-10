@@ -63,14 +63,22 @@ def check_for_profanity_all(text):
 
 
 def detect_gender(name: str) -> Gender:
-    r = g_ext.extract_gender(name.strip())
+    # pre-process the name
+    name = name.split(" ")[0]
+    name = name.strip()
 
+    # extract
+    r = g_ext.extract_gender(name)
+
+    # return result
     if 'male' in r:
         return Gender.MALE
     elif 'female' in r:
         return Gender.FEMALE
     else:
-        return Gender.UNKNOWN
+        # last shot
+        # if name ends with 'а' letter, then assume it's female
+        return Gender.FEMALE if name not in ["фома", "савва", "кима", "алима"] and name.lower()[-1] == 'а' else Gender.UNKNOWN
 
 
 def user_mention(from_user):
