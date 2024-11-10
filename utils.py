@@ -2,14 +2,22 @@ import datetime
 import sys
 import typing
 from typing import final
+from enum import Enum
 
 import psutil
 
 import localization
 from configurator import config
 
-sys.path.append("./censure")  # allow module import from git submodule
+from gender_extractor import GenderExtractor
+g_ext = GenderExtractor()
 
+class Gender(Enum):
+    UNKNOWN = 0
+    MALE = 1
+    FEMALE = 2
+
+sys.path.append("./censure")  # allow module import from git submodule
 from censure import Censor
 
 # create censor instances
@@ -52,6 +60,17 @@ def check_for_profanity_all(text):
         _del, _word, _line = check_for_profanity(text, lang="en")
 
     return _del, _word
+
+
+def detect_gender(name: str) -> Gender:
+    r = g_ext.extract_gender(name.strip())
+
+    if 'male' in r:
+        return Gender.MALE
+    elif 'female' in r:
+        return Gender.FEMALE
+    else:
+        return Gender.UNKNOWN
 
 
 def user_mention(from_user):
