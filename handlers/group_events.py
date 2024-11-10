@@ -20,6 +20,8 @@ from models.spam import Spam
 
 from ruspam import predict as ruspam_predict
 
+from utils import Gender
+
 # blacklist = open("blacklist.txt", mode="r").read().split(',')
 # blacklist_regexp = re.compile(r'(?iu)\b((у|[нз]а|(хитро|не)?вз?[ыьъ]|с[ьъ]|(и|ра)[зс]ъ?|(о[тб]|под)[ьъ]?|(.\B)+?[оаеи])?-?([её]б(?!о[рй])|и[пб][ае][тц]).*?|(н[иеа]|[дп]о|ра[зс]|з?а|с(ме)?|о(т|дно)?|апч)?-?ху([яйиеёю]|ли(?!ган)).*?|(в[зы]|(три|два|четыре)жды|(н|сук)а)?-?бл(я(?!(х|ш[кн]|мб)[ауеыио]).*?|[еэ][дт]ь?)|(ра[сз]|[зн]а|[со]|вы?|п(р[ои]|од)|и[зс]ъ?|[ао]т)?п[иеё]зд.*?|(за)?п[ие]д[аое]?р((ас)?(и(ли)?[нщктл]ь?)?|(о(ч[еи])?)?к|юг)[ауеы]?|манд([ауеы]|ой|[ао]вошь?(е?к[ауе])?|юк(ов|[ауи])?)|муд([аио].*?|е?н([ьюия]|ей))|мля([тд]ь)?|лять|([нз]а|по)х|м[ао]л[ао]фь[яию])\b')
 
@@ -186,9 +188,8 @@ media_content_types = [
 ]
 @dp.message_handler(chat_id=config.groups.main, content_types=media_content_types)
 async def on_user_media(message: types.Message):
-    ### Retrieve member record from DB
+    ### Retrieve member
     member = await lru_cache.retrieve_or_create_member(message.from_user.id)
-
     tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
 
     # User is not allowed to post media type messages, until he reaches required reputation points
@@ -199,8 +200,28 @@ async def on_user_media(message: types.Message):
 
 @dp.message_handler(is_admin=False, chat_id=config.groups.main, content_types=[types.ContentType.TEXT, types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO])
 async def on_user_message_delete_woman(message: types.Message):
-    if message.reply_to_message and message.reply_to_message.forward_from_chat and message.reply_to_message.forward_from_chat.id == config.groups.linked_channel:
-        if (message.date - message.reply_to_message.forward_date).seconds <= 20: #test
+    if not(message.reply_to_message and message.reply_to_message.forward_from_chat and message.reply_to_message.forward_from_chat.id == config.groups.linked_channel):
+        return
+
+    ### Retrieve member
+    member = await lru_cache.retrieve_or_create_member(message.from_user.id)
+    tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
+
+    # Try detect member gender
+    member__gender = utils.detect_gender(tg_member.user.first_name)
+
+    if member__gender == Gender.FEMALE:
+        # RECOGNIZED FEMALE
+        # Women accounts is not allowed to post messages, until they reach required reputation points
+        # exceptions: admins
+        if not tg_member.is_chat_admin() and member.reputation_points < int(config.spam.allow_first_comments_threshold__woman):
+            await message.delete()
+            await utils.write_log(message.bot, f"Удалено сообщение: {message.text}", "🤖 Антивумен")
+    else:
+        # OTHER GENDER (or unknown)
+        # remove any messages within 20 seconds after message posted
+        # exceptions: admins, users with high enough reputation points
+        if not tg_member.is_chat_admin() and member.reputation_points < int(config.spam.allow_first_comments_threshold) and (message.date - message.reply_to_message.forward_date).seconds <= config.spam.remove_first_comments_interval:
             try:
                 await message.delete()
                 await utils.write_log(message.bot, f"Удалено сообщение: {message.text}", "🤖 Антибот")
