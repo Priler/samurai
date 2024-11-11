@@ -197,7 +197,6 @@ async def on_user_media(message: types.Message):
     if not tg_member.is_chat_admin() and member.reputation_points < int(config.spam.allow_media_threshold):
         await message.delete()
 
-
 @dp.message_handler(is_admin=False, chat_id=config.groups.main, content_types=[types.ContentType.TEXT, types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO])
 async def on_user_message_delete_woman(message: types.Message):
     if not(message.reply_to_message and message.reply_to_message.forward_from_chat and message.reply_to_message.forward_from_chat.id == config.groups.linked_channel):
@@ -216,7 +215,7 @@ async def on_user_message_delete_woman(message: types.Message):
         # exceptions: admins
         if not tg_member.is_chat_admin() and member.reputation_points < int(config.spam.allow_first_comments_threshold__woman):
             await message.delete()
-            await utils.write_log(message.bot, f"Удалено сообщение: {message.text}", "🤖 Антивумен")
+            await utils.write_log(message.bot, f"Удалено сообщение: {message.text}\n\n<i>Автор:</i> {utils.user_mention(message.from_user)}", "🤖 Антивумен")
     else:
         # OTHER GENDER (or unknown)
         # remove any messages within 20 seconds after message posted
@@ -224,7 +223,7 @@ async def on_user_message_delete_woman(message: types.Message):
         if not tg_member.is_chat_admin() and member.reputation_points < int(config.spam.allow_first_comments_threshold) and (message.date - message.reply_to_message.forward_date).seconds <= int(config.spam.remove_first_comments_interval):
             try:
                 await message.delete()
-                await utils.write_log(message.bot, f"Удалено сообщение: {message.text}", "🤖 Антибот")
+                await utils.write_log(message.bot, f"Удалено сообщение: {message.text}\n\n<i>Автор:</i> {utils.user_mention(message.from_user)}", "🤖 Антибот")
             except exceptions.MessageCantBeDeleted:
                 pass
 
