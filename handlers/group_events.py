@@ -282,6 +282,15 @@ async def on_me(message: types.Message):
     member = await lru_cache.retrieve_or_create_member(user_id)
     tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, user_id)
 
+    ### Check member name for profanity and censure, if required
+    tg_member__full_name: str = tg_member.user.full_name.strip()
+    _del = False
+    _word = None
+    _del, _word = utils.check_for_profanity_all(tg_member__full_name)
+
+    if _del:
+        tg_member__full_name = tg_member__full_name.replace(_word, '#'*len(_word))
+
     # Try detect member gender
     member__gender = utils.detect_gender(tg_member.user.first_name)
 
@@ -369,7 +378,7 @@ async def on_me(message: types.Message):
         else:
             member_rep_label = "великодушный"
 
-    answer = f"{member_avatar} <b>{tg_member.user.full_name.strip()}</b>"
+    answer = f"{member_avatar} <b>{tg_member__full_name}</b>"
     # answer += f"\n\n<b>Репутация: </b>{member_level} <i>(<tg-spoiler>{member.messages_count}</tg-spoiler>)</i>"
     # answer += f"\n<b>Репутация: </b>{member_level} <i> • 『{member_rep} (<tg-spoiler>{member.reputation_points}</tg-spoiler>)』</i>"
     answer += f"\n<b>Репутация: </b>{member_level} <i> 『{member_rep}{member_rep_label} (<tg-spoiler>{member.reputation_points}</tg-spoiler>)』</i>"
