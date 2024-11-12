@@ -3,13 +3,16 @@ import sys
 import typing
 from typing import final
 from enum import Enum
+import re
 
 import psutil
 
 import localization
 from configurator import config
 
-from gender_extractor import GenderExtractor
+sys.path.append("./libs")  # allow module import from git submodules
+
+from libs.gender_extractor import GenderExtractor
 g_ext = GenderExtractor()
 
 class Gender(Enum):
@@ -17,8 +20,7 @@ class Gender(Enum):
     MALE = 1
     FEMALE = 2
 
-sys.path.append("./censure")  # allow module import from git submodule
-from censure import Censor
+from libs.censure import Censor
 
 # create censor instances
 censor_ru = Censor.get(lang='ru')
@@ -67,8 +69,11 @@ def detect_gender(name: str) -> Gender:
     name = name.split(" ")[0]
     name = name.strip()
 
+    # remove any non-letters (emojies etc)
+    name = remove_non_letters(name)
+
     # extract
-    r = g_ext.extract_gender(name)
+    r = g_ext.extract_gender(name, "Russia")
 
     # return result
     if 'female' in r:
@@ -79,6 +84,23 @@ def detect_gender(name: str) -> Gender:
         # last shot
         # if name ends with 'а' letter, then assume it's female
         return Gender.FEMALE if name not in ["фома", "савва", "кима", "алима"] and name.lower()[-1] == 'а' else Gender.UNKNOWN
+
+
+def remove_non_letters(text):
+    return re.sub(r'[^А-яA-Za-z]', '', text)
+
+
+def remove_emojis(text):
+    emoji_pattern = re.compile(
+        "[\U0001F600-\U0001F64F"  # Смайлы
+        "\U0001F300-\U0001F5FF"  # Символы и пиктограммы
+        "\U0001F680-\U0001F6FF"  # Транспорт и символы карт
+        "\U0001F1E0-\U0001F1FF"  # Флаги (составные символы)
+        "\U00002700-\U000027BF"  # Разные символы
+        "\U000024C2-\U0001F251"  # Дополнительные символы
+        "]+", flags=re.UNICODE)
+
+    return emoji_pattern.sub(r'', text)
 
 
 def user_mention(from_user):

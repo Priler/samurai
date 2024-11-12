@@ -6,7 +6,6 @@ psutil==6.0.0
 easydict
 python-dotenv
 cachetools
-gender-extractor
 
 uvloop==0.20.0; sys_platform != 'windows'
 ujson==5.10.0
