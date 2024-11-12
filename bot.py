@@ -3,6 +3,7 @@ from dispatcher import dp
 import handlers
 import announcements
 import asyncio
+import os
 
 from db import ormar_config
 

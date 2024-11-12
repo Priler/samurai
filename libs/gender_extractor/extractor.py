@@ -64,50 +64,85 @@ class GenderExtractor:
             pickle.dump(self.name_freq, f)
 
     def extract_gender(self, name, country=None):
-        """ Extracts the suspected gender from the first name of a person.
+        """Extracts the suspected gender from the first name of a person.
+
+        The function uses statistical data to determine the likely gender associated
+        with a given first name, optionally taking into account country-specific data.
+        A small epsilon value (1e-6) is added to counts to avoid division by zero.
 
         Args:
-            name (str): First name. Case-insensitive.
-            country (str, optional): Country that we're focusing. If none selected,
-                the result will follow a general statistic. Case-insensitive.
+            name (str): First name of the person. Case-insensitive.
+            country (str, optional): Country to focus analysis on. If None,
+                uses global statistics. Case-insensitive.
 
         Returns:
-            str: One of [male, mostly male, ambiguous, mostly female, female]
-            
-        Raises:
-            KeyError: If country isn't in self.countries_encoding
-        """
-        name = name.lower()
-        if country is None:
-            country_code = None
-        else:
-            country = country.lower()
-            country_code = self.countries_encoding[country]
+            str: Gender category, one of:
+                - "male" (>90% male)
+                - "mostly male" (60-90% male)
+                - "ambiguous" (40-60% either gender)
+                - "mostly female" (60-90% female)
+                - "female" (>90% female)
+                - "female and male" (50/50 when female/male in the same time, ie russian name "Саша")
 
+        Raises:
+            KeyError: If the provided country is not in self.countries_encoding
+            TypeError: If name or country are not strings when provided
+            ValueError: If name is empty or contains only whitespace
+        """
+        # Input validation
+        if not isinstance(name, str):
+            raise TypeError("Name must be a string")
+        if country is not None and not isinstance(country, str):
+            raise TypeError("Country must be a string or None")
+
+        # Normalize inputs
+        name = name.lower().strip()
+
+        # Check for empty name after stripping
+        if not name:
+            raise ValueError("Name cannot be empty or contain only whitespace")
+
+        if country is not None:
+            country = country.lower().strip()
+            country_code = self.countries_encoding[country]
+        else:
+            country_code = None
+
+        # Get gender frequency counts
         try:
             m_counts = self.name_freq[name][0]
             f_counts = self.name_freq[name][1]
         except KeyError:
             return "ambiguous"
 
+        # Calculate relevant counts with epsilon to avoid division by zero
+        epsilon = 1e-6
         if country_code is not None:
-            m_count = m_counts[country_code] + 1e-6
-            f_count = f_counts[country_code] + 1e-6
+            m_count = m_counts[country_code] + epsilon
+            f_count = f_counts[country_code] + epsilon
         else:
-            m_count = sum(m_counts) + 1e-6
-            f_count = sum(f_counts) + 1e-6
+            m_count = sum(m_counts) + epsilon
+            f_count = sum(f_counts) + epsilon
 
-        if m_count == 1e-6 and f_count == 1e-6:
+        # Return early if no meaningful data
+        if m_count == epsilon and f_count == epsilon:
             return "ambiguous"
-        elif f_count / m_count > 0.9:
+
+        # Calculate ratios and determine gender category
+        female_ratio = f_count / m_count
+        male_ratio = m_count / f_count
+
+        if female_ratio == male_ratio:
+            return "female and male" # name is both male/female
+        elif female_ratio > 9:  # >90% female
             return "female"
-        elif f_count / m_count > 0.6:
+        elif female_ratio > 1.5:  # 60-90% female
             return "mostly female"
-        elif m_count / f_count > 0.9:
+        elif male_ratio > 9:  # >90% male
             return "male"
-        elif m_count / f_count > 0.6:
+        elif male_ratio > 1.5:  # 60-90% male
             return "mostly male"
-        else:
+        else:  # 40-60% either gender
             return "ambiguous"
 
 if __name__=="__main__":

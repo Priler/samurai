@@ -83,7 +83,8 @@ FOUL_DATA = {
         '^mcfagget',
         '^minge',
         '^muff(diver)*',
-        '^munging'
+        '^munging',
+        '^m[uo][thd]{1,3}erf[ou][ck]{1,}(er)?'
     ],
     'n': [
         '^nutsack'

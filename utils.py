@@ -1,5 +1,6 @@
 import datetime
 import sys
+import time
 import typing
 from typing import final
 from enum import Enum
@@ -64,30 +65,22 @@ def check_for_profanity_all(text):
     return _del, _word
 
 
-def detect_gender(name: str) -> Gender:
-    # pre-process the name
-    name = name.split(" ")[0]
-    name = name.strip()
+def detect_gender__compare(name: str, country: str = None) -> Gender:
+    if country is not None:
+        r = g_ext.extract_gender(name, country)
+    else:
+        r = g_ext.extract_gender(name)
 
-    # remove any non-letters (emojies etc)
-    name = remove_non_letters(name)
-
-    # extract
-    r = g_ext.extract_gender(name, "Russia")
-
-    # return result
     if 'female' in r:
         return Gender.FEMALE
     elif 'male' in r:
         return Gender.MALE
     else:
-        # last shot
-        # if name ends with 'а' letter, then assume it's female
-        return Gender.FEMALE if name not in ["фома", "савва", "кима", "алима"] and name.lower()[-1] == 'а' else Gender.UNKNOWN
+        return Gender.UNKNOWN
 
 
-def remove_non_letters(text):
-    return re.sub(r'[^А-яA-Za-z]', '', text)
+def remove_non_letters(text: str) -> str:
+    return ''.join(char for char in text if char.isalpha())
 
 
 def remove_emojis(text):
@@ -101,6 +94,112 @@ def remove_emojis(text):
         "]+", flags=re.UNICODE)
 
     return emoji_pattern.sub(r'', text)
+
+
+def detect_name_language(name):
+    """
+    Detects if a name is written in Russian or English.
+
+    Args:
+        name (str): Name to check
+
+    Returns:
+        str: 'russian' if name contains Russian characters, 'english' if only English characters,
+             'unknown' if contains neither or mixed
+    """
+    russian_chars = set('абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ')
+    english_chars = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')
+
+    russian_count = sum(1 for char in name if char in russian_chars)
+    english_count = sum(1 for char in name if char in english_chars)
+
+    total_letters = russian_count + english_count
+
+    if total_letters == 0:
+        return 'unknown'
+    elif russian_count > 0 and english_count == 0:
+        return 'russian'
+    elif english_count > 0 and russian_count == 0:
+        return 'english'
+    else:
+        return 'unknown'
+
+
+def transliterate_name(name):
+    """
+    Transliterates names between Russian and English based on automatic language detection.
+
+    Args:
+        name (str): Name in Russian or English
+
+    Returns:
+        str: Transliterated name in the opposite language
+        None: If language detection fails or input is invalid
+    """
+    # Translation dictionaries
+    ru_to_en = {
+        'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd',
+        'е': 'e', 'ё': 'e', 'ж': 'zh', 'з': 'z', 'и': 'y',
+        'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n',
+        'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't',
+        'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch',
+        'ш': 'sh', 'щ': 'sch', 'ъ': '', 'ы': 'y', 'ь': '',
+        'э': 'e', 'ю': 'yu', 'я': 'ya',
+        'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D',
+        'Е': 'E', 'Ё': 'E', 'Ж': 'Zh', 'З': 'Z', 'И': 'Y',
+        'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M', 'Н': 'N',
+        'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T',
+        'У': 'U', 'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts', 'Ч': 'Ch',
+        'Ш': 'Sh', 'Щ': 'Sch', 'Э': 'E', 'Ю': 'Yu', 'Я': 'Ya'
+    }
+
+    # Create reverse mapping (English to Russian)
+    en_to_ru = {}
+    for ru, en in ru_to_en.items():
+        if len(en) == 1:  # Single character mappings
+            en_to_ru[en.lower()] = ru.lower()
+            en_to_ru[en.upper()] = ru.upper()
+        else:  # Multi-character mappings like 'zh', 'ch'
+            en_to_ru[en.lower()] = ru.lower()
+            en_to_ru[en.title()] = ru.upper()
+
+    # Detect language
+    lang = detect_name_language(name)
+
+    if lang == 'unknown':
+        return None
+
+    if lang == 'russian':
+        # Russian to English
+        result = ''
+        for char in name:
+            result += ru_to_en.get(char, char)
+        return result
+    else:
+        # English to Russian
+        result = ''
+        i = 0
+        while i < len(name):
+            # Try to match two characters first (for 'zh', 'ch', etc.)
+            if i < len(name) - 1:
+                two_chars = name[i:i + 2]
+                if two_chars.lower() in ['zh', 'kh', 'ts', 'ch', 'sh', 'yu', 'ya']:
+                    result += en_to_ru.get(two_chars.title() if two_chars[0].isupper() else two_chars.lower(),
+                                           two_chars)
+                    i += 2
+                    continue
+                elif two_chars.lower() == 'sc' and i < len(name) - 2 and name[i:i + 3].lower() == 'sch':
+                    # Handle 'sch' case
+                    result += en_to_ru.get('Sch' if two_chars[0].isupper() else 'sch', 'sch')
+                    i += 3
+                    continue
+
+            # Single character conversion
+            char = name[i]
+            result += en_to_ru.get(char, char)
+            i += 1
+
+        return result
 
 
 def user_mention(from_user):
@@ -209,3 +308,17 @@ def get_cpu_freq_from_proc():
     except:
         return "N/A"
     return "N/A"
+
+
+# usage example: detect_gender = measure_execution(detect_gender, "detect_gender")
+# detect_gender("name")
+def measure_execution(func, name):
+    def wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        execution_time = (end_time - start_time) * 1000  # Convert to milliseconds
+        print(f"{name} took {execution_time:.3f} ms")
+        return result
+    return wrapper
+
