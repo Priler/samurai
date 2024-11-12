@@ -207,7 +207,7 @@ async def on_user_message_delete_woman(message: types.Message):
     tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
 
     # Try detect member gender
-    member__gender = utils.detect_gender(tg_member.user.first_name)
+    member__gender = lru_cache.detect_gender(tg_member.user.first_name)
 
     if member__gender == Gender.FEMALE:
         # RECOGNIZED FEMALE
@@ -292,7 +292,7 @@ async def on_me(message: types.Message):
         tg_member__full_name = tg_member__full_name.replace(_word, '#'*len(_word))
 
     # Try detect member gender
-    member__gender = utils.detect_gender(tg_member.user.first_name)
+    member__gender = lru_cache.detect_gender(tg_member.user.first_name)
 
     member_level = None
     if isinstance(tg_member, (ChatMemberAdministrator, ChatMemberOwner)) and tg_member.is_chat_creator():

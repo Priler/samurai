@@ -10,7 +10,7 @@ class TestCensor(TestCaseEn):
                 self.data.SIMPLE_OBSCENE_PHRASES,
         ):
             for line in words:
-                cleaned_line, bad_words_count, bad_phrases_count = self.censor.clean_line(line)
+                cleaned_line, bad_words_count, bad_phrases_count, _, _, _ = self.censor.clean_line(line)
                 self.assertEqual(cleaned_line, constants.BEEP)
                 self.assertEqual(bad_phrases_count, 1)
 
@@ -19,15 +19,14 @@ class TestCensor(TestCaseEn):
                 self.data.SIMPLE_OBSCENE_WORDS,
         ):
             for line in words:
-                cleaned_line, bad_words_count, bad_phrases_count = self.censor.clean_line(line)
+                cleaned_line, bad_words_count, bad_phrases_count, _, _, _ = self.censor.clean_line(line)
                 self.assertEqual(cleaned_line, constants.BEEP)
                 self.assertEqual(bad_words_count, 1)
 
                 count = self._get_random_count()
                 line_template = ' '.join(('{line}' for _ in range(count)))
                 line_repeated = line_template.format(line=line)
-                cleaned_line, bad_words_count, bad_phrases_count = \
-                    self.censor.clean_line(line_repeated)
+                cleaned_line, bad_words_count, bad_phrases_count, _, _, _ = self.censor.clean_line(line_repeated)
                 self.assertEqual(cleaned_line, line_template.format(line=constants.BEEP))
                 self.assertEqual(bad_words_count, count)
                 self.assertEqual(bad_phrases_count, 0)

@@ -1,6 +1,8 @@
 import ormar
 from models.member import Member
 
+from utils import Gender, remove_non_letters, detect_name_language, detect_gender__compare, transliterate_name, measure_execution
+
 import cachetools
 from cachetools import LRUCache
 from functools import wraps
@@ -10,7 +12,60 @@ from functools import wraps
 # (currently it's for 1 chat only)
 members_cache = LRUCache(maxsize=1000)
 tgmembers_cache = LRUCache(maxsize=1000)
+gender_detections_cache = LRUCache(maxsize=1000)
 
+def cache_gender_detection(func):
+    @wraps(func)
+    def wrapper(name):
+        # check if it's in cache already
+        if name in gender_detections_cache:
+            return gender_detections_cache[name]
+
+        # Call function and cache result
+        result = func(name)
+        gender_detections_cache[name] = result
+        return result
+
+    return wrapper
+
+
+@cache_gender_detection
+def detect_gender(name: str) -> Gender:
+    # remove any non-letters (emoji etc)
+    name = remove_non_letters(name)
+
+    # pre-process the name
+    name = name.split(" ")[0] # get first name
+    name = name.strip() # just to make sure it's as clean as possible
+
+    #print(name)
+    #print(len(name))
+
+    # compare
+    _name_lang = detect_name_language(name)
+
+    if _name_lang == 'russian':
+        det_gen = detect_gender__compare(name, "Russia")
+
+        # if gender unknown, try to transliterate it and compare again
+        if det_gen == Gender.UNKNOWN:
+            det_gen = detect_gender__compare(transliterate_name(name), "USA")
+
+    elif _name_lang == 'english':
+        det_gen = detect_gender__compare(name, "USA")
+
+        # if gender unknown, try to transliterate it and compare again
+        if det_gen == Gender.UNKNOWN:
+            det_gen = detect_gender__compare(transliterate_name(name), "Russia")
+
+    else:
+        det_gen = detect_gender__compare(name)
+
+    # return result, whatever it will be
+    return det_gen
+    # last shot
+    # if name ends with 'а' letter, then assume it's female
+    # return Gender.FEMALE if name not in ["фома", "савва", "кима", "алима"] and name.lower()[-1] == 'а' else Gender.UNKNOWN
 
 def cache_async_tgmembers(func):
     @wraps(func)

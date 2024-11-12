@@ -2,7 +2,7 @@
 from __future__ import unicode_literals
 
 SIMPLE_OBSCENE_WORDS = (
-    'fuck',
+    'shit',
     'motherfucker',
     'prick',
     'dildo',
@@ -19,7 +19,7 @@ SIMPLE_OBSCENE_PHRASES = (
 
 OBSCENE_HTML_LINES = (
     (
-        '<b>б<i>fu</b>ck<i> this bi<span>tch</i>',
+        '<b>б<i>sh</b>it<i> this bi<span>tch</i>',
         '[beep]<i> this [beep]</i>'
     ),
 )
