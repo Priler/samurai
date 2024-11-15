@@ -15,6 +15,7 @@ import heroku_config
 # import models n stuff
 from db import ormar_config
 from models.member import Member
+from models.spam import Spam
 
 # DROP & INIT tables (async mysql)
 async def reinit_db_tables():
