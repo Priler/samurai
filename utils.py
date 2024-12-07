@@ -20,6 +20,7 @@ class Gender(Enum):
     UNKNOWN = 0
     MALE = 1
     FEMALE = 2
+    AMBIGUOUS = 3 # can be both female & male
 
 from libs.censure import Censor
 
@@ -66,12 +67,18 @@ def check_for_profanity_all(text):
 
 
 def detect_gender__compare(name: str, country: str = None) -> Gender:
-    if country is not None:
-        r = g_ext.extract_gender(name, country)
-    else:
-        r = g_ext.extract_gender(name)
+    try:
+        if country is not None:
+            r = g_ext.extract_gender(name, country)
+        else:
+            r = g_ext.extract_gender(name)
+    except ValueError:
+        # assume gender unknown, if cannot be extracted
+        return Gender.UNKNOWN
 
-    if 'female' in r:
+    if 'female and male' in r:
+        return Gender.AMBIGUOUS
+    elif 'female' in r:
         return Gender.FEMALE
     elif 'male' in r:
         return Gender.MALE
@@ -80,7 +87,8 @@ def detect_gender__compare(name: str, country: str = None) -> Gender:
 
 
 def remove_non_letters(text: str) -> str:
-    return ''.join(char for char in text if char.isalpha())
+    # but preserve spaces
+    return ''.join(char for char in text if char.isalpha() or char == ' ')
 
 
 def remove_emojis(text):
@@ -139,14 +147,14 @@ def transliterate_name(name):
     # Translation dictionaries
     ru_to_en = {
         'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd',
-        'е': 'e', 'ё': 'e', 'ж': 'zh', 'з': 'z', 'и': 'y',
+        'е': 'e', 'ё': 'e', 'ж': 'zh', 'з': 'z', 'и': 'i',
         'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n',
         'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't',
         'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch',
         'ш': 'sh', 'щ': 'sch', 'ъ': '', 'ы': 'y', 'ь': '',
         'э': 'e', 'ю': 'yu', 'я': 'ya',
         'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D',
-        'Е': 'E', 'Ё': 'E', 'Ж': 'Zh', 'З': 'Z', 'И': 'Y',
+        'Е': 'E', 'Ё': 'E', 'Ж': 'Zh', 'З': 'Z', 'И': 'I',
         'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M', 'Н': 'N',
         'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T',
         'У': 'U', 'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts', 'Ч': 'Ch',
@@ -304,7 +312,7 @@ def get_cpu_freq_from_proc():
         with open('/proc/cpuinfo') as f:
             for line in f:
                 if line.startswith('cpu MHz'):
-                    return float(line.split(':')[1].strip())
+                    return int(float(line.split(':')[1].strip()))
     except:
         return "N/A"
     return "N/A"

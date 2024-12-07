@@ -217,7 +217,7 @@ async def on_user_message_delete_woman(message: types.Message):
             await message.delete()
             await utils.write_log(message.bot, f"Удалено сообщение: {message.text}\n\n<i>Автор:</i> {utils.user_mention(message.from_user)}", "🤖 Антивумен")
     else:
-        # OTHER GENDER (or unknown)
+        # OTHER GENDER (or unknown/ambiguous)
         # remove any messages within 20 seconds after message posted
         # exceptions: admins, users with high enough reputation points
         if not tg_member.is_chat_admin() and member.reputation_points < int(config.spam.allow_first_comments_threshold) and (message.date - message.reply_to_message.forward_date).seconds <= int(config.spam.remove_first_comments_interval):
