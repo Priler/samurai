@@ -37,7 +37,7 @@ async def cmd_ping_bot(message: types.Message):
 		reply = f"<b>{random.choice(['👊 Самурай на месте!', '🫰 Нужно больше золота', '🫡 Тута я, бож :3', '✊ Железо говн@, но я держусь!'])}</b>\n\n"
 		reply += "<b>CPU:</b> <i>{} ядро ({} MHz) загружено на {}%</i>\n".format(
 			psutil.cpu_count(),
-			int(utils.get_cpu_freq_from_proc()),
+			utils.get_cpu_freq_from_proc(),
 			psutil.cpu_percent()
 		)
 		reply += "<b>RAM:</b> <i>{}мб / {}мб</i>\n".format(

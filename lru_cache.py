@@ -35,7 +35,8 @@ def detect_gender(name: str) -> Gender:
     name = remove_non_letters(name)
 
     # pre-process the name
-    name = name.split(" ")[0] # get first name
+    name = name.lower()
+    name = next((element for element in name.split(" ") if element.strip()), None) # get first name
     name = name.strip() # just to make sure it's as clean as possible
 
     #print(name)
@@ -44,12 +45,24 @@ def detect_gender(name: str) -> Gender:
     # compare
     _name_lang = detect_name_language(name)
 
+    print(name)
+    print(_name_lang)
+
     if _name_lang == 'russian':
         det_gen = detect_gender__compare(name, "Russia")
 
-        # if gender unknown, try to transliterate it and compare again
         if det_gen == Gender.UNKNOWN:
-            det_gen = detect_gender__compare(transliterate_name(name), "USA")
+            # if name ends with "ка", then try replace it with "а"
+            # and try/detect again
+            if name.endswith("ка"):
+                name = f"{name[:-2]}а"
+
+            det_gen = detect_gender__compare(name, "Russia")
+
+            if det_gen == Gender.UNKNOWN:
+                # if gender unknown, try to transliterate it and compare again
+
+                det_gen = detect_gender__compare(transliterate_name(name), "USA")
 
     elif _name_lang == 'english':
         det_gen = detect_gender__compare(name, "USA")
@@ -66,6 +79,7 @@ def detect_gender(name: str) -> Gender:
     # last shot
     # if name ends with 'а' letter, then assume it's female
     # return Gender.FEMALE if name not in ["фома", "савва", "кима", "алима"] and name.lower()[-1] == 'а' else Gender.UNKNOWN
+
 
 def cache_async_tgmembers(func):
     @wraps(func)

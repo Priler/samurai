@@ -14,18 +14,20 @@ from lru_cache import detect_gender
 
 class GenderDetectionTests(unittest.TestCase):
     def test_male(self):
-        test_names = ["😎 Абрахам", "Алексей", "Тони", "Иннокентий", "Аркадий", "Виктор"]
+        test_names = ["😎 Абрахам", "Алексей", "Тони", "Иннокентий", "Аркадий", "Виктор", "Nikita", ":)[Nikita]"]
         for name in test_names:
             with self.subTest(name=name):
                 self.assertEqual(detect_gender(name), Gender.MALE,
                     f"Failed for name: {name}")
 
+
     def test_female(self):
-        test_names = ["👧 Александра", "Катя", "Ксения", "Ксюша", "Антонина", "Настя", "👧👧Лиза👧👧", "Ника", "Лея"]
+        test_names = ["👧 Александра", "Катя", "Ксения", "Ксюша", "Антонина", "Настя", "👧👧Лиза👧👧", "Ника", "Лея", "Алиска", "Катерина Лися"]
         for name in test_names:
             with self.subTest(name=name):
                 self.assertEqual(detect_gender(name), Gender.FEMALE,
                     f"Failed for name: {name}")
+
 
     def test_unknown(self):
         test_names = ["Almaz", "Kamaz", "💎 Алмаз 💎", "Дивергент", "Лейндаль", "Унга Бунга 🌺"]
