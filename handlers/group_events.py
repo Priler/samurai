@@ -146,7 +146,7 @@ async def on_user_message(message: types.Message):
         # is spam + block user
         spam_keyboard.add(types.InlineKeyboardButton(
             text="❌ Это спам + заблокировать пользователя",
-            callback_data=f"spam_ban_{message.from_user.id}")
+            callback_data=f"spam_ban_{spam_rec.id}_{message.from_user.id}")
         )
 
         # not a spam

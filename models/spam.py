@@ -9,4 +9,5 @@ class Spam(ormar.Model):
     id: int = ormar.Integer(primary_key=True, auto_increment=True)
     message: str = ormar.Text(unique=True)
     is_spam: bool = ormar.Boolean()
+    is_blocked: bool = ormar.Boolean()
     date: datetime = ormar.DateTime(default=datetime.now)
