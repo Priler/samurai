@@ -11,3 +11,5 @@ class Spam(ormar.Model):
     is_spam: bool = ormar.Boolean()
     is_blocked: bool = ormar.Boolean(default=False)
     date: datetime = ormar.DateTime(default=datetime.now)
+    chat_id: int = ormar.BigInteger(default=None)
+    user_id: int = ormar.BigInteger(default=None)
