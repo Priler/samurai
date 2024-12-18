@@ -138,7 +138,7 @@ async def on_user_message(message: types.Message):
         log_msg += "\n\n<i>Автор:</i> " + utils.user_mention(message.from_user)
 
         # Create DB record on spam message
-        spam_rec = await Spam.objects.create(message=msg_text, is_spam=True) # assume is spam by default
+        spam_rec = await Spam.objects.create(message=msg_text, is_spam=True, user_id=message.from_user.id, chat_id=int(config.groups.main)) # assume is spam by default
 
         # Generate keyboard with some actions for detected spam
         spam_keyboard = types.InlineKeyboardMarkup()
