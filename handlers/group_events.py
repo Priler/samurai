@@ -195,6 +195,71 @@ async def on_user_message(message: types.Message):
         member.reputation_points += 1 # increase members reputation points
         await member.update()
 
+
+@dp.message_handler(is_owner = True, chat_id=config.groups.main, commands=["spam"], commands_prefix="!")
+async def on_spam(message: types.Message):
+    if not message.reply_to_message:
+        await message.reply("Чего ты от меня хочешь :3")
+        return
+
+    ### Retrieve member record from DB
+    member = await lru_cache.retrieve_or_create_member(message.reply_to_message.from_user.id)
+
+    # Define message text
+    msg_text = None
+    if message.reply_to_message.content_type == types.ContentType.TEXT:
+        msg_text = message.reply_to_message.text
+    elif message.reply_to_message.content_type in [types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO]:
+        msg_text = message.reply_to_message.caption
+
+    # Quit, if no message to check
+    if msg_text is None:
+        await message.reply("Нет текста - нет спама :3")
+        return
+
+    try:
+        log_msg = msg_text
+        log_msg += "\n\n<i>Автор:</i> " + utils.user_mention(message.reply_to_message.from_user)
+
+        # Create DB record on spam message
+        spam_rec = await Spam.objects.create(message=msg_text, is_spam=True, user_id=message.reply_to_message.from_user.id, chat_id=int(config.groups.main)) # assume is spam by default
+
+        # Generate keyboard with some actions for detected spam
+        spam_keyboard = types.InlineKeyboardMarkup()
+
+        # is spam + block user
+        spam_keyboard.add(types.InlineKeyboardButton(
+            text="❌ Это спам + заблокировать пользователя",
+            callback_data=f"spam_ban_{spam_rec.id}_{message.reply_to_message.from_user.id}")
+        )
+
+        # not a spam
+        spam_keyboard.add(types.InlineKeyboardButton(
+            text="❎ Это НЕ спам",
+            callback_data=f"spam_invert_{spam_rec.id}_{member.id}")
+        )
+
+        # test msg, remove from db
+        spam_keyboard.add(types.InlineKeyboardButton(
+            text="Убрать из БД, это тест",
+            callback_data=f"spam_test_{spam_rec.id}_{member.id}")
+        )
+
+        # send message with a keyboard to log channel
+        await message.bot.send_message(
+            config.groups.logs,
+            utils.generate_log_message(log_msg, "❌ АнтиСПАМ"),
+            reply_markup=spam_keyboard)
+
+        # remove marked message from chat afterwards
+        if not member.is_chat_admin():
+            await message.reply_to_message.delete()
+
+        await message.reply(f"🫡 Сообщение помечено как спам.</i>")
+    except ValueError:
+        await message.reply("O_o Мда")
+
+
 @dp.message_handler(chat_id=config.groups.main, content_types=["voice"])
 async def on_user_voice(message: types.Message):
     if random.random() < 0.75: # 75% chance to react
