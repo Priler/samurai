@@ -205,6 +205,9 @@ async def on_spam(message: types.Message):
     ### Retrieve member record from DB
     member = await lru_cache.retrieve_or_create_member(message.reply_to_message.from_user.id)
 
+    # Retrieve tg member object
+    tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, message.reply_to_message.from_user.id)
+
     # Define message text
     msg_text = None
     if message.reply_to_message.content_type == types.ContentType.TEXT:
@@ -252,7 +255,7 @@ async def on_spam(message: types.Message):
             reply_markup=spam_keyboard)
 
         # remove marked message from chat afterwards
-        if not member.is_chat_admin():
+        if not tg_member.is_chat_admin():
             await message.reply_to_message.delete()
 
         await message.reply(f"🫡 Сообщение помечено как спам.</i>")
