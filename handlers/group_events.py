@@ -258,7 +258,7 @@ async def on_spam(message: types.Message):
         if not tg_member.is_chat_admin():
             await message.reply_to_message.delete()
 
-        await message.reply(f"🫡 Сообщение помечено как спам.</i>")
+        await message.reply(f"🫡 Сообщение помечено как спам.")
     except ValueError:
         await message.reply("O_o Мда")
 
