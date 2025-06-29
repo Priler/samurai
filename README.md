@@ -21,4 +21,4 @@ https://github.com/wwydmanski/gender-extractor - Gender detection we used as a b
 
 ## Author of Samurai
 
-(C) 2024 Abraham Tugalov
+(C) 2025 Abraham Tugalov
