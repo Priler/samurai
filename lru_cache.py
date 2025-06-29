@@ -32,12 +32,16 @@ def cache_gender_detection(func):
 @cache_gender_detection
 def detect_gender(name: str) -> Gender:
     # remove any non-letters (emoji etc)
+    _name = name
     name = remove_non_letters(name)
 
     # pre-process the name
-    name = name.lower()
-    name = next((element for element in name.split(" ") if element.strip()), None) # get first name
-    name = name.strip() # just to make sure it's as clean as possible
+    if name:
+        name = name.lower()
+        name = next((element for element in name.split(" ") if element.strip()), None) # get first name
+        name = name.strip() # just to make sure it's as clean as possible
+    else:
+        name = _name # restore OG name (nicknames like "." or "$" etc)
 
     #print(name)
     #print(len(name))
