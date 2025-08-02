@@ -37,9 +37,12 @@ def detect_gender(name: str) -> Gender:
 
     # pre-process the name
     if name:
-        name = name.lower()
-        name = next((element for element in name.split(" ") if element.strip()), None) # get first name
-        name = name.strip() # just to make sure it's as clean as possible
+        try:
+            name = name.lower()
+            name = next((element for element in name.split(" ") if element.strip()), None) # get first name
+            name = name.strip() # just to make sure it's as clean as possible
+        except AttributeError:
+            name = _name # restore OG
     else:
         name = _name # restore OG name (nicknames like "." or "$" etc)
 
