@@ -1,6 +1,5 @@
 from aiogram import types
 from aiogram.types import ChatMemberAdministrator, ChatMemberOwner, ContentType
-from sympy.strategies.core import switch
 
 from configurator import config
 from dispatcher import dp
@@ -331,6 +330,11 @@ async def on_user_message_delete_woman(message: types.Message):
 
 @dp.message_handler(chat_id=config.groups.main, commands="бу", commands_prefix="!/")
 async def on_bu(message: types.Message):
+  ### Retrieve member record from DB
+  member = await lru_cache.retrieve_or_create_member(message.from_user.id)
+
+
+
   await message.reply(random.choice(["Бугага!", "Не пугай так!", "Боже ..", "Не мешай мне делать сложные компьютерные вычисления :3", "Хватит!",
                                      "Ладно ...", "Бл я аж вздрогнул ...", "Та за шо :3", "Страшна вырубай",
                                      "Не смешно :3", "Так и сердешный приступ можно словить!", "Сам ты б/у пон",
@@ -505,12 +509,12 @@ async def on_setlvl(message: types.Message):
     member = await lru_cache.retrieve_or_create_member(message.reply_to_message.from_user.id)
 
     try:
-        member.messages_count = abs(int(utils.remove_prefix(message.text, "!setlvl")))
-        member.reputation_points += abs(int(utils.remove_prefix(message.text, "!setlvl")))
-
         if member.messages_count > 100000:
             await message.reply("Что куришь, другалёк? :3")
         else:
+            member.messages_count = abs(int(utils.remove_prefix(message.text, "!setlvl")))
+            member.reputation_points += abs(int(utils.remove_prefix(message.text, "!setlvl")))
+
             await member.update()
             await message.reply("Ладно :3")
     except ValueError:
@@ -529,11 +533,11 @@ async def on_reward(message: types.Message):
     member = await lru_cache.retrieve_or_create_member(message.reply_to_message.from_user.id)
 
     try:
-        member.reputation_points += points
-
         if points > 100_000:
             await message.reply("Нетб :3")
         else:
+            member.reputation_points += points
+
             await member.update()
             # await message.reply(f"🎃 <b>Слушаюсь, повелитель!</b>\nУчастник чата благословлён вашей милостью, ему начислено <i><b>{points} очков репутации.</b></i>")
             await message.reply(f"➕ Участник чата получает <i><b>{points}</b> очков репутации.</i>")
@@ -571,11 +575,11 @@ async def on_punish(message: types.Message):
     member = await lru_cache.retrieve_or_create_member(message.reply_to_message.from_user.id)
 
     try:
-        member.reputation_points -= points
-
         if points > 100_000:
             await message.reply("Нетб :3")
         else:
+            member.reputation_points -= points
+
             await member.update()
             await message.reply(f"➖ Участник чата теряет <i><b>{points}</b> очков репутации.</i>")
     except ValueError:
