@@ -277,6 +277,18 @@ async def on_user_voice(message: types.Message):
         await member.update()
 
 
+@dp.message_handler(chat_id=config.groups.main, content_types=['contact'])
+async def on_user_contact(message: types.Message):
+    ### Retrieve member
+    # member = await lru_cache.retrieve_or_create_member(message.from_user.id)
+    tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
+
+    # User is not allowed to post contact type messages
+    # exceptions: admins
+    if not tg_member.is_chat_admin():
+        await message.delete()
+
+
 media_content_types = [
     ContentType.PHOTO,
     ContentType.VIDEO,
