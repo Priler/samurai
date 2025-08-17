@@ -321,18 +321,23 @@ async def on_user_message_delete_woman(message: types.Message):
     # Try detect member gender
     member__gender = lru_cache.detect_gender(tg_member.user.first_name)
 
-    if member__gender == Gender.FEMALE:
+    if member__gender == Gender.FEMALE and bool(config.spam.antiwomen):
         # RECOGNIZED FEMALE
         # Women accounts is not allowed to post messages, until they reach required reputation points
+        # @TODO: Only delete within period of time (ex. 60 seconds?)
         # exceptions: admins
-        if not tg_member.is_chat_admin() and member.reputation_points < int(config.spam.allow_first_comments_threshold__woman):
+        if (not tg_member.is_chat_admin()
+                and member.reputation_points < int(config.spam.allow_comments_rep_threshold__woman)
+                and (message.date - message.reply_to_message.forward_date).seconds <= int(config.spam.women_remove_first_comments_interval)):
             await message.delete()
             await utils.write_log(message.bot, f"Удалено сообщение: {message.text}\n\n<i>Автор:</i> {utils.user_mention(message.from_user)}", "🤖 Антивумен")
     else:
         # OTHER GENDER (or unknown/ambiguous)
         # remove any messages within 20 seconds after message posted
         # exceptions: admins, users with high enough reputation points
-        if not tg_member.is_chat_admin() and member.reputation_points < int(config.spam.allow_first_comments_threshold) and (message.date - message.reply_to_message.forward_date).seconds <= int(config.spam.remove_first_comments_interval):
+        if (not tg_member.is_chat_admin()
+                and member.reputation_points < int(config.spam.allow_comments_rep_threshold)
+                and (message.date - message.reply_to_message.forward_date).seconds <= int(config.spam.remove_first_comments_interval)):
             try:
                 await message.delete()
                 await utils.write_log(message.bot, f"Удалено сообщение: {message.text}\n\n<i>Автор:</i> {utils.user_mention(message.from_user)}", "🤖 Антибот")
