@@ -31,32 +31,44 @@ async def cmd_ping_bot(message: types.Message):
 	# Check if command is sent by group admin
 	user = await message.bot.get_chat_member(config.groups.main, message.from_user.id)
 	if user.is_chat_admin():
-
 		ram = psutil.virtual_memory()
+		cpu_freq = psutil.cpu_freq().current if psutil.cpu_freq() else 0
 
 		reply = f"<b>{random.choice(['👊 Самурай на месте!', '🫰 Нужно больше золота', '🫡 Тута я, бож :3', '✊ Железо говн@, но я держусь!'])}</b>\n\n"
-		reply += "<b>CPU:</b> <i>{} ядро ({} MHz) загружено на {}%</i>\n".format(
-			psutil.cpu_count(),
-			utils.get_cpu_freq_from_proc(),
-			psutil.cpu_percent()
+
+		# CPU
+		reply += "<b>CPU:</b> <i>{} ядер, {:.0f} MHz, загрузка {}%</i>\n".format(
+			psutil.cpu_count(logical=True),
+			cpu_freq,
+			psutil.cpu_percent(interval=1)
 		)
-		reply += "<b>RAM:</b> <i>{}мб / {}мб</i>\n".format(
-			ram.used >> 20,
-			ram.total >> 20
+
+		# RAM
+		reply += "<b>RAM:</b> <i>{} МБ / {} МБ ({}%)</i>\n".format(
+			ram.used // (1024 ** 2),
+			ram.total // (1024 ** 2),
+			ram.percent
 		)
+
+		# GPU
 		reply += "<b>GPU:</b> <i>N/A</i>\n"
 
 		# Get disk info for root partition
 		disk = psutil.disk_usage('/')
-		# Convert bytes to GB
-		disk_total_gb = disk.total // (2 ** 30)  # or (1024**3)
-		disk_free_gb = disk.free // (2 ** 30)
 
-		reply += "<b>SSD:</b> <i>{}ГБ / {}ГБ ({}% занято)</i>\n".format(
-			disk_free_gb,
+		# Convert bytes to GB (с двумя знаками после запятой)
+		disk_total_gb = disk.total / (1024 ** 3)
+		disk_used_gb = disk.used / (1024 ** 3)
+		disk_free_gb = disk.free / (1024 ** 3)
+
+		reply += "<b>SSD:</b> <i>{:.2f} ГБ из {:.2f} ГБ использовано ({}% занято)</i>\n".format(
+			disk_used_gb,
 			disk_total_gb,
 			int(disk.percent)
 		)
+
+		# etc
+		reply += "<b>Расположение сервера:</b> <i>Марс</i>\n"
 
 		reply += "\n<b>Версия бота:</b> <i>" + str(config.bot.version) + " codename «<b>" + config.bot.version_codename + "</b>»</i>"
 
