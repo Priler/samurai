@@ -309,6 +309,7 @@ async def on_user_media(message: types.Message):
     if not tg_member.is_chat_admin() and member.reputation_points < int(config.spam.allow_media_threshold):
         await message.delete()
 
+# @TODO: Only auto-delete women if profile description contains links etc, or it has channel attached idk, or stories with links etc.
 @dp.message_handler(is_admin=False, chat_id=config.groups.main, content_types=[types.ContentType.TEXT, types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO])
 async def on_user_message_delete_woman(message: types.Message):
     if not(message.reply_to_message and message.reply_to_message.forward_from_chat and message.reply_to_message.forward_from_chat.id == config.groups.linked_channel):
@@ -324,7 +325,6 @@ async def on_user_message_delete_woman(message: types.Message):
     if member__gender == Gender.FEMALE and bool(config.spam.antiwomen):
         # RECOGNIZED FEMALE
         # Women accounts is not allowed to post messages, until they reach required reputation points
-        # @TODO: Only delete within period of time (ex. 60 seconds?)
         # exceptions: admins
         if (not tg_member.is_chat_admin()
                 and member.reputation_points < int(config.spam.allow_comments_rep_threshold__woman)

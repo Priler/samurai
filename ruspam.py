@@ -12,3 +12,5 @@ def predict(text):
         logits = outputs.logits
         predicted_class = torch.argmax(logits, dim=1).item()
     return True if predicted_class == 1 else False
+
+print("Результат: " , predict("Привет, нужны 2 человека ,все с телефона, или  компьютера. От 220 $ в день. Удалённая занятость , пиши + в лс"))
