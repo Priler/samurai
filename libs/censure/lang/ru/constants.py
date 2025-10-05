@@ -1031,11 +1031,10 @@ BAD_SEMI_PHRASES = (
     'сучийпотрох',
     'тебяимел[аи]?(?!(ввид))',
     'тык[ао]зел',
-)
-
-BAD_PHRASES = (
     'official_vpnbot'
 )
+
+BAD_PHRASES = ()
 
 TRANS_TAB = dict((ord(a), b) for a, b in zip(
     '@gcxyaeopkhbtmnu 036 ёdiz',
