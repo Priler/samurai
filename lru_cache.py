@@ -1,7 +1,8 @@
 import ormar
 from models.member import Member
+import re
 
-from utils import Gender, remove_non_letters, detect_name_language, detect_gender__compare, transliterate_name, measure_execution
+from utils import Gender, remove_non_letters, detect_name_language, detect_gender__compare, transliterate_name, name_strip_suffixes, name_norm
 
 import cachetools
 from cachetools import LRUCache
@@ -35,12 +36,23 @@ def detect_gender(name: str) -> Gender:
     _name = name
     name = remove_non_letters(name)
 
+    FEMALE_SUFFIXES = [
+        "очка", "ечка", "юшка", "енька", "инка", "ушка", "ка", "ша", "уся", "юся", "ся",
+        "онька", "ень", "еньки", "юнька",
+    ]
+
+    MALE_SUFFIXES = [
+        "ик", "ек", "ёк", "ок", "чик",
+        "яша", "юша", "ёша", "ян"
+    ]
+
     # pre-process the name
     if name:
         try:
             name = name.lower()
             name = next((element for element in name.split(" ") if element.strip()), None) # get first name
             name = name.strip() # just to make sure it's as clean as possible
+
         except AttributeError:
             name = _name # restore OG
     else:
@@ -52,24 +64,36 @@ def detect_gender(name: str) -> Gender:
     # compare
     _name_lang = detect_name_language(name)
 
-    print(name)
-    print(_name_lang)
+    # print(name)
+    # print(_name_lang)
 
     if _name_lang == 'russian':
         det_gen = detect_gender__compare(name, "Russia")
 
         if det_gen == Gender.UNKNOWN:
-            # if name ends with "ка", then try replace it with "а"
-            # and try/detect again
-            if name.endswith("ка"):
-                name = f"{name[:-2]}а"
-
-            det_gen = detect_gender__compare(name, "Russia")
+            # dedup letters and try again
+            dedupped_name = re.sub(r'([А-Яа-яЁё])\1+', r'\1', name)
+            det_gen = detect_gender__compare(dedupped_name, "Russia")
 
             if det_gen == Gender.UNKNOWN:
-                # if gender unknown, try to transliterate it and compare again
+                # try to detect based on suffixes
+                # and try/detect again
+                name = name_norm(name)
 
-                det_gen = detect_gender__compare(transliterate_name(name), "USA")
+                if name != name_strip_suffixes(name, FEMALE_SUFFIXES):
+                    det_gen = Gender.FEMALE
+                elif name != name_strip_suffixes(name, MALE_SUFFIXES):
+                    det_gen = Gender.MALE
+
+                # print("SSS ", name)
+                # print("SSS ", det_gen)
+
+                # det_gen = detect_gender__compare(name, "Russia")
+
+                if det_gen == Gender.UNKNOWN:
+                    # if gender is still unknown, try to transliterate it and compare again
+
+                    det_gen = detect_gender__compare(transliterate_name(name), "USA")
 
     elif _name_lang == 'english':
         det_gen = detect_gender__compare(name, "USA")
@@ -86,7 +110,6 @@ def detect_gender(name: str) -> Gender:
     # last shot
     # if name ends with 'а' letter, then assume it's female
     # return Gender.FEMALE if name not in ["фома", "савва", "кима", "алима"] and name.lower()[-1] == 'а' else Gender.UNKNOWN
-
 
 def cache_async_tgmembers(func):
     @wraps(func)

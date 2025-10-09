@@ -5,6 +5,7 @@ import typing
 from typing import final
 from enum import Enum
 import re
+import unicodedata
 
 import psutil
 
@@ -73,7 +74,7 @@ def detect_gender__compare(name: str, country: str = None) -> Gender:
         else:
             r = g_ext.extract_gender(name)
     except ValueError:
-        # assume gender unknown, if cannot be extracted
+        # assume gender unknown if it cannot be extracted
         return Gender.UNKNOWN
 
     if 'female and male' in r:
@@ -89,6 +90,21 @@ def detect_gender__compare(name: str, country: str = None) -> Gender:
 def remove_non_letters(text: str) -> str:
     # but preserve spaces
     return ''.join(char for char in text if char.isalpha() or char == ' ')
+
+
+def name_norm(s: str) -> str:
+    s = unicodedata.normalize("NFKC", s.lower())
+    s = s.replace("ё", "е")
+    s = re.sub(r"[^а-яa-z]+", "", s)        # убираем цифры/эмодзи/знаки
+    s = re.sub(r"(.)\1{2,}", r"\1\1", s)    # сжать растяжки: оооляя -> ооля
+    return s
+
+
+def name_strip_suffixes(name: str, suffixes: list) -> str:
+    for suf in sorted(suffixes, key=len, reverse=True):
+        if name.endswith(suf) and len(name) - len(suf) >= 3:
+            return name[: -len(suf)]
+    return name
 
 
 def remove_emojis(text):
