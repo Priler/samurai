@@ -5,8 +5,8 @@ With reports, logs, profanity filter, anti-spam AI and more :3
 
 # What samurai do?
 Samurai is a personal bot, made for easy chat auto-moderation.  
-It adds reporting functionality, profanity filtering (both english & russian languages are supported), logging system via private channel, spam detection AI and much more!  
-More of that, the bot code & functions can be easily extended and/or limited as you prefer.  
+It adds reporting functionality, profanity filtering (both english & russian languages are supported), logging system via private channel, spam detection AI, NSFW detection AI and much more!  
+More of that, the bot code and functions can be easily extended and/or limited as you prefer.  
 
 *The code has NOT been polished and is provided "as is". There are a lot of code that are redundant and there are tons of improvements that can be made.*
 
