@@ -1,4 +1,3 @@
-# import gradio as gr
 from transformers import AutoImageProcessor, SiglipForImageClassification
 from PIL import Image
 import torch
@@ -46,15 +45,14 @@ def classify_explicit_content(image):
     return prediction
 
 # Gradio Interface
-# iface = gr.Interface(
-#     fn=classify_explicit_content,
-#     inputs=gr.Image(type="numpy"),
-#     outputs=gr.Label(num_top_classes=5, label="Predicted Content Type"),
-#     title="siglip2-x256-explicit-content",
-#     description="Classifies images into explicit, suggestive, or safe categories (e.g., Hentai, Pornography, Normal)."
-# )
+import gradio as gr
+iface = gr.Interface(
+    fn=classify_explicit_content,
+    inputs=gr.Image(type="numpy"),
+    outputs=gr.Label(num_top_classes=5, label="Predicted Content Type"),
+    title="siglip2-x256-explicit-content",
+    description="Classifies images into explicit, suggestive, or safe categories (e.g., Hentai, Pornography, Normal)."
+)
 
-# if __name__ == "__main__":
-#     # iface.launch()
-#
-#     print( classify_explicit_content( np.asarray(Image.open(f"tests/nsfw/{nsfw_test_images[0][0]}")) ) )
+if __name__ == "__main__":
+    iface.launch()

@@ -261,8 +261,19 @@ async def check_for_unwanted(message: types.Message, msg_text, member, tg_member
             # currently we don't include 'Pornography' for two reasons
             # a) It's rare for ad bots to set pornography profile images
             # b) It works not as accurate in a currently used model
-            if (float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.prediction_threshold)
-                or float(nsfw_prediction["Hentai"]) > float(config.nsfw.prediction_threshold)):
+            if (
+                # safe checks (allowed detections)
+                (float(nsfw_prediction["Normal"]) < float(config.nsfw.normal_prediction_threshold)
+                or float(nsfw_prediction["Anime Picture"]) < float(config.nsfw.anime_prediction_threshold))
+
+                # unsafe checks (disallowed detections)
+                and (
+                    # check this flags with AND condition (both should return True to be detected as NSFW
+                    (float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.sensual_prediction_threshold)
+                        and float(nsfw_prediction["Pornography"]) > float(config.nsfw.pornography_prediction_threshold))
+
+                    # separate detection
+                    or float(nsfw_prediction["Hentai"]) > float(config.nsfw.hentai_prediction_threshold))):
 
                 log_msg = msg_text
                 log_msg += "\n\n<i>Автор:</i> " + utils.user_mention(message.from_user)
