@@ -45,14 +45,15 @@ def classify_explicit_content(image):
     return prediction
 
 # Gradio Interface
-import gradio as gr
-iface = gr.Interface(
-    fn=classify_explicit_content,
-    inputs=gr.Image(type="numpy"),
-    outputs=gr.Label(num_top_classes=5, label="Predicted Content Type"),
-    title="siglip2-x256-explicit-content",
-    description="Classifies images into explicit, suggestive, or safe categories (e.g., Hentai, Pornography, Normal)."
-)
-
 if __name__ == "__main__":
+    import gradio as gr
+
+    iface = gr.Interface(
+        fn=classify_explicit_content,
+        inputs=gr.Image(type="numpy"),
+        outputs=gr.Label(num_top_classes=5, label="Predicted Content Type"),
+        title="siglip2-x256-explicit-content",
+        description="Classifies images into explicit, suggestive, or safe categories (e.g., Hentai, Pornography, Normal)."
+    )
+
     iface.launch()
