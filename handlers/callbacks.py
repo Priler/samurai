@@ -161,7 +161,6 @@ async def callback_handler(call: types.CallbackQuery):
 
     elif call.data.startswith("nsfw_ban_"):
         with suppress(CantRestrictChatOwner, BadRequest):
-            print(call.data)
             await call.message.bot.kick_chat_member(chat_id=config.groups.main, user_id=call.data.split("_")[2])
 
         await call.message.bot.edit_message_text(chat_id=config.groups.logs,

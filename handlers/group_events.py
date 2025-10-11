@@ -111,6 +111,10 @@ async def on_user_message(message: types.Message):
   # Retrieve tg member object
   tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
 
+  # skip admins
+  if tg_member.is_chat_admin():
+      return
+
   # Define message text
   msg_text = None
 
@@ -133,13 +137,12 @@ async def on_user_message(message: types.Message):
   if _del:
     # PROFANITY DETECTED
     # if not (tg_member.is_chat_admin() and tg_member.can_restrict_members):
-    if not tg_member.is_chat_admin():
-        await message.delete()
+    await message.delete()
 
-        # increase member violations count
-        member.violations_count_profanity += 1
-        member.reputation_points -= 20 # every profanity message removes some reputation points from user
-        await member.update()
+    # increase member violations count
+    member.violations_count_profanity += 1
+    member.reputation_points -= 20 # every profanity message removes some reputation points from user
+    await member.update()
 
     log_msg = msg_text
     if _word:
@@ -152,13 +155,12 @@ async def on_user_message(message: types.Message):
     if (member.messages_count < int(config.spam.member_messages_threshold) or member.reputation_points < int(config.spam.member_reputation_threshold)) and ruspam_predict(msg_text):
         # SPAM DETECTED
         # if not (tg_member.is_chat_admin() and tg_member.can_restrict_members):
-        if not tg_member.is_chat_admin():
-            await message.delete()
+        await message.delete()
 
-            # increase member violations count
-            member.violations_count_spam += 1
-            member.reputation_points -= 5  # every spam message removes some reputation points from user
-            await member.update()
+        # increase member violations count
+        member.violations_count_spam += 1
+        member.reputation_points -= 5  # every spam message removes some reputation points from user
+        await member.update()
 
         # TEMPORARY TURN OFF SPAM DB LOGGING etc
         # log_msg = msg_text
@@ -194,10 +196,105 @@ async def on_user_message(message: types.Message):
         #     utils.generate_log_message(log_msg, "❌ АнтиСПАМ"),
         #     reply_markup=spam_keyboard)
     else:
-        # only if message doesn't contain any violations
-        member.messages_count += 1 # increase members messages count
-        member.reputation_points += 1 # increase members reputation points
-        await member.update()
+        # if a message doesn't contain violations,
+        # optionally check for post-replies & nsfw
+        additional_checks = await check_for_unwanted(message, member, tg_member) # returns True if handled, False otherwise
+
+        if not additional_checks:
+            # finally, we know that's a message without any violations
+            member.messages_count += 1 # increase member's messages count
+            member.reputation_points += 1 # increase member's reputation points
+            await member.update()
+
+
+# @TODO: Only auto-delete women if profile description contains links etc, or it has channel attached idk, or stories with links etc.
+# Also should split this function into two sub-functions.
+# @dp.message_handler(is_admin=False, chat_id=config.groups.main, content_types=[types.ContentType.TEXT, types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO])
+async def check_for_unwanted(message: types.Message, member, tg_member) -> bool:
+    if message.reply_to_message and message.reply_to_message.forward_from_chat and message.reply_to_message.forward_from_chat.id == config.groups.linked_channel:
+        # that's a reply to channel message (comment)
+        # remove any messages within N seconds after message posted
+        # exceptions: admins, users with high enough reputation points
+        if (member.reputation_points < int(config.spam.allow_comments_rep_threshold)
+                 and (message.date - message.reply_to_message.forward_date).seconds <= int(config.spam.remove_first_comments_interval)):
+            try:
+                await message.delete()
+                await utils.write_log(message.bot, f"Удалено сообщение: {message.text}\n\n<i>Автор:</i> {utils.user_mention(message.from_user)}", "🤖 Антибот")
+                return True
+            except exceptions.MessageCantBeDeleted:
+                pass
+
+        return False
+    else:
+        # chat message
+        # check for nsfw, etc.
+
+        # Try to detect member gender
+        member__gender = lru_cache.detect_gender(tg_member.user.first_name)
+
+        if member__gender == Gender.FEMALE and bool(config.nsfw.enabled):
+            # RECOGNIZED FEMALE, check for NSFW
+            # skip high rep members
+            if member.reputation_points > int(config.spam.allow_comments_rep_threshold__woman):
+                return False
+
+            profile_photos = await message.bot.get_user_profile_photos(user_id = message.from_user.id)
+
+            if not profile_photos.photos:
+                # no photos, not nsfw
+                return False
+
+            # Get the largest size of the most recent photo
+            file_id = profile_photos.photos[0][-1].file_id
+            img_file = await message.bot.get_file(file_id)
+
+            # Download file bytes
+            file_bytes = await message.bot.download_file(img_file.file_path)
+
+            # Make the image
+            image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
+            # image.save("test.jpg", "JPEG")
+
+            # Predict NSFW
+            nsfw_prediction = nsfw_predict(np.asarray(image))
+
+            # currently we don't include 'Pornography' for two reasons
+            # a) It's rare for ad bots to set pornography profile images
+            # b) It works not as accurate in a currently used model
+            if (float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.prediction_threshold)
+                or float(nsfw_prediction["Hentai"]) > float(config.nsfw.prediction_threshold)):
+
+                log_msg = message.text
+                log_msg += "\n\n<i>Автор:</i> " + utils.user_mention(message.from_user)
+
+                # Generate keyboard with some actions for detected spam
+                nsfw_keyboard = types.InlineKeyboardMarkup()
+
+                # it's nsfw + block user
+                nsfw_keyboard.add(types.InlineKeyboardButton(
+                    text="❌ Это NSFW + заблокировать пользователя",
+                    callback_data=f"nsfw_ban_{message.from_user.id}")
+                )
+
+                # not nsfw
+                nsfw_keyboard.add(types.InlineKeyboardButton(
+                    text="❎ Это НЕ NSFW",
+                    callback_data=f"nsfw_safe_{member.id}")
+                )
+
+                # send a message with a keyboard to log channel
+                await message.bot.send_message(
+                    config.groups.logs,
+                    utils.generate_log_message(log_msg, "🔞 NSFW"),
+                    reply_markup=nsfw_keyboard)
+
+                # remove the message
+                await message.delete()
+                return True
+            else:
+                return False
+        else:
+            return False
 
 
 @dp.message_handler(is_owner = True, chat_id=config.groups.main, commands=["spam"], commands_prefix="!")
@@ -349,96 +446,6 @@ async def on_user_media(message: types.Message):
 #                 await utils.write_log(message.bot, f"Удалено сообщение: {message.text}\n\n<i>Автор:</i> {utils.user_mention(message.from_user)}", "🤖 Антибот")
 #             except exceptions.MessageCantBeDeleted:
 #                 pass
-
-
-# @TODO: Only auto-delete women if profile description contains links etc, or it has channel attached idk, or stories with links etc.
-@dp.message_handler(is_admin=False, chat_id=config.groups.main, content_types=[types.ContentType.TEXT, types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO])
-async def on_user_message_delete_unwanted(message: types.Message):
-    ### Retrieve member
-    member = await lru_cache.retrieve_or_create_member(message.from_user.id)
-    tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
-
-    # skip admins
-    if tg_member.is_chat_admin():
-        return
-
-    if message.reply_to_message and message.reply_to_message.forward_from_chat and message.reply_to_message.forward_from_chat.id == config.groups.linked_channel:
-        # that's a reply to channel message (comment)
-        # remove any messages within N seconds after message posted
-        # exceptions: admins, users with high enough reputation points
-        if (member.reputation_points < int(config.spam.allow_comments_rep_threshold)
-                 and (message.date - message.reply_to_message.forward_date).seconds <= int(config.spam.remove_first_comments_interval)):
-            try:
-                await message.delete()
-                await utils.write_log(message.bot, f"Удалено сообщение: {message.text}\n\n<i>Автор:</i> {utils.user_mention(message.from_user)}", "🤖 Антибот")
-            except exceptions.MessageCantBeDeleted:
-                pass
-    else:
-        # print("UNWANTED")
-        # chat message
-        # check for nsfw, etc.
-
-        # Try to detect member gender
-        member__gender = lru_cache.detect_gender(tg_member.user.first_name)
-
-        if member__gender == Gender.FEMALE and bool(config.nsfw.enabled):
-            # RECOGNIZED FEMALE, check for NSFW
-            # skip high rep members
-            if member.reputation_points > int(config.spam.allow_comments_rep_threshold__woman):
-                return
-
-            profile_photos = await message.bot.get_user_profile_photos(user_id = message.from_user.id)
-
-            if not profile_photos.photos:
-                # no photos, not nsfw
-                return
-
-            # Get the largest size of the most recent photo
-            file_id = profile_photos.photos[0][-1].file_id
-            img_file = await message.bot.get_file(file_id)
-
-            # Download file bytes
-            file_bytes = await message.bot.download_file(img_file.file_path)
-
-            # Make the image
-            image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
-            # image.save("test.jpg", "JPEG")
-
-            # Predict NSFW
-            nsfw_prediction = nsfw_predict(np.asarray(image))
-
-            # currently we don't include 'Pornography' for two reasons
-            # a) It's rare for ad bots to set pornography profile images
-            # b) It works not as accurate in a currently used model
-            if (float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.prediction_threshold)
-                or float(nsfw_prediction["Hentai"]) > float(config.nsfw.prediction_threshold)):
-
-                log_msg = message.text
-                log_msg += "\n\n<i>Автор:</i> " + utils.user_mention(message.from_user)
-
-                # Generate keyboard with some actions for detected spam
-                nsfw_keyboard = types.InlineKeyboardMarkup()
-
-                # it's nsfw + block user
-                nsfw_keyboard.add(types.InlineKeyboardButton(
-                    text="❌ Это NSFW + заблокировать пользователя",
-                    callback_data=f"nsfw_ban_{message.from_user.id}")
-                )
-
-                # not nsfw
-                nsfw_keyboard.add(types.InlineKeyboardButton(
-                    text="❎ Это НЕ NSFW",
-                    callback_data=f"nsfw_safe_{member.id}")
-                )
-
-                # send message with a keyboard to log channel
-                await message.bot.send_message(
-                    config.groups.logs,
-                    utils.generate_log_message(log_msg, "🔞 NSFW"),
-                    reply_markup=nsfw_keyboard)
-
-                # remove the message
-                await message.delete()
 
 
 @dp.message_handler(chat_id=config.groups.main, commands="бу", commands_prefix="!/")
