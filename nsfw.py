@@ -1,4 +1,4 @@
-import gradio as gr
+# import gradio as gr
 from transformers import AutoImageProcessor, SiglipForImageClassification
 from PIL import Image
 import torch
