@@ -299,7 +299,7 @@ def get_report_comment(message_date: datetime.datetime, message_id: int, report_
 def get_url_chat_id(chat_id: int) -> int:
     """
     Well, this value is a "magic number", so I have to explain it a bit.
-    I don't want to use hardcoded chat username, so I just take its ID (see "group_main" variable above),
+    I don't want to use hardcoded chat username, so I just take its ID (see groups.main in config),
     add id_compensator and take a positive value. This way I can use https://t.me/c/{chat_id}/{msg_id} links,
     which don't rely on chat username.
 

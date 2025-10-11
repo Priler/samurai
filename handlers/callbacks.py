@@ -158,3 +158,28 @@ async def callback_handler(call: types.CallbackQuery):
         await call.message.bot.edit_message_text(chat_id=config.groups.logs,
                                                  message_id=call.message.message_id,
                                                  text=call.message.text + "\n\n❎ <b>Сообщение помечено как НЕ СПАМ</b>")
+
+    elif call.data.startswith("nsfw_ban_"):
+        with suppress(CantRestrictChatOwner, BadRequest):
+            print(call.data)
+            await call.message.bot.kick_chat_member(chat_id=config.groups.main, user_id=call.data.split("_")[2])
+
+        await call.message.bot.edit_message_text(chat_id=config.groups.logs,
+                                                 message_id=call.message.message_id,
+                                                 text=call.message.text + "\n\n❌ <b>Юзер забанен за NSFW изображение профиля.</b>")
+        await call.answer(text="Done")
+
+    elif call.data.startswith("nsfw_safe_"):
+        try:
+            # increase member messages count, cuz is not spam :3
+            member = await Member.objects.get(id=int(call.data.split("_")[2]))
+            member.messages_count += 1
+            member.reputation_points += 10 # add rep. points for not-nsfw reaction
+            await member.update()
+        except IndexError:
+            pass
+
+        await call.message.bot.edit_message_text(chat_id=config.groups.logs,
+                                                 message_id=call.message.message_id,
+                                                 text=call.message.text + "\n\n❎ <b>Сообщение помечено как не содержащее NSFW.</b>")
+        await call.answer(text="Done")

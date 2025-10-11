@@ -18,3 +18,8 @@ pymysql
 
 torch
 transformers
+numpy
+
+pillow
+# gradio
+hf_xet
