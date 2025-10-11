@@ -230,10 +230,12 @@ async def check_for_unwanted(message: types.Message, msg_text, member, tg_member
         # check for nsfw, etc.
 
         # Try to detect member gender
+        print(f"\nChecking {tg_member.user.first_name} ...")
         member__gender = lru_cache.detect_gender(tg_member.user.first_name)
 
         if member__gender == Gender.FEMALE and bool(config.nsfw.enabled):
             # RECOGNIZED FEMALE, check for NSFW
+            print("Recognized FEMALE.")
             # skip high rep members
             if member.reputation_points > int(config.spam.allow_comments_rep_threshold__woman):
                 return False
@@ -257,6 +259,7 @@ async def check_for_unwanted(message: types.Message, msg_text, member, tg_member
 
             # Predict NSFW
             nsfw_prediction = nsfw_predict(np.asarray(image))
+            print("Prediction:", nsfw_prediction)
 
             # currently we don't include 'Pornography' for two reasons
             # a) It's rare for ad bots to set pornography profile images
