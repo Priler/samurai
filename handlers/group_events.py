@@ -269,10 +269,12 @@ async def check_for_unwanted(message: types.Message, msg_text, member, tg_member
                 # unsafe checks (disallowed detections)
                 and (
                     # check this flags with AND condition (both should return True to be detected as NSFW
-                    (float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.sensual_prediction_threshold)
-                        and float(nsfw_prediction["Pornography"]) > float(config.nsfw.pornography_prediction_threshold))
+                    (float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.comb_sensual_prediction_threshold)
+                        and float(nsfw_prediction["Pornography"]) > float(config.nsfw.comb_pornography_prediction_threshold))
 
-                    # separate detection
+                    # separate detections
+                    or float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.sensual_prediction_threshold)
+                    or float(nsfw_prediction["Pornography"]) > float(config.nsfw.pornography_prediction_threshold)
                     or float(nsfw_prediction["Hentai"]) > float(config.nsfw.hentai_prediction_threshold))):
 
                 log_msg = msg_text
