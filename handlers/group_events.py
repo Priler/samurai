@@ -198,7 +198,7 @@ async def on_user_message(message: types.Message):
     else:
         # if a message doesn't contain violations,
         # optionally check for post-replies & nsfw
-        additional_checks = await check_for_unwanted(message, member, tg_member) # returns True if handled, False otherwise
+        additional_checks = await check_for_unwanted(message, msg_text, member, tg_member) # returns True if handled, False otherwise
 
         if not additional_checks:
             # finally, we know that's a message without any violations
@@ -210,7 +210,7 @@ async def on_user_message(message: types.Message):
 # @TODO: Only auto-delete women if profile description contains links etc, or it has channel attached idk, or stories with links etc.
 # Also should split this function into two sub-functions.
 # @dp.message_handler(is_admin=False, chat_id=config.groups.main, content_types=[types.ContentType.TEXT, types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO])
-async def check_for_unwanted(message: types.Message, member, tg_member) -> bool:
+async def check_for_unwanted(message: types.Message, msg_text, member, tg_member) -> bool:
     if message.reply_to_message and message.reply_to_message.forward_from_chat and message.reply_to_message.forward_from_chat.id == config.groups.linked_channel:
         # that's a reply to channel message (comment)
         # remove any messages within N seconds after message posted
@@ -264,7 +264,7 @@ async def check_for_unwanted(message: types.Message, member, tg_member) -> bool:
             if (float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.prediction_threshold)
                 or float(nsfw_prediction["Hentai"]) > float(config.nsfw.prediction_threshold)):
 
-                log_msg = message.text
+                log_msg = msg_text
                 log_msg += "\n\n<i>Автор:</i> " + utils.user_mention(message.from_user)
 
                 # Generate keyboard with some actions for detected spam
