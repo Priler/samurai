@@ -29,6 +29,11 @@ from libs.censure import Censor
 censor_ru = Censor.get(lang='ru')
 censor_en = Censor.get(lang='en')
 
+
+def prepare_word(word):
+    return censor_ru.prepare_word(word)
+
+
 def check_for_profanity(text, lang="ru"):
     _profanity_detected = False
     _word = None
@@ -141,15 +146,17 @@ def detect_name_language(name):
 
     if total_letters == 0:
         return 'unknown'
-    elif russian_count > 0 and english_count == 0:
+    # elif russian_count > 0 and english_count == 0:
+    elif russian_count > english_count:
         return 'russian'
-    elif english_count > 0 and russian_count == 0:
+    # elif english_count > 0 and russian_count == 0:
+    elif english_count > russian_count:
         return 'english'
     else:
         return 'unknown'
 
 
-def transliterate_name(name):
+def transliterate_name(name, force_lang = None):
     """
     Transliterates names between Russian and English based on automatic language detection.
 
@@ -187,11 +194,14 @@ def transliterate_name(name):
             en_to_ru[en.lower()] = ru.lower()
             en_to_ru[en.title()] = ru.upper()
 
-    # Detect language
-    lang = detect_name_language(name)
+    if not force_lang:
+        # Detect language
+        lang = detect_name_language(name)
 
-    if lang == 'unknown':
-        return None
+        if lang == 'unknown':
+            return None
+    else:
+        lang = force_lang
 
     if lang == 'russian':
         # Russian to English

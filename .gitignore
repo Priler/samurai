@@ -6,6 +6,7 @@
 .idea/jsLibraryMappings.xml
 pipsize.py
 Dockerfile
+local_test.py
 
 # Sensitive or high-churn files:
 .idea/dataSources.ids
