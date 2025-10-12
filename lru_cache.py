@@ -50,20 +50,17 @@ def detect_gender(name: str) -> Gender:
     if name:
         try:
             # prepare the name
-            name = name.lower()
             name = next((element for element in name.split(" ") if element.strip()), None) # get first name
-            name = name.strip() # just to make sure it's as clean as possible
-            name = prepare_word(name) # fix mask letters ('h' as 'н', etc.)
 
         except AttributeError:
             name = _name # restore OG
     else:
         name = _name # restore OG name (nicknames like "." or "$" etc)
 
-    # compare
+    # preprocess name
     _name_lang = detect_name_language(name)
     name = transliterate_name(name, 'english' if _name_lang == 'russian' else 'english')
-
+    name = prepare_word(name)  # fix mask letters ('h' as 'н', etc.)
 
     # print(name)
     # print(_name_lang)

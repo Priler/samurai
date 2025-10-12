@@ -25,6 +25,7 @@ import numpy as np
 import io
 
 from utils import Gender
+from utils import check_name_for_violations
 
 # blacklist = open("blacklist.txt", mode="r").read().split(',')
 # blacklist_regexp = re.compile(r'(?iu)\b((у|[нз]а|(хитро|не)?вз?[ыьъ]|с[ьъ]|(и|ра)[зс]ъ?|(о[тб]|под)[ьъ]?|(.\B)+?[оаеи])?-?([её]б(?!о[рй])|и[пб][ае][тц]).*?|(н[иеа]|[дп]о|ра[зс]|з?а|с(ме)?|о(т|дно)?|апч)?-?ху([яйиеёю]|ли(?!ган)).*?|(в[зы]|(три|два|четыре)жды|(н|сук)а)?-?бл(я(?!(х|ш[кн]|мб)[ауеыио]).*?|[еэ][дт]ь?)|(ра[сз]|[зн]а|[со]|вы?|п(р[ои]|од)|и[зс]ъ?|[ао]т)?п[иеё]зд.*?|(за)?п[ие]д[аое]?р((ас)?(и(ли)?[нщктл]ь?)?|(о(ч[еи])?)?к|юг)[ауеы]?|манд([ауеы]|ой|[ао]вошь?(е?к[ауе])?|юк(ов|[ауи])?)|муд([аио].*?|е?н([ьюия]|ей))|мля([тд]ь)?|лять|([нз]а|по)х|м[ао]л[ао]фь[яию])\b')
@@ -253,28 +254,39 @@ async def check_for_unwanted(message: types.Message, msg_text, member, tg_member
         image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
         # image.save("test.jpg", "JPEG")
 
-        # Predict NSFW
-        nsfw_prediction = nsfw_predict(np.asarray(image))
-        print("Prediction:", nsfw_prediction)
+        # Check name for violations
+        name_valid = check_name_for_violations(message.from_user.full_name)
 
+        # Predict NSFW
         # currently we don't include 'Pornography' for two reasons
         # a) It's rare for ad bots to set pornography profile images
         # b) It works not as accurate in a currently used model
-        if (
-            # safe checks (allowed detections)
-            (float(nsfw_prediction["Normal"]) < float(config.nsfw.normal_prediction_threshold)
-            or float(nsfw_prediction["Anime Picture"]) < float(config.nsfw.anime_prediction_threshold))
+        nsfw_prediction = None
+        if name_valid:
+            nsfw_prediction = nsfw_predict(np.asarray(image))
+            print("Prediction:", nsfw_prediction) # temp debug stuff
+        else:
+            print("Invalid name:", message.from_user.full_name)
 
-            # unsafe checks (disallowed detections)
-            and (
-                # check this flags with AND condition (both should return True to be detected as NSFW
-                (float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.comb_sensual_prediction_threshold)
-                    and float(nsfw_prediction["Pornography"]) > float(config.nsfw.comb_pornography_prediction_threshold))
+        if (not name_valid or (
+                # safe checks (allowed detections)
+                (float(nsfw_prediction["Normal"]) < float(config.nsfw.normal_prediction_threshold)
+                 or float(nsfw_prediction["Anime Picture"]) < float(config.nsfw.anime_prediction_threshold))
 
-                # separate detections
-                or float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.sensual_prediction_threshold)
-                or float(nsfw_prediction["Pornography"]) > float(config.nsfw.pornography_prediction_threshold)
-                or float(nsfw_prediction["Hentai"]) > float(config.nsfw.hentai_prediction_threshold))):
+                # unsafe checks (disallowed detections)
+                and (
+                        # check this flags with AND condition (both should return True to be detected as NSFW
+                        (float(nsfw_prediction["Enticing or Sensual"]) > float(
+                            config.nsfw.comb_sensual_prediction_threshold)
+                         and float(nsfw_prediction["Pornography"]) > float(
+                                    config.nsfw.comb_pornography_prediction_threshold))
+
+                        # separate detections
+                        or float(nsfw_prediction["Enticing or Sensual"]) > float(
+                    config.nsfw.sensual_prediction_threshold)
+                        or float(nsfw_prediction["Pornography"]) > float(config.nsfw.pornography_prediction_threshold)
+                        or float(nsfw_prediction["Hentai"]) > float(config.nsfw.hentai_prediction_threshold))
+            )):
 
             log_msg = msg_text
             log_msg += "\n\n<i>Автор:</i> " + utils.user_mention(message.from_user)
