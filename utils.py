@@ -31,14 +31,33 @@ censor_en = Censor.get(lang='en')
 
 
 def prepare_word(word):
+    word = word.lower()
+    word = word.strip()  # just to make sure it's as clean as possible
     return censor_ru.prepare_word(word)
+
+
+def check_name_for_violations(name) -> bool:
+    blacklist_words = [
+        "профиль",
+        "посмотри",
+        "кликай",
+        "загляни",
+        "проф"
+    ]
+
+    name = prepare_word(name)
+    is_clean = not any(sub.lower() in name.lower() for sub in blacklist_words)
+
+    _prof = check_for_profanity(name, detect_name_language(name))
+
+    return not _prof[0] and is_clean
 
 
 def check_for_profanity(text, lang="ru"):
     _profanity_detected = False
     _word = None
 
-    if lang == "ru":
+    if lang == "ru" or lang == "russian":
         line_info = censor_ru.clean_line(text)
     else:
         line_info = censor_en.clean_line(text)

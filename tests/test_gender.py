@@ -7,7 +7,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from configurator import config, make_config
 if not make_config("config.ini"):
     exit(1)
-import heroku_config
 
 from utils import Gender
 from lru_cache import detect_gender
