@@ -127,7 +127,7 @@ async def on_user_message(message: types.Message):
   if msg_text is None:
       return
 
-  ###   CHECK FOR PROFANITY & SPAM
+  ### CHECK FOR PROFANITY & SPAM
   _del = False
   _word = None
 
@@ -224,93 +224,89 @@ async def check_for_unwanted(message: types.Message, msg_text, member, tg_member
             except exceptions.MessageCantBeDeleted:
                 pass
 
-        return False
-    else:
-        # chat message
-        # check for nsfw, etc.
+    # check for nsfw, etc.
+    # Try to detect member gender
+    print(f"\nChecking {tg_member.user.first_name} ...")
+    member__gender = lru_cache.detect_gender(tg_member.user.first_name)
 
-        # Try to detect member gender
-        print(f"\nChecking {tg_member.user.first_name} ...")
-        member__gender = lru_cache.detect_gender(tg_member.user.first_name)
+    if member__gender == Gender.FEMALE and bool(config.nsfw.enabled):
+        # RECOGNIZED FEMALE, check for NSFW
+        print("Recognized FEMALE.")
+        # skip high rep members
+        if member.reputation_points > int(config.spam.allow_comments_rep_threshold__woman):
+            return False
 
-        if member__gender == Gender.FEMALE and bool(config.nsfw.enabled):
-            # RECOGNIZED FEMALE, check for NSFW
-            print("Recognized FEMALE.")
-            # skip high rep members
-            if member.reputation_points > int(config.spam.allow_comments_rep_threshold__woman):
-                return False
+        profile_photos = await message.bot.get_user_profile_photos(user_id = message.from_user.id)
 
-            profile_photos = await message.bot.get_user_profile_photos(user_id = message.from_user.id)
+        if not profile_photos.photos:
+            # no photos, not nsfw
+            return False
 
-            if not profile_photos.photos:
-                # no photos, not nsfw
-                return False
+        # Get the largest size of the most recent photo
+        file_id = profile_photos.photos[0][-1].file_id
+        img_file = await message.bot.get_file(file_id)
 
-            # Get the largest size of the most recent photo
-            file_id = profile_photos.photos[0][-1].file_id
-            img_file = await message.bot.get_file(file_id)
+        # Download file bytes
+        file_bytes = await message.bot.download_file(img_file.file_path)
 
-            # Download file bytes
-            file_bytes = await message.bot.download_file(img_file.file_path)
+        # Make the image
+        image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
+        # image.save("test.jpg", "JPEG")
 
-            # Make the image
-            image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
-            # image.save("test.jpg", "JPEG")
+        # Predict NSFW
+        nsfw_prediction = nsfw_predict(np.asarray(image))
+        print("Prediction:", nsfw_prediction)
 
-            # Predict NSFW
-            nsfw_prediction = nsfw_predict(np.asarray(image))
-            print("Prediction:", nsfw_prediction)
+        # currently we don't include 'Pornography' for two reasons
+        # a) It's rare for ad bots to set pornography profile images
+        # b) It works not as accurate in a currently used model
+        if (
+            # safe checks (allowed detections)
+            (float(nsfw_prediction["Normal"]) < float(config.nsfw.normal_prediction_threshold)
+            or float(nsfw_prediction["Anime Picture"]) < float(config.nsfw.anime_prediction_threshold))
 
-            # currently we don't include 'Pornography' for two reasons
-            # a) It's rare for ad bots to set pornography profile images
-            # b) It works not as accurate in a currently used model
-            if (
-                # safe checks (allowed detections)
-                (float(nsfw_prediction["Normal"]) < float(config.nsfw.normal_prediction_threshold)
-                or float(nsfw_prediction["Anime Picture"]) < float(config.nsfw.anime_prediction_threshold))
+            # unsafe checks (disallowed detections)
+            and (
+                # check this flags with AND condition (both should return True to be detected as NSFW
+                (float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.comb_sensual_prediction_threshold)
+                    and float(nsfw_prediction["Pornography"]) > float(config.nsfw.comb_pornography_prediction_threshold))
 
-                # unsafe checks (disallowed detections)
-                and (
-                    # check this flags with AND condition (both should return True to be detected as NSFW
-                    (float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.comb_sensual_prediction_threshold)
-                        and float(nsfw_prediction["Pornography"]) > float(config.nsfw.comb_pornography_prediction_threshold))
+                # separate detections
+                or float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.sensual_prediction_threshold)
+                or float(nsfw_prediction["Pornography"]) > float(config.nsfw.pornography_prediction_threshold)
+                or float(nsfw_prediction["Hentai"]) > float(config.nsfw.hentai_prediction_threshold))):
 
-                    # separate detections
-                    or float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.sensual_prediction_threshold)
-                    or float(nsfw_prediction["Pornography"]) > float(config.nsfw.pornography_prediction_threshold)
-                    or float(nsfw_prediction["Hentai"]) > float(config.nsfw.hentai_prediction_threshold))):
+            log_msg = msg_text
+            log_msg += "\n\n<i>Автор:</i> " + utils.user_mention(message.from_user)
 
-                log_msg = msg_text
-                log_msg += "\n\n<i>Автор:</i> " + utils.user_mention(message.from_user)
+            # Generate keyboard with some actions for detected spam
+            nsfw_keyboard = types.InlineKeyboardMarkup()
 
-                # Generate keyboard with some actions for detected spam
-                nsfw_keyboard = types.InlineKeyboardMarkup()
+            # it's nsfw + block user
+            nsfw_keyboard.add(types.InlineKeyboardButton(
+                text="❌ Это NSFW + заблокировать пользователя",
+                callback_data=f"nsfw_ban_{message.from_user.id}")
+            )
 
-                # it's nsfw + block user
-                nsfw_keyboard.add(types.InlineKeyboardButton(
-                    text="❌ Это NSFW + заблокировать пользователя",
-                    callback_data=f"nsfw_ban_{message.from_user.id}")
-                )
+            # not nsfw
+            nsfw_keyboard.add(types.InlineKeyboardButton(
+                text="❎ Это НЕ NSFW",
+                callback_data=f"nsfw_safe_{member.id}")
+            )
 
-                # not nsfw
-                nsfw_keyboard.add(types.InlineKeyboardButton(
-                    text="❎ Это НЕ NSFW",
-                    callback_data=f"nsfw_safe_{member.id}")
-                )
+            # send a message with a keyboard to log channel
+            await message.bot.send_message(
+                config.groups.logs,
+                utils.generate_log_message(log_msg, "🔞 NSFW"),
+                reply_markup=nsfw_keyboard)
 
-                # send a message with a keyboard to log channel
-                await message.bot.send_message(
-                    config.groups.logs,
-                    utils.generate_log_message(log_msg, "🔞 NSFW"),
-                    reply_markup=nsfw_keyboard)
-
-                # remove the message
-                await message.delete()
-                return True
-            else:
-                return False
+            # remove the message
+            await message.delete()
+            return True
         else:
             return False
+    else:
+        return False
 
 
 @dp.message_handler(is_owner = True, chat_id=config.groups.main, commands=["spam"], commands_prefix="!")
