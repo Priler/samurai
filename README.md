@@ -15,9 +15,10 @@ https://trello.com/b/MbwAxjd1/xobot-official
 
 ## Credits
 https://github.com/masteroncluster/py-censure - Profanity filter we used as a base  
-https://github.com/MasterGroosha/telegram-report-bot - Reports system we used as a base
-https://huggingface.co/RUSpam/spam_deberta_v4 - Anti-Spam AI model we used as a base
-https://github.com/wwydmanski/gender-extractor - Gender detection we used as a base
+https://github.com/MasterGroosha/telegram-report-bot - Reports system we used as a base  
+https://huggingface.co/RUSpam/spam_deberta_v4 - Anti-Spam AI model we used as a base  
+https://github.com/wwydmanski/gender-extractor - Gender detection we used as a base  
+https://huggingface.co/prithivMLmods/siglip2-x256-explicit-content - Our current NSFW detection model
 
 ## Author of Samurai
 
