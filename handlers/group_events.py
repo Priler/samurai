@@ -237,23 +237,6 @@ async def check_for_unwanted(message: types.Message, msg_text, member, tg_member
         if member.reputation_points > int(config.spam.allow_comments_rep_threshold__woman):
             return False
 
-        profile_photos = await message.bot.get_user_profile_photos(user_id = message.from_user.id)
-
-        if not profile_photos.photos:
-            # no photos, not nsfw
-            return False
-
-        # Get the largest size of the most recent photo
-        file_id = profile_photos.photos[0][-1].file_id
-        img_file = await message.bot.get_file(file_id)
-
-        # Download file bytes
-        file_bytes = await message.bot.download_file(img_file.file_path)
-
-        # Make the image
-        image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
-        # image.save("test.jpg", "JPEG")
-
         # Check name for violations
         name_valid = check_name_for_violations(message.from_user.full_name)
 
@@ -263,6 +246,23 @@ async def check_for_unwanted(message: types.Message, msg_text, member, tg_member
         # b) It works not as accurate in a currently used model
         nsfw_prediction = None
         if name_valid:
+            profile_photos = await message.bot.get_user_profile_photos(user_id=message.from_user.id)
+
+            if not profile_photos.photos:
+                # no photos, not nsfw
+                return False
+
+            # Get the largest size of the most recent photo
+            file_id = profile_photos.photos[0][-1].file_id
+            img_file = await message.bot.get_file(file_id)
+
+            # Download file bytes
+            file_bytes = await message.bot.download_file(img_file.file_path)
+
+            # Make the image
+            image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
+            # image.save("test.jpg", "JPEG")
+
             nsfw_prediction = nsfw_predict(np.asarray(image))
             print("Prediction:", nsfw_prediction) # temp debug stuff
         else:
@@ -270,22 +270,28 @@ async def check_for_unwanted(message: types.Message, msg_text, member, tg_member
 
         if (not name_valid or (
                 # safe checks (allowed detections)
-                (float(nsfw_prediction["Normal"]) < float(config.nsfw.normal_prediction_threshold)
-                 or float(nsfw_prediction["Anime Picture"]) < float(config.nsfw.anime_prediction_threshold))
+                not (
+                    (float(nsfw_prediction["Normal"]) > float(config.nsfw.normal_prediction_threshold)
+                    or float(nsfw_prediction["Anime Picture"]) > float(config.nsfw.anime_prediction_threshold))
+                    and
+                    (
+                        float(nsfw_prediction["Enticing or Sensual"]) < float(config.nsfw.normal_comb_sensual_prediction_threshold)
+                        and
+                        float(nsfw_prediction["Pornography"]) < float(config.nsfw.normal_comb_pornography_prediction_threshold)
+                    )
+                )
 
                 # unsafe checks (disallowed detections)
                 and (
-                        # check this flags with AND condition (both should return True to be detected as NSFW
-                        (float(nsfw_prediction["Enticing or Sensual"]) > float(
-                            config.nsfw.comb_sensual_prediction_threshold)
-                         and float(nsfw_prediction["Pornography"]) > float(
-                                    config.nsfw.comb_pornography_prediction_threshold))
+                    # check this flags with AND condition (both should return True to be detected as NSFW
+                    (float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.comb_sensual_prediction_threshold)
+                     and float(nsfw_prediction["Pornography"]) > float(config.nsfw.comb_pornography_prediction_threshold))
 
-                        # separate detections
-                        or float(nsfw_prediction["Enticing or Sensual"]) > float(
-                    config.nsfw.sensual_prediction_threshold)
-                        or float(nsfw_prediction["Pornography"]) > float(config.nsfw.pornography_prediction_threshold)
-                        or float(nsfw_prediction["Hentai"]) > float(config.nsfw.hentai_prediction_threshold))
+                    # separate detections
+                    or float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.sensual_prediction_threshold)
+                    or float(nsfw_prediction["Pornography"]) > float(config.nsfw.pornography_prediction_threshold)
+                    or float(nsfw_prediction["Hentai"]) > float(config.nsfw.hentai_prediction_threshold)
+                )
             )):
 
             log_msg = msg_text

@@ -1,6 +1,8 @@
 import re
-
+from configurator import config, make_config
 from utils import Gender, remove_non_letters, detect_name_language, detect_gender__compare, transliterate_name, name_strip_suffixes, name_norm, prepare_word
+
+make_config("config.ini")
 
 def detect_gender(name: str) -> Gender:
     # remove any non-letters (emoji etc)
@@ -21,7 +23,10 @@ def detect_gender(name: str) -> Gender:
     if name:
         try:
             # prepare the name
-            name = next((element for element in name.split(" ") if element.strip()), None) # get first name
+            name = next(
+                (part for part in name.split() if part.strip() and len(part.strip()) > 1),
+                None
+            )
 
         except AttributeError:
             name = _name # restore OG
@@ -30,8 +35,8 @@ def detect_gender(name: str) -> Gender:
 
     # preprocess name
     _name_lang = detect_name_language(name)
-    name = transliterate_name(name, 'english' if _name_lang == 'russian' else 'english')
     name = prepare_word(name)  # fix mask letters ('h' as 'н', etc.)
+    name = transliterate_name(name, 'english' if _name_lang == 'russian' else 'english')
 
     print(name)
     print(_name_lang)
@@ -86,4 +91,42 @@ def detect_gender(name: str) -> Gender:
 # print("DET: ", detect_gender(":)[Nikita]"))
 # print("DET: ", detect_gender("Hasтюшкаааа"))
 # print("DET: ", detect_gender("пpофuль"))
-print("DET: ", detect_gender("пр0филь"))
+# print("DET: ", detect_gender("пр0филь"))
+# print("DET: ", detect_gender("у б0тоB для aнтucπаmа с/\\0Вa 4ymb-4ymb uck0Bepkaнbl 😁"))
+
+# name_valid = True
+# nsfw_prediction = {
+#     "Normal": 0.54,
+#     "Enticing or Sensual": 0.18,
+#     "Pornography": 0.27,
+#     "Anime Picture": 0.01,
+#     "Hentai": 0
+# }
+#
+# if (not name_valid or (
+#         # safe checks (allowed detections)
+#         not (
+#             (float(nsfw_prediction["Normal"]) > float(config.nsfw.normal_prediction_threshold)
+#             or float(nsfw_prediction["Anime Picture"]) > float(config.nsfw.anime_prediction_threshold))
+#             and
+#             (
+#                     float(nsfw_prediction["Enticing or Sensual"]) < float(config.nsfw.normal_comb_sensual_prediction_threshold)
+#                     and
+#                     float(nsfw_prediction["Pornography"]) < float(config.nsfw.normal_comb_pornography_prediction_threshold)
+#             )
+#         )
+#
+#         # unsafe checks (disallowed detections)
+#         and (
+#                 # check this flags with AND condition (both should return True to be detected as NSFW
+#                 (float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.comb_sensual_prediction_threshold)
+#                  and float(nsfw_prediction["Pornography"]) > float(config.nsfw.comb_pornography_prediction_threshold))
+#
+#                 # separate detections
+#                 or float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.sensual_prediction_threshold)
+#                 or float(nsfw_prediction["Pornography"]) > float(config.nsfw.pornography_prediction_threshold)
+#                 or float(nsfw_prediction["Hentai"]) > float(config.nsfw.hentai_prediction_threshold))
+# )):
+#     print("NFSW detected")
+# else:
+#     print("Image is clear.")
