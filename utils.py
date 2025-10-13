@@ -112,8 +112,8 @@ def detect_gender__compare(name: str, country: str = None) -> Gender:
 
 
 def remove_non_letters(text: str) -> str:
-    # but preserve spaces
-    return ''.join(char for char in text if char.isalpha() or char == ' ')
+    # but preserve spaces and digits
+    return ''.join(char for char in text if char.isalpha() or char == ' ' or char.isdigit())
 
 
 def name_norm(s: str) -> str:
