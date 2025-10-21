@@ -102,7 +102,7 @@ def detect_gender__compare(name: str, country: str = None) -> Gender:
         return Gender.UNKNOWN
 
     if 'female and male' in r:
-        return Gender.AMBIGUOUS
+        return Gender.AMBIGUOUS 
     elif 'female' in r:
         return Gender.FEMALE
     elif 'male' in r:
