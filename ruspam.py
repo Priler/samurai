@@ -7,6 +7,9 @@ model = AutoModelForSequenceClassification.from_pretrained(model_path, local_fil
 
 spam_substrings = [
     "official_vpnbot",
+    "rkt_vpn_bot",
+    "vpnbot",
+    "vpn_bot"
 ]
 
 def predict(text):
