@@ -131,6 +131,6 @@ time_window = 60
 
 [healthcheck]
 # HTTP health check endpoint for container orchestration
-enabled = true
+enabled = false
 host = "0.0.0.0"
 port = 8080
