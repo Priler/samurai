@@ -4,7 +4,7 @@ owner = 0
 # <heroku-var>
 token = ""
 version = "0.7"
-version_codename = "Eternal Ronin"
+version_codename = "Night City Samurai"
 
 [locale]
 # default locale for bot messages
