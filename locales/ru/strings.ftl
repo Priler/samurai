@@ -255,3 +255,14 @@ report-responses =
     <i>SWAT уже выехал :3</i>
     ---
     <i>Щасб кто-нибудь глянет :3</i>
+
+# ========== REPUTATION LABELS ==========
+rep-label-wanted = ⭐️⭐️⭐️⭐️⭐️ пять звёзд розыска
+rep-label-dangerous = особо опасный
+rep-label-shady = тёмная личность
+rep-label-violator = нарушитель
+rep-label-neutral = нейтральный
+rep-label-good = хороший
+rep-label-very-good = очень хороший
+rep-label-generous = великодушный
+rep-title = Репутация

@@ -133,24 +133,24 @@ async def on_me(message: Message) -> None:
     member_rep_label = ""
     if not is_creator:
         if member.reputation_points < -2000:
-            member_rep_label = "⭐️⭐️⭐️⭐️⭐️ пять звёзд розыска"
+            member_rep_label = get_string("rep-label-wanted")
         elif -2000 <= member.reputation_points < -1000:
-            member_rep_label = "особо опасный"
+            member_rep_label = get_string("rep-label-dangerous")
         elif -1000 <= member.reputation_points < -500:
-            member_rep_label = "тёмная личность"
+            member_rep_label = get_string("rep-label-shady")
         elif -500 <= member.reputation_points < 0:
-            member_rep_label = "нарушитель"
+            member_rep_label = get_string("rep-label-violator")
         elif 0 <= member.reputation_points < 100:
-            member_rep_label = "нейтральный"
+            member_rep_label = get_string("rep-label-neutral")
         elif 100 <= member.reputation_points < 500:
-            member_rep_label = "хороший"
+            member_rep_label = get_string("rep-label-good")
         elif 500 <= member.reputation_points < 1000:
-            member_rep_label = "очень хороший"
+            member_rep_label = get_string("rep-label-very-good")
         else:
-            member_rep_label = "великодушный"
+            member_rep_label = get_string("rep-label-generous")
 
     answer = f"{member_avatar} <b>{full_name}</b>"
-    answer += f"\n<b>Репутация: </b>{member_level} <i> 『{member_rep}{member_rep_label} (<tg-spoiler>{member.reputation_points}</tg-spoiler>)』</i>"
+    answer += f"\n<b>{get_string('rep-title')}: </b>{member_level} <i> 『{member_rep}{member_rep_label} (<tg-spoiler>{member.reputation_points}</tg-spoiler>)』</i>"
 
     try:
         await message.reply(answer)

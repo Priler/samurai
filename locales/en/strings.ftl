@@ -254,3 +254,14 @@ report-responses =
     <i>SWAT is en route :3</i>
     ---
     <i>Someone will check it soon :3</i>
+
+# ========== REPUTATION LABELS ==========
+rep-label-wanted = ⭐️⭐️⭐️⭐️⭐️ five star wanted
+rep-label-dangerous = extremely dangerous
+rep-label-shady = shady character
+rep-label-violator = violator
+rep-label-neutral = neutral
+rep-label-good = good
+rep-label-very-good = very good
+rep-label-generous = generous
+rep-title = Reputation
