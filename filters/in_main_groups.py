@@ -27,6 +27,6 @@ class InMainGroups(Filter):
         else:
             chat_id = event.chat.id
 
-        print(chat_id)
+        # print(chat_id)
         # Use O(1) set lookup instead of O(n) list lookup
         return config.groups.is_main_group(chat_id)
