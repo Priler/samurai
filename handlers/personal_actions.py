@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import psutil
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 from config import config
 from filters import IsOwnerFilter, IsAdminFilter, InMainGroups
@@ -21,15 +21,16 @@ sys.path.append("./libs")
 router = Router(name="personal_actions")
 
 # Temporary storage for pending messages (auto-cleanup after 5 minutes)
-_pending_messages: dict[str, tuple[str, datetime]] = {}
+# Exported for use by callbacks.py
+pending_messages: dict[str, tuple[str, datetime]] = {}
 
 
 def _cleanup_old_messages() -> None:
     """Remove messages older than 5 minutes."""
     now = datetime.now()
-    expired = [k for k, (_, ts) in _pending_messages.items() if now - ts > timedelta(minutes=5)]
+    expired = [k for k, (_, ts) in pending_messages.items() if now - ts > timedelta(minutes=5)]
     for k in expired:
-        del _pending_messages[k]
+        del pending_messages[k]
 
 
 async def _build_chat_keyboard(bot, msg_id: str) -> InlineKeyboardMarkup:
@@ -88,7 +89,7 @@ async def cmd_message_from_bot(message: Message) -> None:
     
     # Generate unique ID and store message
     msg_id = uuid.uuid4().hex[:8]
-    _pending_messages[msg_id] = (text, datetime.now())
+    pending_messages[msg_id] = (text, datetime.now())
     
     # Build keyboard
     keyboard = await _build_chat_keyboard(message.bot, msg_id)
@@ -98,76 +99,6 @@ async def cmd_message_from_bot(message: Message) -> None:
         f"Выберите куда отправить:",
         reply_markup=keyboard
     )
-
-
-@router.callback_query(F.data.startswith("msg_"))
-async def callback_msg_send(call: CallbackQuery) -> None:
-    """Handle message send callbacks."""
-    # Verify owner
-    if call.from_user.id not in config.bot.owner_ids:
-        await call.answer("⛔ Только для владельца", show_alert=True)
-        return
-    
-    parts = call.data.split("_")
-    if len(parts) < 3:
-        await call.answer("❌ Ошибка данных", show_alert=True)
-        return
-    
-    msg_id = parts[1]
-    target = "_".join(parts[2:])  # Handle negative chat IDs like -100123
-    
-    # Get stored message
-    if msg_id not in _pending_messages:
-        await call.message.edit_text("❌ Сообщение устарело. Отправьте команду заново.")
-        await call.answer()
-        return
-    
-    text, _ = _pending_messages[msg_id]
-    
-    if target == "cancel":
-        del _pending_messages[msg_id]
-        await call.message.edit_text("❌ Отменено.")
-        await call.answer()
-        return
-    
-    if target == "all":
-        # Send to all chats
-        sent = 0
-        failed = 0
-        for chat_id in config.groups.main:
-            try:
-                await call.bot.send_message(chat_id, text)
-                sent += 1
-            except Exception:
-                failed += 1
-        
-        del _pending_messages[msg_id]
-        await call.message.edit_text(
-            f"✅ <b>Отправлено во все чаты</b>\n\n"
-            f"Успешно: {sent}\n"
-            f"Ошибок: {failed}"
-        )
-        await call.answer("Отправлено!")
-    else:
-        # Send to specific chat
-        try:
-            chat_id = int(target)
-            await call.bot.send_message(chat_id, text)
-            
-            # Get chat name for confirmation
-            try:
-                chat = await call.bot.get_chat(chat_id)
-                chat_name = chat.title or f"Chat {chat_id}"
-            except Exception:
-                chat_name = f"Chat {chat_id}"
-            
-            del _pending_messages[msg_id]
-            await call.message.edit_text(f"✅ <b>Отправлено в:</b> {chat_name}")
-            await call.answer("Отправлено!")
-        except ValueError:
-            await call.answer("❌ Неверный ID чата", show_alert=True)
-        except Exception as e:
-            await call.answer(f"❌ Ошибка: {str(e)[:100]}", show_alert=True)
 
 
 @router.message(

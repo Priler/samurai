@@ -16,8 +16,83 @@ from aiogram.exceptions import TelegramBadRequest
 from config import config
 from db.models import Member, Spam
 from utils import get_string
+from handlers.personal_actions import pending_messages
 
 router = Router(name="callbacks")
+
+
+# ===============================
+# MSG SEND CALLBACKS (owner broadcast)
+# ===============================
+
+@router.callback_query(F.data.startswith("msg_"))
+async def callback_msg_send(call: CallbackQuery) -> None:
+    """Handle message send callbacks."""
+    # Verify owner
+    if call.from_user.id not in config.bot.owner_ids:
+        await call.answer("⛔ Только для владельца", show_alert=True)
+        return
+    
+    parts = call.data.split("_")
+    if len(parts) < 3:
+        await call.answer("❌ Ошибка данных", show_alert=True)
+        return
+    
+    msg_id = parts[1]
+    target = "_".join(parts[2:])  # Handle negative chat IDs like -100123
+    
+    # Get stored message
+    if msg_id not in pending_messages:
+        await call.message.edit_text("❌ Сообщение устарело. Отправьте команду заново.")
+        await call.answer()
+        return
+    
+    text, _ = pending_messages[msg_id]
+    
+    if target == "cancel":
+        del pending_messages[msg_id]
+        await call.message.edit_text("❌ Отменено.")
+        await call.answer()
+        return
+    
+    if target == "all":
+        # Send to all chats
+        sent = 0
+        failed = 0
+        for chat_id in config.groups.main:
+            try:
+                await call.bot.send_message(chat_id, text)
+                sent += 1
+            except Exception:
+                failed += 1
+        
+        del pending_messages[msg_id]
+        await call.message.edit_text(
+            f"✅ <b>Отправлено во все чаты</b>\n\n"
+            f"Успешно: {sent}\n"
+            f"Ошибок: {failed}"
+        )
+        await call.answer("Отправлено!")
+    else:
+        # Send to specific chat
+        try:
+            chat_id = int(target)
+            await call.bot.send_message(chat_id, text)
+            
+            # Get chat name for confirmation
+            try:
+                chat = await call.bot.get_chat(chat_id)
+                chat_name = chat.title or f"Chat {chat_id}"
+            except Exception:
+                chat_name = f"Chat {chat_id}"
+            
+            del pending_messages[msg_id]
+            await call.message.edit_text(f"✅ <b>Отправлено в:</b> {chat_name}")
+            await call.answer("Отправлено!")
+        except ValueError:
+            await call.answer("❌ Неверный ID чата", show_alert=True)
+        except Exception as e:
+            await call.answer(f"❌ Ошибка: {str(e)[:100]}", show_alert=True)
 
 
 # ===============================

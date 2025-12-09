@@ -6,8 +6,8 @@ from aiogram import Dispatcher
 from . import exceptions
 from . import admin_actions
 from . import user_actions
+from . import personal_actions  # Must be before callbacks (callbacks imports from it)
 from . import callbacks
-from . import personal_actions
 from . import group_events
 
 
