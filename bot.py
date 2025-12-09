@@ -1,17 +1,7 @@
-"""
-Samurai Bot - Main entry point.
+# Main entry point.
 
-A Telegram group moderation bot with:
-- Anti-profanity (Russian/English)
-- Anti-spam (ML-based)
-- NSFW profile detection (ML-based)
-- Reputation system
-- Report system
-- Scheduled announcements
-"""
 import asyncio
 import logging
-import signal
 import sys
 from contextlib import suppress
 
@@ -115,53 +105,27 @@ async def main() -> None:
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    # Create stop event for graceful shutdown
-    stop_event = asyncio.Event()
-
-    def signal_handler() -> None:
-        logger.info("Received shutdown signal")
-        stop_event.set()
-
-    # Setup signal handlers
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        with suppress(NotImplementedError):
-            loop.add_signal_handler(sig, signal_handler)
-
-    # Start scheduler task
+    # Start scheduler as background task
     scheduler_task = asyncio.create_task(run_scheduler())
-
-    # Start polling
-    polling_task = asyncio.create_task(
-        dp.start_polling(bot, skip_updates=True)
-    )
 
     logger.info("Bot started")
 
-    # Wait for stop signal
-    await stop_event.wait()
+    try:
+        # Start polling (aiogram handles SIGINT/SIGTERM internally)
+        await dp.start_polling(bot, skip_updates=True)
+    finally:
+        # Cancel scheduler
+        scheduler_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await scheduler_task
 
-    # Cancel tasks
-    polling_task.cancel()
-    scheduler_task.cancel()
+        # Stop health check server
+        if config.healthcheck.enabled:
+            await stop_health_server()
 
-    with suppress(asyncio.CancelledError):
-        await polling_task
-        await scheduler_task
-
-    # Stop dispatcher
-    await dp.stop_polling()
-
-    # Stop health check server
-    if config.healthcheck.enabled:
-        await stop_health_server()
-
-    # Close bot session
-    await bot.session.close()
+        # Close bot session
+        await bot.session.close()
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
+    asyncio.run(main())
