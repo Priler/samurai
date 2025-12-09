@@ -1,3 +1,6 @@
+# PyTorch CPU-only wheels (must be at top)
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 # Aiogram 3.x
 aiogram>=3.4.0
 
@@ -9,7 +12,6 @@ aiohttp>=3.9.0
 # System
 psutil>=6.0.0
 python-dotenv>=1.0.0
-toml
 
 # Data structures
 cachetools>=5.0.0
@@ -32,8 +34,7 @@ sqlalchemy>=1.4.42,<2.0.0
 # aiomysql
 # pymysql
 
-# ML models (optional - for spam/nsfw detection)
---index-url https://download.pytorch.org/whl/cpu
+# ML models (spam/nsfw detection) - CPU only
 torch>=2.0.0
 transformers>=4.30.0
 numpy>=1.24.0
