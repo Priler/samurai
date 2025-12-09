@@ -15,20 +15,20 @@ from utils.localization import get_string
 def get_message_text(message: Message) -> Optional[str]:
     """
     Extract text content from a message.
-
+    
     Handles both regular text messages and captions on media.
-
+    
     Args:
         message: The message to extract text from
-
+        
     Returns:
         The message text/caption or None if no text content
     """
     if message.content_type == ContentType.TEXT:
         return message.text
     elif message.content_type in (
-        ContentType.PHOTO,
-        ContentType.DOCUMENT,
+        ContentType.PHOTO, 
+        ContentType.DOCUMENT, 
         ContentType.VIDEO,
         ContentType.ANIMATION,
         ContentType.AUDIO,
@@ -58,7 +58,7 @@ def generate_log_message(
 ) -> str:
     """
     Generate formatted log message.
-
+    
     Args:
         message: Log message content
         log_type: Type of log (e.g., "ban", "mute", "spam")
@@ -68,10 +68,10 @@ def generate_log_message(
     current_time = now.strftime("%H:%M:%S")
 
     log_message = f"🕥 <i>{current_time}</i> "
-
+    
     if chat_title:
         log_message += f"[<b>{chat_title}</b>] "
-
+    
     log_message += f"<b>[{log_type.upper()}]</b> "
     log_message += message
 
@@ -86,7 +86,7 @@ async def write_log(
 ):
     """
     Write log message to logs channel.
-
+    
     Args:
         bot: Bot instance
         message: Log message content
@@ -137,7 +137,7 @@ def get_report_comment(
 ) -> str:
     """
     Generate report message for admins.
-
+    
     Args:
         message_date: Date of the reported message
         message_id: ID of the reported message
@@ -149,7 +149,7 @@ def get_report_comment(
     header = ""
     if chat_title:
         header = f"🟢 <b>{chat_title}</b>\n\n"
-
+    
     # Pass variables directly to get_string for Fluent interpolation
     msg = header + get_string(
         "report_message",

@@ -62,10 +62,7 @@ async def cmd_ping_bot(message: Message) -> None:
     ram = psutil.virtual_memory()
     cpu_freq = psutil.cpu_freq().current if psutil.cpu_freq() else 0
 
-    reply = f"<b>{random.choice(['👊 Самурай на месте!',
-                                 '🫰 Нужно больше золота',
-                                 '🫡 Тута я, бож :3',
-                                 '✊ Железо говн@, но я держусь!'])}</b>\n\n"
+    reply = f"<b>{random.choice(['👊 Самурай на месте!', '🫰 Нужно больше золота', '🫡 Тута я, бож :3', '✊ Железо говн@, но я держусь!'])}</b>\n\n"
 
     # CPU
     reply += "<b>CPU:</b> <i>{} ядер, {:.0f} MHz, загрузка {}%</i>\n".format(
@@ -99,9 +96,7 @@ async def cmd_ping_bot(message: Message) -> None:
     reply += "<b>Расположение сервера:</b> <i>Марс</i>\n"
 
     # Version
-    reply += f"\n<b>Версия бота:</b> <i>{
-        config.bot.version} codename «<b>{
-        config.bot.version_codename}</b>»</i>"
+    reply += f"\n<b>Версия бота:</b> <i>{config.bot.version} codename «<b>{config.bot.version_codename}</b>»</i>"
 
     await message.reply(reply)
 
@@ -121,14 +116,14 @@ async def cmd_profanity_check(message: Message) -> None:
     text = remove_prefix(message.text, "!prof ").strip()
     if not text:
         text = remove_prefix(message.text, "!мат ").strip()
-
+    
     if not text:
         await message.reply("Укажите текст для проверки после команды.")
         return
 
     # Check Russian
     is_profanity_ru, word_ru, line_info_ru = check_for_profanity(text, "ru")
-
+    
     # Check English
     is_profanity_en, word_en, line_info_en = check_for_profanity(text, "en")
 
@@ -157,14 +152,14 @@ async def cmd_profanity_check_private(message: Message) -> None:
     text = remove_prefix(message.text, "!prof ").strip()
     if not text:
         text = remove_prefix(message.text, "!мат ").strip()
-
+    
     if not text:
         await message.reply("Укажите текст для проверки после команды.")
         return
 
     # Check Russian
     is_profanity_ru, word_ru, line_info_ru = check_for_profanity(text, "ru")
-
+    
     # Check English
     is_profanity_en, word_en, line_info_en = check_for_profanity(text, "en")
 

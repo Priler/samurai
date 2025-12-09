@@ -1,7 +1,6 @@
 """
 Gender detection service based on first name analysis.
 """
-from libs.gender_extractor import GenderExtractor
 import sys
 import re
 import unicodedata
@@ -10,6 +9,7 @@ from enum import Enum
 # Add libs path for gender_extractor module
 sys.path.insert(0, "./libs")
 
+from libs.gender_extractor import GenderExtractor
 
 g_ext = GenderExtractor()
 
@@ -106,8 +106,7 @@ def transliterate_name(name: str, force_lang: str = None) -> str | None:
             if i < len(name) - 1:
                 two_chars = name[i:i + 2]
                 if two_chars.lower() in ['zh', 'kh', 'ts', 'ch', 'sh', 'yu', 'ya']:
-                    result += en_to_ru.get(two_chars.title()
-                                           if two_chars[0].isupper() else two_chars.lower(), two_chars)
+                    result += en_to_ru.get(two_chars.title() if two_chars[0].isupper() else two_chars.lower(), two_chars)
                     i += 2
                     continue
                 elif two_chars.lower() == 'sc' and i < len(name) - 2 and name[i:i + 3].lower() == 'sch':

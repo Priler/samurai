@@ -35,7 +35,8 @@ from services.cache import (
     invalidate_member_cache,
     is_trusted_user,
     get_cached_nsfw_result,
-    cache_nsfw_result
+    cache_nsfw_result,
+    get_member_orm
 )
 from utils import (
     get_string, _random, user_mention, write_log, 
@@ -234,16 +235,17 @@ async def on_setlvl(message: Message) -> None:
         await message.reply("Чего ты от меня хочешь :3")
         return
 
-    member = await retrieve_or_create_member(message.reply_to_message.from_user.id)
-
     try:
         value = abs(int(remove_prefix(message.text, "!setlvl")))
         if value > 100000:
             await message.reply("Что куришь, другалёк? :3")
         else:
+            # Need ORM object for absolute value set
+            member = await get_member_orm(message.reply_to_message.from_user.id)
             member.messages_count = value
             member.reputation_points += value
             await member.update()
+            invalidate_member_cache(message.reply_to_message.from_user.id)
             await message.reply("Ладно :3")
     except ValueError:
         await message.reply("O_o Мда")
@@ -262,13 +264,10 @@ async def on_reward(message: Message) -> None:
         await message.reply("O_o Мда")
         return
 
-    member = await retrieve_or_create_member(message.reply_to_message.from_user.id)
-
     if points > 100_000:
         await message.reply("Нетб :3")
     else:
-        member.reputation_points += points
-        await member.update()
+        await queue_member_update(message.reply_to_message.from_user.id, reputation_points=points)
         await message.reply(f"➕ Участник чата получает <i><b>{points}</b> очков репутации.</i>")
 
 
@@ -279,11 +278,12 @@ async def on_rep_reset(message: Message) -> None:
         await message.reply("Чего ты от меня хочешь :3")
         return
 
-    member = await retrieve_or_create_member(message.reply_to_message.from_user.id)
-
     try:
+        # Need ORM object for absolute value set
+        member = await get_member_orm(message.reply_to_message.from_user.id)
         member.reputation_points = member.messages_count
         await member.update()
+        invalidate_member_cache(message.reply_to_message.from_user.id)
         await message.reply("☯ Уровень репутации участника <i><b>сброшен</b>.</i>")
     except Exception:
         await message.reply("O_o Мда")
@@ -302,13 +302,10 @@ async def on_punish(message: Message) -> None:
         await message.reply("O_o Мда")
         return
 
-    member = await retrieve_or_create_member(message.reply_to_message.from_user.id)
-
     if points > 100_000:
         await message.reply("Нетб :3")
     else:
-        member.reputation_points -= points
-        await member.update()
+        await queue_member_update(message.reply_to_message.from_user.id, reputation_points=-points)
         await message.reply(f"➖ Участник чата теряет <i><b>{points}</b> очков репутации.</i>")
 
 
@@ -336,12 +333,8 @@ async def on_user_join(message: Message) -> None:
 async def on_user_voice(message: Message) -> None:
     """React to voice messages (discourage them)."""
     if random.random() < 0.75:  # 75% chance
-        member = await retrieve_or_create_member(message.from_user.id)
-
         await message.reply(_random("voice-responses"))
-
-        member.reputation_points -= 10
-        await member.update()
+        await queue_member_update(message.from_user.id, reputation_points=-10)
 
 
 # ========== CONTACT MESSAGES ==========

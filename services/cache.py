@@ -251,6 +251,21 @@ async def retrieve_or_create_member(user_id: int) -> MemberData:
     return member_data
 
 
+async def get_member_orm(user_id: int) -> Member:
+    """
+    Get actual ORM Member object for direct updates.
+    
+    Use this ONLY for admin commands that need to set absolute values.
+    For delta updates (add/subtract), use queue_member_update() instead.
+    
+    Note: Does not use cache - always fetches fresh from DB.
+    """
+    try:
+        return await Member.objects.get(user_id=user_id)
+    except ormar.NoMatch:
+        return await Member.objects.create(user_id=user_id, messages_count=1)
+
+
 def invalidate_member_cache(user_id: int) -> None:
     """Invalidate member cache for specific user."""
     if user_id in members_cache:

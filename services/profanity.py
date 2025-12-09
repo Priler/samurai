@@ -7,6 +7,7 @@ import unicodedata
 
 # Add libs path for censure module
 sys.path.insert(0, "./libs")
+
 from libs.censure import Censor
 
 # Create censor instances for different languages

@@ -221,15 +221,15 @@ async def callback_spam_ban(call: CallbackQuery) -> None:
     spam_id = int(parts[2])
     user_id = int(parts[3])
     # chat_id is stored in spam record
-
+    
     # Get spam record to find the chat_id
     try:
         spam_rec = await Spam.objects.get(id=spam_id)
         chat_id = spam_rec.chat_id
-
+        
         with suppress(TelegramBadRequest):
             await call.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
-
+            
         spam_rec.is_blocked = True
         await spam_rec.update()
     except Exception:
@@ -283,7 +283,7 @@ async def callback_nsfw_ban(call: CallbackQuery) -> None:
     user_id = int(parts[2])
     # chat_id is included in callback data
     chat_id = int(parts[3]) if len(parts) > 3 else None
-
+    
     if chat_id:
         with suppress(TelegramBadRequest):
             await call.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)

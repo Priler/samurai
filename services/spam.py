@@ -40,8 +40,7 @@ def _get_model() -> AutoModelForSequenceClassification:
     """Lazy load model on first use."""
     global _model
     if _model is None:
-        _model = AutoModelForSequenceClassification.from_pretrained(
-            MODEL_PATH, local_files_only=True)
+        _model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH, local_files_only=True)
         _model.eval()  # Set to evaluation mode
     return _model
 
@@ -64,7 +63,7 @@ def predict(text: str) -> bool:
     # ML-based prediction (lazy load models)
     tokenizer = _get_tokenizer()
     model = _get_model()
-
+    
     inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=256)
     with torch.no_grad():
         outputs = model(**inputs)

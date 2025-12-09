@@ -17,7 +17,7 @@ def register_all_middlewares(
 ) -> None:
     """
     Register all middlewares with the dispatcher.
-
+    
     Args:
         dp: Dispatcher instance
         default_locale: Default locale for i18n
@@ -31,7 +31,7 @@ def register_all_middlewares(
     dp.message.middleware(i18n_middleware)
     dp.callback_query.middleware(i18n_middleware)
     dp.edited_message.middleware(i18n_middleware)
-
+    
     # Throttling middleware - rate limiting for private chats
     if enable_throttling:
         throttle_middleware = ThrottlingMiddleware(
