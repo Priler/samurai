@@ -32,24 +32,24 @@ class GroupsConfig(BaseModel):
     linked_channels: List[int] = []
     # Time in seconds for new users media restriction
     new_users_nomedia: int = 7776000
-    
+
     # Cached sets for O(1) lookup (populated after init)
     _main_set: set = set()
     _linked_channels_set: set = set()
-    
+
     def model_post_init(self, __context) -> None:
         """Build sets after model initialization."""
         object.__setattr__(self, '_main_set', set(self.main))
         object.__setattr__(self, '_linked_channels_set', set(self.linked_channels))
-    
+
     def is_main_group(self, chat_id: int) -> bool:
         """Check if chat_id is a main group (O(1) lookup)."""
         return chat_id in self._main_set
-    
+
     def is_linked_channel(self, chat_id: int) -> bool:
         """Check if chat_id is a linked channel (O(1) lookup)."""
         return chat_id in self._linked_channels_set
-    
+
     def rebuild_sets(self) -> None:
         """Rebuild sets after modifying lists."""
         object.__setattr__(self, '_main_set', set(self.main))
@@ -149,7 +149,7 @@ def apply_env_overrides(config: Config) -> Config:
         config.bot.owner = int(os.environ["BOT_OWNER"])
     if os.environ.get("BOT_LOCALE"):
         config.locale.default = os.environ["BOT_LOCALE"]
-    
+
     # Groups - now supports comma-separated lists
     groups_changed = False
     if os.environ.get("GROUPS_MAIN"):
@@ -162,11 +162,11 @@ def apply_env_overrides(config: Config) -> Config:
     if os.environ.get("LINKED_CHANNELS"):
         config.groups.linked_channels = _parse_int_list(os.environ["LINKED_CHANNELS"])
         groups_changed = True
-    
+
     # Rebuild sets after modifying lists
     if groups_changed:
         config.groups.rebuild_sets()
-    
+
     if os.environ.get("DB_URL"):
         config.db.url = os.environ["DB_URL"]
     if os.environ.get("HEALTHCHECK_PORT"):

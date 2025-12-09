@@ -203,10 +203,8 @@ class CensorBase:
         word = self._remove_duplicates(word)
         return word
 
-
     def prepare_word(self, word):
         return self._prepare_word(word)
-
 
     @staticmethod
     def _get_word_info(word):

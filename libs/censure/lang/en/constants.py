@@ -178,11 +178,11 @@ BAD_SEMI_PHRASES = (
 )
 
 BAD_PHRASES = (
-    'camel(\s)*toe',
-    'dick[\-\s]*sneeze',
-    'blow[\-\s]*job',
-    'jerk[\-\s]*off',
-    'nut[\-\s]*sack'
+    'camel(\\s)*toe',
+    'dick[\\-\\s]*sneeze',
+    'blow[\\-\\s]*job',
+    'jerk[\\-\\s]*off',
+    'nut[\\-\\s]*sack'
 )
 
 TRANS_TAB = {}

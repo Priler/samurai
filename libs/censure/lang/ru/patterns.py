@@ -20,23 +20,23 @@ PAT_AS_L = re.compile(r'/\\')                 # Л
 
 PAT_AS_X1 = re.compile(r'><')                 # Х
 PAT_AS_X2 = re.compile(r'><')                 # Х
-PAT_AS_X3 = re.compile('\)\(')                # Х
+PAT_AS_X3 = re.compile('\\)\\(')                # Х
 PAT_AS_X4 = re.compile('}{')                  # Х
 
-PAT_AS_J1 = re.compile('>\|<')                # Ж
-PAT_AS_J2 = re.compile('}\|{')                # Ж
+PAT_AS_J1 = re.compile('>\\|<')                # Ж
+PAT_AS_J2 = re.compile('}\\|{')                # Ж
 
 PAT_AS_Y1 = re.compile('`/')                  # Y
-PAT_AS_Y2 = re.compile('\-/')                 # Y
-PAT_AS_Y3 = re.compile('`\-/')                # Y
+PAT_AS_Y2 = re.compile('\\-/')                 # Y
+PAT_AS_Y3 = re.compile('`\\-/')                # Y
 
-PAT_AS_YY1 = re.compile('b\|')                # ы
+PAT_AS_YY1 = re.compile('b\\|')                # ы
 PAT_AS_YY2 = re.compile('bI')                 # ы
 PAT_AS_YY3 = re.compile('bl')                 # ы
 
 
-PAT_PI = re.compile('3[\.,]14[\d]*')
-PAT_E = re.compile('2[\.,]72[\d]*')
+PAT_PI = re.compile('3[\\.,]14[\\d]*')
+PAT_E = re.compile('2[\\.,]72[\\d]*')
 PAT_PREP = re.compile('(а[х]?)|(в)|([вмт]ы)|(д[ао])|(же)|(за)')
 
 

@@ -51,7 +51,7 @@ TRUSTED_USER_MESSAGES = 100
 async def queue_member_update(user_id: int, **changes: int) -> None:
     """
     Queue member field updates for batch processing.
-    
+
     Args:
         user_id: User ID to update
         **changes: Field deltas, e.g. messages_count=1, reputation_points=5
@@ -59,7 +59,7 @@ async def queue_member_update(user_id: int, **changes: int) -> None:
     async with _batch_lock:
         if user_id not in _pending_updates:
             _pending_updates[user_id] = {}
-        
+
         for field, delta in changes.items():
             current = _pending_updates[user_id].get(field, 0)
             _pending_updates[user_id][field] = current + delta
@@ -68,17 +68,17 @@ async def queue_member_update(user_id: int, **changes: int) -> None:
 async def flush_member_updates() -> int:
     """
     Flush all pending member updates to database.
-    
+
     Returns:
         Number of users updated
     """
     async with _batch_lock:
         if not _pending_updates:
             return 0
-        
+
         updates_copy = dict(_pending_updates)
         _pending_updates.clear()
-    
+
     count = 0
     for user_id, changes in updates_copy.items():
         try:
@@ -88,14 +88,14 @@ async def flush_member_updates() -> int:
                 setattr(member, field, current_value + delta)
             await member.update()
             count += 1
-            
+
             # Invalidate cache after update
             invalidate_member_cache(user_id)
         except ormar.NoMatch:
             pass
         except Exception:
             pass
-    
+
     return count
 
 
@@ -153,15 +153,15 @@ def detect_gender(name: str) -> Gender:
 async def retrieve_tgmember(bot, chat_id: int, user_id: int):
     """
     Retrieve Telegram member with caching.
-    
+
     Uses (chat_id, user_id) tuple as key to properly support
     multi-group scenarios where user may have different roles.
     """
     cache_key = (chat_id, user_id)
-    
+
     if cache_key in tgmembers_cache:
         return tgmembers_cache[cache_key]
-    
+
     result = await bot.get_chat_member(chat_id, user_id)
     tgmembers_cache[cache_key] = result
     return result
@@ -189,12 +189,12 @@ async def retrieve_or_create_member(user_id: int) -> Member:
     """Retrieve or create member record with caching."""
     if user_id in members_cache:
         return members_cache[user_id]
-    
+
     try:
         member = await Member.objects.get(user_id=user_id)
     except ormar.NoMatch:
         member = await Member.objects.create(user_id=user_id, messages_count=1)
-    
+
     members_cache[user_id] = member
     return member
 
@@ -217,7 +217,7 @@ def update_member_cache(user_id: int, member: Member) -> None:
 def get_cached_nsfw_result(user_id: int, photo_file_unique_id: str) -> Optional[bool]:
     """
     Get cached NSFW detection result.
-    
+
     Returns:
         True/False if cached, None if not in cache
     """

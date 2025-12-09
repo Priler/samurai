@@ -30,14 +30,14 @@ from services import (
 from services.spam import predict as ruspam_predict
 from services.nsfw import classify_explicit_content as nsfw_predict
 from services.cache import (
-    queue_member_update, 
+    queue_member_update,
     invalidate_member_cache,
     is_trusted_user,
     get_cached_nsfw_result,
     cache_nsfw_result
 )
 from utils import (
-    get_string, _random, user_mention, write_log, 
+    get_string, _random, user_mention, write_log,
     generate_log_message, remove_prefix, get_message_text,
     MemberStatus
 )
@@ -98,7 +98,8 @@ async def on_me(message: Message) -> None:
         member_rep = "⭐️⭐️⭐️⭐️⭐️ Пять звёзд розыска"
         member_avatar = "✖️"
     elif is_admin:
-        member_level = random.choice(["Полицейский", "S.W.A.T.", "Агент ФБР", "Мститель", "Модератор", "Длань правосудия"])
+        member_level = random.choice(
+            ["Полицейский", "S.W.A.T.", "Агент ФБР", "Мститель", "Модератор", "Длань правосудия"])
         member_rep = "🛡 "
         member_avatar = random.choice(['👮', '👮‍♂️', '👮‍♀️', '🚔', '⚖️', '🤖', '😼', '⚔️'])
     else:
@@ -122,7 +123,8 @@ async def on_me(message: Message) -> None:
         if member_gender == Gender.FEMALE:
             member_avatar = random.choice(['👩‍🦰', '👩', '👱‍♀️', '👧', '👩‍🦱', '🤵‍♀️', '👩‍🦳'])
         elif member_gender == Gender.MALE:
-            member_avatar = random.choice(['👨‍🦳', '🧔', '🧑', '👨', '🧔‍♂️', '🧑‍🦰', '🧑‍🦱', '👨‍🦰', '👦', '🤵‍♂️'])
+            member_avatar = random.choice(
+                ['👨‍🦳', '🧔', '🧑', '👨', '🧔‍♂️', '🧑‍🦰', '🧑‍🦱', '👨‍🦰', '👦', '🤵‍♂️'])
         else:
             member_avatar = random.choice(['🤖', '😼', '👻', '😺'])
 
@@ -147,7 +149,8 @@ async def on_me(message: Message) -> None:
             member_rep_label = "великодушный"
 
     answer = f"{member_avatar} <b>{full_name}</b>"
-    answer += f"\n<b>Репутация: </b>{member_level} <i> 『{member_rep}{member_rep_label} (<tg-spoiler>{member.reputation_points}</tg-spoiler>)』</i>"
+    answer += f"\n<b>Репутация: </b>{member_level} <i> 『{member_rep}{member_rep_label} (<tg-spoiler>{
+        member.reputation_points}</tg-spoiler>)』</i>"
 
     await message.reply(answer)
 
@@ -359,7 +362,7 @@ async def on_user_media(message: Message) -> None:
     tg_member = await retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
 
     if (tg_member.status not in MemberStatus.admin_statuses() and
-        member.reputation_points < config.spam.allow_media_threshold):
+            member.reputation_points < config.spam.allow_media_threshold):
         await message.delete()
 
 
@@ -369,16 +372,18 @@ async def on_user_media(message: Message) -> None:
 
 @router.message(
     InMainGroups(),
-    F.content_type.in_({ContentType.TEXT, ContentType.PHOTO, ContentType.DOCUMENT, ContentType.VIDEO})
+    F.content_type.in_({ContentType.TEXT, ContentType.PHOTO,
+                       ContentType.DOCUMENT, ContentType.VIDEO})
 )
 @router.edited_message(
     InMainGroups(),
-    F.content_type.in_({ContentType.TEXT, ContentType.PHOTO, ContentType.DOCUMENT, ContentType.VIDEO})
+    F.content_type.in_({ContentType.TEXT, ContentType.PHOTO,
+                       ContentType.DOCUMENT, ContentType.VIDEO})
 )
 async def on_user_message(message: Message) -> None:
     """
     Process every user message - profanity, spam, reputation.
-    
+
     NOTE: This handler MUST be defined LAST in this file!
     It catches all text messages, so command handlers must come before it.
     """
@@ -429,10 +434,10 @@ async def on_user_message(message: Message) -> None:
         # NO PROFANITY - CHECK FOR SPAM
         # Skip expensive ML check for trusted users
         should_check_spam = not is_trusted_user(member) and (
-            member.messages_count < config.spam.member_messages_threshold or 
+            member.messages_count < config.spam.member_messages_threshold or
             member.reputation_points < config.spam.member_reputation_threshold
         )
-        
+
         if should_check_spam and ruspam_predict(msg_text):
             # SPAM DETECTED
             await message.delete()
@@ -463,21 +468,24 @@ async def check_for_unwanted(message: Message, msg_text: str, member: Member, tg
     """Check for unwanted content (first comments, NSFW profiles)."""
     # Check if this is a reply to channel message (comment)
     # Using O(1) set lookup instead of list lookup
-    if (message.reply_to_message and 
-        message.reply_to_message.forward_from_chat and 
-        config.groups.is_linked_channel(message.reply_to_message.forward_from_chat.id)):
-        
+    if (message.reply_to_message and
+        message.reply_to_message.forward_from_chat and
+            config.groups.is_linked_channel(message.reply_to_message.forward_from_chat.id)):
+
         # Remove early comments from low-rep users
         threshold = config.spam.allow_comments_rep_threshold
         interval = config.spam.remove_first_comments_interval
-        
+
         if (member.reputation_points < threshold and
-            (message.date - message.reply_to_message.forward_date).seconds <= interval):
+                (message.date - message.reply_to_message.forward_date).seconds <= interval):
             try:
                 await message.delete()
                 await write_log(
                     message.bot,
-                    f"Удалено сообщение: {message.text}\n\n<i>Автор:</i> {user_mention(message.from_user)}",
+                    f"Удалено сообщение: {
+                        message.text}\n\n<i>Автор:</i> {
+                        user_mention(
+                            message.from_user)}",
                     "🤖 Антибот",
                     message.chat.title
                 )
@@ -507,7 +515,7 @@ async def check_for_unwanted(message: Message, msg_text: str, member: Member, tg
             # Get largest size of most recent photo
             photo = profile_photos.photos[0][-1]
             file_unique_id = photo.file_unique_id
-            
+
             # Check NSFW cache first (avoid expensive re-processing)
             cached_result = get_cached_nsfw_result(message.from_user.id, file_unique_id)
             if cached_result is not None:
@@ -525,17 +533,17 @@ async def check_for_unwanted(message: Message, msg_text: str, member: Member, tg
                 # Make image
                 image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
                 nsfw_prediction = nsfw_predict(np.asarray(image))
-                
+
                 # Cache the result
                 is_nsfw = is_nsfw_detected(nsfw_prediction) if nsfw_prediction else False
                 cache_nsfw_result(message.from_user.id, file_unique_id, is_nsfw)
-                
+
                 if not is_nsfw:
                     return False
 
         # Check NSFW thresholds
         if (not name_valid or (nsfw_prediction and is_nsfw_detected(nsfw_prediction)) or
-            (cached_result is True)):  # Also handle cached NSFW result
+                (cached_result is True)):  # Also handle cached NSFW result
             log_msg = msg_text
             log_msg += f"\n\n<i>Автор:</i> {user_mention(message.from_user)}"
 

@@ -1,14 +1,5 @@
-"""
-Samurai Bot - Main entry point.
+# Main entry point.
 
-A Telegram group moderation bot with:
-- Anti-profanity (Russian/English)
-- Anti-spam (ML-based)
-- NSFW profile detection (ML-based)
-- Reputation system
-- Report system
-- Scheduled announcements
-"""
 import asyncio
 import logging
 import signal

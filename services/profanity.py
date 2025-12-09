@@ -1,6 +1,7 @@
 """
 Profanity detection service using censure library.
 """
+from libs.censure import Censor
 import sys
 import re
 import unicodedata
@@ -8,7 +9,6 @@ import unicodedata
 # Add libs path for censure module
 sys.path.insert(0, "./libs")
 
-from libs.censure import Censor
 
 # Create censor instances for different languages
 censor_ru = Censor.get(lang='ru')
