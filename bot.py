@@ -25,9 +25,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Global reference to scheduler task for cleanup
+_scheduler_task: asyncio.Task | None = None
+
 
 async def on_startup(bot: Bot) -> None:
     """Startup hook."""
+    global _scheduler_task
+    
     logger.info("Bot starting up...")
 
     # Initialize database
@@ -40,6 +45,9 @@ async def on_startup(bot: Bot) -> None:
 
     # Setup announcements
     await setup_announcements(bot)
+    
+    # Start scheduler task
+    _scheduler_task = asyncio.create_task(run_scheduler())
     logger.info("Announcements scheduled")
 
     # Set health check to ready
@@ -51,11 +59,20 @@ async def on_startup(bot: Bot) -> None:
 
 async def on_shutdown(bot: Bot) -> None:
     """Shutdown hook."""
+    global _scheduler_task
+    
     logger.info("Bot shutting down...")
 
     # Set health check to not ready
     if config.healthcheck.enabled:
         get_health_server().set_ready(False)
+
+    # Cancel scheduler task
+    if _scheduler_task and not _scheduler_task.done():
+        _scheduler_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await _scheduler_task
+        logger.info("Scheduler stopped")
 
     # Stop batch flush task and flush remaining updates
     stop_batch_flush_task()
@@ -65,6 +82,11 @@ async def on_shutdown(bot: Bot) -> None:
     # Close database
     await close_db()
     logger.info("Database disconnected")
+    
+    # Stop health check server
+    if config.healthcheck.enabled:
+        await stop_health_server()
+        logger.info("Health check server stopped")
 
 
 async def main() -> None:
@@ -105,24 +127,12 @@ async def main() -> None:
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    # Start scheduler as background task
-    scheduler_task = asyncio.create_task(run_scheduler())
-
     logger.info("Bot started")
 
     try:
         # Start polling (aiogram handles SIGINT/SIGTERM internally)
         await dp.start_polling(bot, skip_updates=True)
     finally:
-        # Cancel scheduler
-        scheduler_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await scheduler_task
-
-        # Stop health check server
-        if config.healthcheck.enabled:
-            await stop_health_server()
-
         # Close bot session
         await bot.session.close()
 

@@ -3,11 +3,13 @@ Personal/owner action handlers (ping, profanity check, message from bot).
 """
 import random
 import sys
+import uuid
+from datetime import datetime, timedelta
 
 import psutil
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
 from config import config
 from filters import IsOwnerFilter, IsAdminFilter, InMainGroups
@@ -18,21 +20,154 @@ sys.path.append("./libs")
 
 router = Router(name="personal_actions")
 
+# Temporary storage for pending messages (auto-cleanup after 5 minutes)
+_pending_messages: dict[str, tuple[str, datetime]] = {}
+
+
+def _cleanup_old_messages() -> None:
+    """Remove messages older than 5 minutes."""
+    now = datetime.now()
+    expired = [k for k, (_, ts) in _pending_messages.items() if now - ts > timedelta(minutes=5)]
+    for k in expired:
+        del _pending_messages[k]
+
+
+async def _build_chat_keyboard(bot, msg_id: str) -> InlineKeyboardMarkup:
+    """Build inline keyboard with chat names."""
+    buttons = []
+    
+    for chat_id in config.groups.main:
+        try:
+            chat = await bot.get_chat(chat_id)
+            chat_name = chat.title or f"Chat {chat_id}"
+        except Exception:
+            chat_name = f"Chat {chat_id}"
+        
+        buttons.append([InlineKeyboardButton(
+            text=f"📤 {chat_name}",
+            callback_data=f"msg_{msg_id}_{chat_id}"
+        )])
+    
+    # Add "Send to all" button
+    buttons.append([InlineKeyboardButton(
+        text="📢 Отправить во все чаты",
+        callback_data=f"msg_{msg_id}_all"
+    )])
+    
+    # Add cancel button
+    buttons.append([InlineKeyboardButton(
+        text="❌ Отмена",
+        callback_data=f"msg_{msg_id}_cancel"
+    )])
+    
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
 
 @router.message(
     IsOwnerFilter(),
     Command("msg", prefix="!/")
 )
 async def cmd_message_from_bot(message: Message) -> None:
-    """Send a message to all main groups from bot (owner only)."""
-    text = remove_prefix(message.text, "!msg ").strip()
-    if text:
-        # Send to all configured main groups
-        for group_id in config.groups.main:
+    """
+    Send a message from bot (owner only).
+    
+    Usage:
+        !msg <text> - Shows keyboard to select target chat
+    """
+    _cleanup_old_messages()
+    
+    text = remove_prefix(message.text, "!msg").strip()
+    
+    if not text:
+        await message.reply(
+            "<b>Использование:</b>\n"
+            "<code>!msg текст сообщения</code>\n\n"
+            "После ввода команды появится меню выбора чата."
+        )
+        return
+    
+    # Generate unique ID and store message
+    msg_id = uuid.uuid4().hex[:8]
+    _pending_messages[msg_id] = (text, datetime.now())
+    
+    # Build keyboard
+    keyboard = await _build_chat_keyboard(message.bot, msg_id)
+    
+    await message.reply(
+        f"<b>Сообщение:</b>\n<i>{text[:500]}{'...' if len(text) > 500 else ''}</i>\n\n"
+        f"Выберите куда отправить:",
+        reply_markup=keyboard
+    )
+
+
+@router.callback_query(F.data.startswith("msg_"))
+async def callback_msg_send(call: CallbackQuery) -> None:
+    """Handle message send callbacks."""
+    # Verify owner
+    if call.from_user.id not in config.bot.owner_ids:
+        await call.answer("⛔ Только для владельца", show_alert=True)
+        return
+    
+    parts = call.data.split("_")
+    if len(parts) < 3:
+        await call.answer("❌ Ошибка данных", show_alert=True)
+        return
+    
+    msg_id = parts[1]
+    target = "_".join(parts[2:])  # Handle negative chat IDs like -100123
+    
+    # Get stored message
+    if msg_id not in _pending_messages:
+        await call.message.edit_text("❌ Сообщение устарело. Отправьте команду заново.")
+        await call.answer()
+        return
+    
+    text, _ = _pending_messages[msg_id]
+    
+    if target == "cancel":
+        del _pending_messages[msg_id]
+        await call.message.edit_text("❌ Отменено.")
+        await call.answer()
+        return
+    
+    if target == "all":
+        # Send to all chats
+        sent = 0
+        failed = 0
+        for chat_id in config.groups.main:
             try:
-                await message.bot.send_message(group_id, text)
+                await call.bot.send_message(chat_id, text)
+                sent += 1
             except Exception:
-                pass
+                failed += 1
+        
+        del _pending_messages[msg_id]
+        await call.message.edit_text(
+            f"✅ <b>Отправлено во все чаты</b>\n\n"
+            f"Успешно: {sent}\n"
+            f"Ошибок: {failed}"
+        )
+        await call.answer("Отправлено!")
+    else:
+        # Send to specific chat
+        try:
+            chat_id = int(target)
+            await call.bot.send_message(chat_id, text)
+            
+            # Get chat name for confirmation
+            try:
+                chat = await call.bot.get_chat(chat_id)
+                chat_name = chat.title or f"Chat {chat_id}"
+            except Exception:
+                chat_name = f"Chat {chat_id}"
+            
+            del _pending_messages[msg_id]
+            await call.message.edit_text(f"✅ <b>Отправлено в:</b> {chat_name}")
+            await call.answer("Отправлено!")
+        except ValueError:
+            await call.answer("❌ Неверный ID чата", show_alert=True)
+        except Exception as e:
+            await call.answer(f"❌ Ошибка: {str(e)[:100]}", show_alert=True)
 
 
 @router.message(

@@ -36,7 +36,8 @@ from services.cache import (
     is_trusted_user,
     get_cached_nsfw_result,
     cache_nsfw_result,
-    get_member_orm
+    get_member_orm,
+    MemberData
 )
 from utils import (
     get_string, _random, user_mention, write_log, 
@@ -466,7 +467,7 @@ async def on_user_message(message: Message) -> None:
 # HELPER FUNCTIONS
 # ==========================================================================
 
-async def check_for_unwanted(message: Message, msg_text: str, member: Member, tg_member) -> bool:
+async def check_for_unwanted(message: Message, msg_text: str, member: MemberData, tg_member) -> bool:
     """Check for unwanted content (first comments, NSFW profiles)."""
     # Check if this is a reply to channel message (comment)
     # Using O(1) set lookup instead of list lookup
