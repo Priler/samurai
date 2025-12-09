@@ -1,0 +1,86 @@
+[bot]
+# <heroku-var>
+owner = 0
+# <heroku-var>
+token = ""
+version = "0.7"
+version_codename = "Eternal Ronin"
+
+[locale]
+# default locale for bot messages
+default = "ru"
+# available locales (must have corresponding folder in locales/)
+available = ["ru", "en"]
+
+[groups]
+# list of main chat IDs where bot operates (can be multiple)
+main = []
+# single channel for admin reports
+reports = 0
+# single channel for logs
+logs = 0
+# list of linked channels (for auto-forward/comment detection)
+linked_channels = []
+# time in seconds for new users media restriction
+new_users_nomedia = 7776000
+
+[spam]
+# after what amount of messages, anti-spam will stop checking this user
+member_messages_threshold = 10
+# OR after what amount of reputation points, anti-spam will stop checking this user
+member_reputation_threshold = 10
+# reputation points user must have, to be allowed to send media type messages
+allow_media_threshold = 20
+# remove messages during this interval after a post to channel has been made (any other gender/unknown)
+# set to 0 to allow all
+remove_first_comments_interval = 30
+# reputation points account must have, to be allowed to post messages (automatic_forward)
+allow_comments_rep_threshold = 50
+# remove messages during this interval after a post to channel has been made (only applied to woman gender)
+# set to 0 to allow all
+women_remove_first_comments_interval = 600
+# reputation points women account must have, to be allowed to post messages
+# could be lower for those groups where women comments not so often
+# affects if profile photo will be checked for NSFW
+allow_comments_rep_threshold__woman = 10
+# accounts with rep > allow_comments_rep_threshold__woman will be skipped from nsfw checks
+# note that NSFW checks are performed only with FEMALE accounts with low rep
+
+[nsfw]
+enabled = true
+# > will be detected as nsfw
+# these values works through AND condition between sensual and pornography
+comb_sensual_prediction_threshold = 0.15
+comb_pornography_prediction_threshold = 0.15
+# > will be detected as nsfw
+sensual_prediction_threshold = 0.8
+# > will be detected as nsfw
+pornography_prediction_threshold = 0.3
+# > will be detected as nsfw
+hentai_prediction_threshold = 0.5
+# > will NOT be detected as nsfw
+# these values works as: normal and (comb_sensual and comb_pornography)
+normal_prediction_threshold = 0.3
+normal_comb_sensual_prediction_threshold = 0.5
+normal_comb_pornography_prediction_threshold = 0.2
+# > will NOT be detected as nsfw
+anime_prediction_threshold = 0.7
+
+[db]
+url = "sqlite+aiosqlite:///db.sqlite"
+
+[throttling]
+# rate limiting for private chats
+enabled = true
+# minimum seconds between messages
+rate_limit = 0.5
+# max messages allowed in time window
+max_messages = 20
+# time window in seconds
+time_window = 60
+
+[healthcheck]
+# HTTP health check endpoint for container orchestration
+enabled = true
+host = "0.0.0.0"
+port = 8080

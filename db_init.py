@@ -1,33 +1,28 @@
-exit("COMMENT THIS LINE IN ORDER TO RE-INIT DATABASE TABLES")
-
+"""
+Database initialization script.
+Run this once to create the database tables.
+"""
 import asyncio
-import logging
-from configurator import make_config
 
-logging.basicConfig(level=logging.INFO)
+from db.database import ormar_config
+from db.models import Member, Spam
 
-if not make_config("config.ini"):
-    logging.error("Errors while parsing config file. Exiting.")
-    exit(1)
 
-import heroku_config
+async def init_database() -> None:
+    """Initialize the database and create tables."""
+    # Connect to database
+    if not ormar_config.database.is_connected:
+        await ormar_config.database.connect()
 
-# import models n stuff
-from db import ormar_config
-from models.member import Member
-from models.spam import Spam
-
-# DROP & INIT tables (async mysql)
-async def reinit_db_tables():
+    # Create tables using SQLAlchemy
     async with ormar_config.engine.begin() as conn:
-        await conn.run_sync(ormar_config.metadata.drop_all)
         await conn.run_sync(ormar_config.metadata.create_all)
 
-    await ormar_config.engine.dispose()
+    print("Database tables created successfully!")
 
-asyncio.run(reinit_db_tables())
-exit("DONE")
+    # Disconnect
+    await ormar_config.database.disconnect()
 
-# for sqlite use this :3
-# ormar_config.metadata.drop_all(ormar_config.engine)
-# ormar_config.metadata.create_all(ormar_config.engine)
+
+if __name__ == "__main__":
+    asyncio.run(init_database())

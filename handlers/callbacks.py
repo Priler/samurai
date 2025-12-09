@@ -1,184 +1,313 @@
-from time import time
-from aiogram import types
-from configurator import config
-from dispatcher import dp
-import localization
+"""
+Callback query handlers for inline buttons.
 
+Note: callback_data format includes chat_id for multi-group support:
+- del_{chat_id}_{msg_id}
+- delban_{chat_id}_{msg_id}_{user_id}
+- etc.
+"""
 from contextlib import suppress
-from aiogram.utils.exceptions import (MessageToEditNotFound, MessageCantBeEdited, MessageCantBeDeleted,
-                                      MessageToDeleteNotFound, CantRestrictChatOwner, BadRequest)
+from datetime import datetime, timedelta, timezone
 
-from models.member import Member
-from models.spam import Spam
+from aiogram import Router, F
+from aiogram.types import CallbackQuery, ChatPermissions
+from aiogram.exceptions import TelegramBadRequest
 
-@dp.callback_query_handler()
-async def callback_handler(call: types.CallbackQuery):
-    """
-    Keyboard buttons handler
+from config import config
+from db.models import Member, Spam
+from utils import get_string
 
-    :param call: Callback with action put into call.data field
-    """
-
-    ###
-    ### REPORT callbacks
-    ###
-    if call.data.startswith("del_"):
-        with suppress(MessageCantBeDeleted, MessageToDeleteNotFound):
-            await call.message.bot.delete_message(config.groups.main, int(call.data.split("_")[1]))
-
-        await call.message.bot.edit_message_text(chat_id=config.groups.reports,
-                                                 message_id=call.message.message_id,
-                                                 text=call.message.text + localization.get_string("action_deleted"))
-        await call.answer(text="Done")
-
-    elif call.data.startswith("delban_"):
-        with suppress(MessageCantBeDeleted, MessageToDeleteNotFound):
-            await call.message.bot.delete_message(config.groups.main, int(call.data.split("_")[1]))
-
-        await call.message.bot.kick_chat_member(chat_id=config.groups.main, user_id=call.data.split("_")[2])
-        await call.message.bot.edit_message_text(chat_id=config.groups.reports,
-                                                 message_id=call.message.message_id,
-                                                 text=call.message.text + localization.get_string(
-                                                     "action_deleted_banned"))
-        await call.answer(text="Done")
-
-    elif call.data.startswith("mute_"):
-        with suppress(MessageCantBeDeleted, MessageToDeleteNotFound):
-            await call.message.bot.delete_message(config.groups.main, int(call.data.split("_")[1]))
-
-        await call.message.bot.restrict_chat_member(chat_id=config.groups.main, user_id=call.data.split("_")[2],
-                                                    permissions=types.ChatPermissions(),
-                                                    until_date=int(time()) + (3600 * 24))  # 24 hours from now
-        await call.message.bot.edit_message_text(chat_id=config.groups.reports,
-                                                 message_id=call.message.message_id,
-                                                 text=call.message.text + localization.get_string(
-                                                     "action_deleted_readonly"))
-        await call.answer(text="Done")
+router = Router(name="callbacks")
 
 
-    elif call.data.startswith("mute2_"):
-        with suppress(MessageCantBeDeleted, MessageToDeleteNotFound):
-            await call.message.bot.delete_message(config.groups.main, int(call.data.split("_")[1]))
-            
-        await call.message.bot.restrict_chat_member(chat_id=config.groups.main, user_id=call.data.split("_")[2],
-                                                    permissions=types.ChatPermissions(),
-                                                    until_date=int(time()) + ((3600 * 24) * 7))  # 7 days from now
-        await call.message.bot.edit_message_text(chat_id=config.groups.reports,
-                                                 message_id=call.message.message_id,
-                                                 text=call.message.text + localization.get_string(
-                                                     "action_deleted_readonly2"))
-        await call.answer(text="Done")
+# ===============================
+# REPORT CALLBACKS
+# ===============================
 
-    elif call.data.startswith("dismiss_"):
-        await call.message.bot.edit_message_text(chat_id=config.groups.reports,
-                                                 message_id=call.message.message_id,
-                                                 text=call.message.text + localization.get_string(
-                                                     "action_dismissed"))
-        await call.answer(text="Done")
+@router.callback_query(F.data.startswith("del_"))
+async def callback_delete(call: CallbackQuery) -> None:
+    """Delete reported message only."""
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    message_id = int(parts[2])
 
-    elif call.data.startswith("dismiss2_"):
-        with suppress(MessageCantBeDeleted, MessageToDeleteNotFound):
-            await call.message.bot.delete_message(config.groups.main, int(call.data.split("_")[1]))
+    with suppress(TelegramBadRequest):
+        await call.bot.delete_message(chat_id, message_id)
 
-        await call.message.bot.restrict_chat_member(chat_id=config.groups.main, user_id=call.data.split("_")[2],
-                                                    permissions=types.ChatPermissions(),
-                                                    until_date=int(time()) + ((3600 * 24)))  # 1 day from now
-        await call.message.bot.edit_message_text(chat_id=config.groups.reports,
-                                                 message_id=call.message.message_id,
-                                                 text=call.message.text + localization.get_string(
-                                                     "action_deleted_dismissed2"))
-        await call.answer(text="Done")
-    elif call.data.startswith("dismiss3_"):
-        with suppress(MessageCantBeDeleted, MessageToDeleteNotFound):
-            await call.message.bot.delete_message(config.groups.main, int(call.data.split("_")[1]))
+    await call.message.edit_text(
+        call.message.text + get_string("action_deleted")
+    )
+    await call.answer(text="Done")
 
-        await call.message.bot.restrict_chat_member(chat_id=config.groups.main, user_id=call.data.split("_")[2],
-                                                    permissions=types.ChatPermissions(),
-                                                    until_date=int(time()) + ((3600 * 24) * 7))  # 7 days from now
-        await call.message.bot.edit_message_text(chat_id=config.groups.reports,
-                                                 message_id=call.message.message_id,
-                                                 text=call.message.text + localization.get_string(
-                                                     "action_deleted_dismissed3"))
-        await call.answer(text="Done")
-    elif call.data.startswith("dismiss4_"):
-        with suppress(MessageCantBeDeleted, MessageToDeleteNotFound):
-            await call.message.bot.delete_message(config.groups.main, int(call.data.split("_")[1]))
 
-        await call.message.bot.kick_chat_member(chat_id=config.groups.main, user_id=call.data.split("_")[2])
-        await call.message.bot.edit_message_text(chat_id=config.groups.reports,
-                                                 message_id=call.message.message_id,
-                                                 text=call.message.text + localization.get_string(
-                                                     "action_deleted_dismissed4"))
-        await call.answer(text="Done")
+@router.callback_query(F.data.startswith("delban_"))
+async def callback_delete_and_ban(call: CallbackQuery) -> None:
+    """Delete message and ban user."""
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    message_id = int(parts[2])
+    user_id = int(parts[3])
 
-    ###
-    ### SPAM callbacks
-    ###
-    elif call.data.startswith("spam_test_"):
-        # delete record
-        await Spam.objects.delete(id=int(call.data.split("_")[2]))
+    with suppress(TelegramBadRequest):
+        await call.bot.delete_message(chat_id, message_id)
 
-        # increase member messages count, cuz is not a spam :3
-        member = await Member.objects.get(id=int(call.data.split("_")[3]))
+    await call.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+
+    await call.message.edit_text(
+        call.message.text + get_string("action_deleted_banned")
+    )
+    await call.answer(text="Done")
+
+
+@router.callback_query(F.data.startswith("mute_"))
+async def callback_delete_and_mute_24h(call: CallbackQuery) -> None:
+    """Delete message and mute user for 24 hours."""
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    message_id = int(parts[2])
+    user_id = int(parts[3])
+
+    with suppress(TelegramBadRequest):
+        await call.bot.delete_message(chat_id, message_id)
+
+    await call.bot.restrict_chat_member(
+        chat_id=chat_id,
+        user_id=user_id,
+        permissions=ChatPermissions(can_send_messages=False),
+        until_date=datetime.now(timezone.utc) + timedelta(hours=24)
+    )
+
+    await call.message.edit_text(
+        call.message.text + get_string("action_deleted_readonly")
+    )
+    await call.answer(text="Done")
+
+
+@router.callback_query(F.data.startswith("mute2_"))
+async def callback_delete_and_mute_7d(call: CallbackQuery) -> None:
+    """Delete message and mute user for 7 days."""
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    message_id = int(parts[2])
+    user_id = int(parts[3])
+
+    with suppress(TelegramBadRequest):
+        await call.bot.delete_message(chat_id, message_id)
+
+    await call.bot.restrict_chat_member(
+        chat_id=chat_id,
+        user_id=user_id,
+        permissions=ChatPermissions(can_send_messages=False),
+        until_date=datetime.now(timezone.utc) + timedelta(days=7)
+    )
+
+    await call.message.edit_text(
+        call.message.text + get_string("action_deleted_readonly2")
+    )
+    await call.answer(text="Done")
+
+
+@router.callback_query(F.data.startswith("dismiss_"))
+async def callback_dismiss(call: CallbackQuery) -> None:
+    """Dismiss report (false alarm)."""
+    await call.message.edit_text(
+        call.message.text + get_string("action_dismissed")
+    )
+    await call.answer(text="Done")
+
+
+@router.callback_query(F.data.startswith("dismiss2_"))
+async def callback_dismiss_mute_reporter_1d(call: CallbackQuery) -> None:
+    """Dismiss and mute reporter for 1 day."""
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    message_id = int(parts[2])
+    user_id = int(parts[3])
+
+    with suppress(TelegramBadRequest):
+        await call.bot.delete_message(chat_id, message_id)
+
+    await call.bot.restrict_chat_member(
+        chat_id=chat_id,
+        user_id=user_id,
+        permissions=ChatPermissions(can_send_messages=False),
+        until_date=datetime.now(timezone.utc) + timedelta(days=1)
+    )
+
+    await call.message.edit_text(
+        call.message.text + get_string("action_deleted_dismissed2")
+    )
+    await call.answer(text="Done")
+
+
+@router.callback_query(F.data.startswith("dismiss3_"))
+async def callback_dismiss_mute_reporter_7d(call: CallbackQuery) -> None:
+    """Dismiss and mute reporter for 7 days."""
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    message_id = int(parts[2])
+    user_id = int(parts[3])
+
+    with suppress(TelegramBadRequest):
+        await call.bot.delete_message(chat_id, message_id)
+
+    await call.bot.restrict_chat_member(
+        chat_id=chat_id,
+        user_id=user_id,
+        permissions=ChatPermissions(can_send_messages=False),
+        until_date=datetime.now(timezone.utc) + timedelta(days=7)
+    )
+
+    await call.message.edit_text(
+        call.message.text + get_string("action_deleted_dismissed3")
+    )
+    await call.answer(text="Done")
+
+
+@router.callback_query(F.data.startswith("dismiss4_"))
+async def callback_dismiss_ban_reporter(call: CallbackQuery) -> None:
+    """Dismiss and ban reporter."""
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    message_id = int(parts[2])
+    user_id = int(parts[3])
+
+    with suppress(TelegramBadRequest):
+        await call.bot.delete_message(chat_id, message_id)
+
+    await call.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+
+    await call.message.edit_text(
+        call.message.text + get_string("action_deleted_dismissed4")
+    )
+    await call.answer(text="Done")
+
+
+# ===============================
+# SPAM CALLBACKS
+# ===============================
+
+@router.callback_query(F.data.startswith("spam_test_"))
+async def callback_spam_test(call: CallbackQuery) -> None:
+    """Remove spam record (it was a test)."""
+    parts = call.data.split("_")
+    spam_id = int(parts[2])
+    member_id = int(parts[3])
+
+    # Delete spam record
+    try:
+        await Spam.objects.delete(id=spam_id)
+    except Exception:
+        pass
+
+    # Increase member messages count
+    try:
+        member = await Member.objects.get(id=member_id)
         member.messages_count += 1
         await member.update()
+    except Exception:
+        pass
 
-        await call.message.bot.edit_message_text(chat_id=config.groups.logs,
-                                                 message_id=call.message.message_id,
-                                                 text=call.message.text + "\n\n<b>Удалено из базы, вероятно тест.</b>")
-        await call.answer(text="Done")
-    elif call.data.startswith("spam_ban_"):
-        with suppress(CantRestrictChatOwner, BadRequest):
-            await call.message.bot.kick_chat_member(chat_id=config.groups.main, user_id=call.data.split("_")[3])
+    await call.message.edit_text(
+        call.message.text + "\n\n<b>Удалено из базы, вероятно тест.</b>"
+    )
+    await call.answer(text="Done")
 
-            # retrieve record
-            spam_rec = await Spam.objects.get(id=int(call.data.split("_")[2]))
-            spam_rec.is_blocked = True
-            await spam_rec.update()
 
-        await call.message.bot.edit_message_text(chat_id=config.groups.logs,
-                                                 message_id=call.message.message_id,
-                                                 text=call.message.text + "\n\n❌ <b>Юзер забанен, сообщение помечено как спам</b>")
-        await call.answer(text="Done")
-    elif call.data.startswith("spam_invert_"):
-        # retrieve record
-        spam_rec = await Spam.objects.get(id=int(call.data.split("_")[2]))
+@router.callback_query(F.data.startswith("spam_ban_"))
+async def callback_spam_ban(call: CallbackQuery) -> None:
+    """Ban user for spam."""
+    parts = call.data.split("_")
+    spam_id = int(parts[2])
+    user_id = int(parts[3])
+    # chat_id is stored in spam record
+    
+    # Get spam record to find the chat_id
+    try:
+        spam_rec = await Spam.objects.get(id=spam_id)
+        chat_id = spam_rec.chat_id
+        
+        with suppress(TelegramBadRequest):
+            await call.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+            
+        spam_rec.is_blocked = True
+        await spam_rec.update()
+    except Exception:
+        pass
+
+    await call.message.edit_text(
+        call.message.text + "\n\n❌ <b>Юзер забанен, сообщение помечено как спам</b>"
+    )
+    await call.answer(text="Done")
+
+
+@router.callback_query(F.data.startswith("spam_invert_"))
+async def callback_spam_not_spam(call: CallbackQuery) -> None:
+    """Mark message as not spam."""
+    parts = call.data.split("_")
+    spam_id = int(parts[2])
+    member_id = int(parts[3]) if len(parts) > 3 else None
+
+    # Update spam record
+    try:
+        spam_rec = await Spam.objects.get(id=spam_id)
         spam_rec.is_spam = False
         await spam_rec.update()
+    except Exception:
+        pass
 
+    # Increase member reputation
+    if member_id:
         try:
-            # increase member messages count, cuz is not a spam :3
-            member = await Member.objects.get(id=int(call.data.split("_")[3]))
+            member = await Member.objects.get(id=member_id)
             member.messages_count += 1
-            member.reputation_points += 10 # add rep. points for not-a-spam reaction
+            member.reputation_points += 10
             await member.update()
-        except IndexError:
+        except Exception:
             pass
 
-        await call.message.bot.edit_message_text(chat_id=config.groups.logs,
-                                                 message_id=call.message.message_id,
-                                                 text=call.message.text + "\n\n❎ <b>Сообщение помечено как НЕ СПАМ</b>")
+    await call.message.edit_text(
+        call.message.text + "\n\n❎ <b>Сообщение помечено как НЕ СПАМ</b>"
+    )
+    await call.answer(text="Done")
 
-    elif call.data.startswith("nsfw_ban_"):
-        with suppress(CantRestrictChatOwner, BadRequest):
-            await call.message.bot.kick_chat_member(chat_id=config.groups.main, user_id=call.data.split("_")[2])
 
-        await call.message.bot.edit_message_text(chat_id=config.groups.logs,
-                                                 message_id=call.message.message_id,
-                                                 text=call.message.text + "\n\n❌ <b>Юзер забанен за NSFW изображение профиля.</b>")
-        await call.answer(text="Done")
+# ===============================
+# NSFW CALLBACKS
+# ===============================
 
-    elif call.data.startswith("nsfw_safe_"):
-        try:
-            # increase member messages count, cuz is not spam :3
-            member = await Member.objects.get(id=int(call.data.split("_")[2]))
-            member.messages_count += 1
-            member.reputation_points += 10 # add rep. points for not-nsfw reaction
-            await member.update()
-        except IndexError:
-            pass
+@router.callback_query(F.data.startswith("nsfw_ban_"))
+async def callback_nsfw_ban(call: CallbackQuery) -> None:
+    """Ban user for NSFW profile picture."""
+    parts = call.data.split("_")
+    user_id = int(parts[2])
+    # chat_id is included in callback data
+    chat_id = int(parts[3]) if len(parts) > 3 else None
+    
+    if chat_id:
+        with suppress(TelegramBadRequest):
+            await call.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
 
-        await call.message.bot.edit_message_text(chat_id=config.groups.logs,
-                                                 message_id=call.message.message_id,
-                                                 text=call.message.text + "\n\n❎ <b>Сообщение помечено как не содержащее NSFW.</b>")
-        await call.answer(text="Done")
+    await call.message.edit_text(
+        call.message.text + "\n\n❌ <b>Юзер забанен за NSFW изображение профиля.</b>"
+    )
+    await call.answer(text="Done")
+
+
+@router.callback_query(F.data.startswith("nsfw_safe_"))
+async def callback_nsfw_safe(call: CallbackQuery) -> None:
+    """Mark as not NSFW."""
+    member_id = int(call.data.split("_")[2])
+
+    try:
+        member = await Member.objects.get(id=member_id)
+        member.messages_count += 1
+        member.reputation_points += 10
+        await member.update()
+    except Exception:
+        pass
+
+    await call.message.edit_text(
+        call.message.text + "\n\n❎ <b>Сообщение помечено как не содержащее NSFW.</b>"
+    )
+    await call.answer(text="Done")

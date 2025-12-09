@@ -1,87 +1,58 @@
-# User-specific stuff:
-.idea/workspace.xml
-.idea/tasks.xml
-.idea/dictionaries
-.idea/vcs.xml
-.idea/jsLibraryMappings.xml
-pipsize.py
-Dockerfile
-local_test.py
-
-# Sensitive or high-churn files:
-.idea/dataSources.ids
-.idea/dataSources.xml
-.idea/dataSources.local.xml
-.idea/sqlDataSources.xml
-.idea/dynamic.xml
-.idea/uiDesigner.xml
-
-# Gradle:
-.idea/gradle.xml
-.idea/libraries
-
-# Mongo Explorer plugin:
-.idea/mongoSettings.xml
-
-.idea/
-
-# Environments
-.env
-dev.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-.python-version
-
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
-__pycache__/*
 *.py[cod]
 *$py.class
-*.pyc
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Visual Studio cache directory
-.vs/
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
 
-# General
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+
+# Database
+*.sqlite
+*.db
+
+# Logs
+*.log
+logs/
+
+# Model cache
+.cache/
+*.pt
+*.bin
+
+# OS
 .DS_Store
-.AppleDouble
-.LSOverride
-
-# Files that might appear in the root of a volume
-.DocumentRevisions-V100
-.fseventsd
-.Spotlight-V100
-.TemporaryItems
-.Trashes
-.VolumeIcon.icns
-.com.apple.timemachine.donotpresent
-
-# Directories potentially created on remote AFP share
-.AppleDB
-.AppleDesktop
-Network Trash Folder
-Temporary Items
-.apdisk
-
-# Windows thumbnail cache files
 Thumbs.db
-Thumbs.db:encryptable
-ehthumbs.db
-ehthumbs_vista.db
 
-# Recycle Bin used on file shares
-$RECYCLE.BIN/
-
-# Windows Installer files
-*.cab
-*.msi
-*.msix
-*.msm
-*.msp
-
-# Windows shortcuts
-*.lnk
+# Temporary files
+tmp/
+temp/

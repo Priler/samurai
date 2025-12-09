@@ -1,117 +1,131 @@
-from time import time
-from aiogram import types
-from aiogram.dispatcher.filters import Text
-from configurator import config
-from dispatcher import dp
-import localization
-import utils
-import random
+"""
+User action handlers (report, @admin).
+"""
+from aiogram import Router, F
+from aiogram.filters import Command
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-@dp.message_handler(chat_id=config.groups.main, commands=["report", "репорт"], commands_prefix="!/")
-async def cmd_report(message: types.Message):
-    # Check if command is sent as reply to some message
+from config import config
+from filters import InMainGroups
+from utils import get_string, _random, get_report_comment, get_url_chat_id, MemberStatus
+
+router = Router(name="user_actions")
+
+
+@router.message(
+    InMainGroups(),
+    Command("report", "репорт", prefix="!/")
+)
+async def cmd_report(message: Message) -> None:
+    """Report a message to admins."""
+    # Check if command is sent as reply
     if not message.reply_to_message:
-        await message.reply(localization.get_string("error_no_reply"))
+        await message.reply(get_string("error_no_reply"))
         return
 
-    # Check if command is sent to own message
+    # Can't report yourself
     if message.reply_to_message.from_user.id == message.from_user.id:
-        await message.reply(localization.get_string("error_report_self"))
+        await message.reply(get_string("error_report_self"))
         return
 
-    # Check if command is sent as reply to admin
-    user = await message.bot.get_chat_member(config.groups.main, message.reply_to_message.from_user.id)
-    if user.is_chat_admin() and user.can_restrict_members:
-        await message.reply(localization.get_string("error_report_admin"))
-        return
-
-    # Cannot report group posts
-    if message.reply_to_message.from_user.id == 777000:
-        await message.bot.delete_message(config.groups.main, message.message_id)
-        return
-
-    # Check for report message (anything sent after /report or !report command)
-    msg_parts = message.text.split()
-    report_message = None
-    if len(msg_parts) > 1:
-        report_message = message.text.replace("!report", "")
-        report_message = report_message.replace("/report", "")
-
-    # Generate keyboard with some actions
-    action_keyboard = types.InlineKeyboardMarkup()
-    # Delete message by its id
-    action_keyboard.add(types.InlineKeyboardButton(
-        text=localization.get_string("action_del_msg"),
-        callback_data=f"del_{message.reply_to_message.message_id}")
+    # Can't report admins
+    user = await message.bot.get_chat_member(
+        message.chat.id,
+        message.reply_to_message.from_user.id
     )
+    if user.status in MemberStatus.admin_statuses():
+        await message.reply(get_string("error_report_admin"))
+        return
 
-    # Delete message by its id and ban user by their id
-    action_keyboard.add(types.InlineKeyboardButton(
-        text=localization.get_string("action_del_and_ban"),
-        callback_data=f"delban_{message.reply_to_message.message_id}_{message.reply_to_message.from_user.id}"
-    ))
+    # Can't report channel posts (user 777000)
+    if message.reply_to_message.from_user.id == 777000:
+        await message.delete()
+        return
 
-    # Delete message by its id and mute user for 24 hours by their id
-    action_keyboard.add(types.InlineKeyboardButton(
-        text=localization.get_string("action_del_and_readonly"),
-        callback_data=f"mute_{message.reply_to_message.message_id}_{message.reply_to_message.from_user.id}"
-    ))
+    # Check for report message (anything after /report)
+    msg_parts = message.text.split(maxsplit=1)
+    report_message = msg_parts[1] if len(msg_parts) > 1 else None
 
-    # Delete message by its id and mute user for 7 days by their id
-    action_keyboard.add(types.InlineKeyboardButton(
-        text=localization.get_string("action_del_and_readonly2"),
-        callback_data=f"mute2_{message.reply_to_message.message_id}_{message.reply_to_message.from_user.id}"
-    ))
+    # Generate keyboard with actions
+    # Include chat_id in callback_data for multi-group support
+    chat_id = message.chat.id
+    reply_msg_id = message.reply_to_message.message_id
+    reply_user_id = message.reply_to_message.from_user.id
+    reporter_msg_id = message.message_id
+    reporter_user_id = message.from_user.id
 
-    # Do nothing, false alarm
-    action_keyboard.add(types.InlineKeyboardButton(
-        text=localization.get_string("action_false_alarm"),
-        callback_data=f"dismiss_{message.reply_to_message.message_id}_{message.reply_to_message.from_user.id}"
-    ))
+    action_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=get_string("action_del_msg"),
+            callback_data=f"del_{chat_id}_{reply_msg_id}"
+        )],
+        [InlineKeyboardButton(
+            text=get_string("action_del_and_ban"),
+            callback_data=f"delban_{chat_id}_{reply_msg_id}_{reply_user_id}"
+        )],
+        [InlineKeyboardButton(
+            text=get_string("action_del_and_readonly"),
+            callback_data=f"mute_{chat_id}_{reply_msg_id}_{reply_user_id}"
+        )],
+        [InlineKeyboardButton(
+            text=get_string("action_del_and_readonly2"),
+            callback_data=f"mute2_{chat_id}_{reply_msg_id}_{reply_user_id}"
+        )],
+        [InlineKeyboardButton(
+            text=get_string("action_false_alarm"),
+            callback_data=f"dismiss_{chat_id}_{reply_msg_id}_{reply_user_id}"
+        )],
+        [InlineKeyboardButton(
+            text=get_string("action_false_alarm_2"),
+            callback_data=f"dismiss2_{chat_id}_{reporter_msg_id}_{reporter_user_id}"
+        )],
+        [InlineKeyboardButton(
+            text=get_string("action_false_alarm_3"),
+            callback_data=f"dismiss3_{chat_id}_{reporter_msg_id}_{reporter_user_id}"
+        )],
+        [InlineKeyboardButton(
+            text=get_string("action_false_alarm_4"),
+            callback_data=f"dismiss4_{chat_id}_{reporter_msg_id}_{reporter_user_id}"
+        )]
+    ])
 
-    # Do nothing, false alarm + mute reporter for one day
-    action_keyboard.add(types.InlineKeyboardButton(
-        text=localization.get_string("action_false_alarm_2"),
-        callback_data=f"dismiss2_{message.message_id}_{message.from_user.id}"
-    ))
-
-    # Do nothing, false alarm + mute reporter for one week
-    action_keyboard.add(types.InlineKeyboardButton(
-        text=localization.get_string("action_false_alarm_3"),
-        callback_data=f"dismiss3_{message.message_id}_{message.from_user.id}"
-    ))
-
-    # Do nothing, false alarm + ban reporter
-    action_keyboard.add(types.InlineKeyboardButton(
-        text=localization.get_string("action_false_alarm_4"),
-        callback_data=f"dismiss4_{message.message_id}_{message.from_user.id}"
-    ))
-
+    # Forward reported message and send report
     await message.reply_to_message.forward(config.groups.reports)
     await message.bot.send_message(
         config.groups.reports,
-        utils.get_report_comment(
+        get_report_comment(
             message.reply_to_message.date,
             message.reply_to_message.message_id,
-            report_message
+            chat_id,
+            report_message,
+            message.chat.title
         ),
-        reply_markup=action_keyboard)
-    await message.reply(random.choice(["<i>Репорт отправлен.</i>", "<i>Админы посмотрят.</i>", "<i>Полиция уже в пути :3</i>", "<i>SWAT уже выехал :3</i>", "<i>Щасб кто-нибудь глянет :3</i>"]))
+        reply_markup=action_keyboard
+    )
 
-@dp.message_handler(Text(startswith="@admin", ignore_case=True), chat_id=config.groups.main)
-async def calling_all_units(message: types.Message):
-    """
-    Handler which is triggered when message starts with @admin.
-    Honestly any combination will work: @admin, @admins, @adminisshit
+    await message.reply(_random("report-responses"))
 
-    :param message: Telegram message where text starts with @admin
-    """
+
+@router.message(
+    InMainGroups(),
+    F.text.lower().startswith("@admin")
+)
+async def calling_all_units(message: Message) -> None:
+    """Handle @admin mentions."""
+    msg_id = (
+        message.reply_to_message.message_id
+        if message.reply_to_message
+        else message.message_id
+    )
+
+    # Include chat name in the message
+    header = f"🟢 <b>{message.chat.title}</b>\n\n" if message.chat.title else ""
+
     await message.bot.send_message(
         config.groups.reports,
-        localization.get_string("need_admins_attention").format(
-            chat_id=utils.get_url_chat_id(config.groups.main),
-            msg_id=message.reply_to_message.message_id
-            if message.reply_to_message
-            else message.message_id
+        header + get_string(
+            "need_admins_attention",
+            chat_id=get_url_chat_id(message.chat.id),
+            msg_id=msg_id
         )
     )

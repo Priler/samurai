@@ -1,129 +1,178 @@
+"""
+Personal/owner action handlers (ping, profanity check, message from bot).
+"""
 import random
-from time import time
-from aiogram import types
-from configurator import config
-from dispatcher import dp
-import localization
-import utils
-import psutil
-
 import sys
-sys.path.append("./censure") # allow module import from git submodule
 
-from censure import Censor
+import psutil
+from aiogram import Router, F
+from aiogram.filters import Command
+from aiogram.types import Message
 
-censor_ru = Censor.get(lang='ru')
-censor_en = Censor.get(lang='en')
+from config import config
+from filters import IsOwnerFilter, IsAdminFilter, InMainGroups
+from services.profanity import check_for_profanity
+from utils import remove_prefix, MemberStatus
 
+sys.path.append("./libs")
 
-@dp.message_handler(user_id = int(config.bot.owner), commands="msg", commands_prefix="!/")
-async def cmd_message_from_bot(message: types.Message):
-	await message.bot.send_message(config.groups.main, utils.remove_prefix(message.text, "!msg "))
-
-
-@dp.message_handler(user_id = int(config.bot.owner), commands="log", commands_prefix="!/")
-async def cmd_write_log_bot(message: types.Message):
-	await utils.write_log(message.bot, utils.remove_prefix(message.text, "!log "), "test")
+router = Router(name="personal_actions")
 
 
-@dp.message_handler(is_admin=True, commands="ping", commands_prefix="!")
-async def cmd_ping_bot(message: types.Message):
-	# Check if command is sent by group admin
-	user = await message.bot.get_chat_member(config.groups.main, message.from_user.id)
-	if user.is_chat_admin():
-		ram = psutil.virtual_memory()
-		cpu_freq = psutil.cpu_freq().current if psutil.cpu_freq() else 0
-
-		reply = f"<b>{random.choice(['👊 Самурай на месте!', '🫰 Нужно больше золота', '🫡 Тута я, бож :3', '✊ Железо говн@, но я держусь!'])}</b>\n\n"
-
-		# CPU
-		reply += "<b>CPU:</b> <i>{} ядер, {:.0f} MHz, загрузка {}%</i>\n".format(
-			psutil.cpu_count(logical=True),
-			cpu_freq,
-			psutil.cpu_percent(interval=1)
-		)
-
-		# RAM
-		reply += "<b>RAM:</b> <i>{} МБ / {} МБ ({}%)</i>\n".format(
-			ram.used // (1024 ** 2),
-			ram.total // (1024 ** 2),
-			ram.percent
-		)
-
-		# GPU
-		reply += "<b>GPU:</b> <i>N/A</i>\n"
-
-		# Get disk info for root partition
-		disk = psutil.disk_usage('/')
-
-		# Convert bytes to GB (с двумя знаками после запятой)
-		disk_total_gb = disk.total / (1024 ** 3)
-		disk_used_gb = disk.used / (1024 ** 3)
-		disk_free_gb = disk.free / (1024 ** 3)
-
-		reply += "<b>SSD:</b> <i>{:.2f} ГБ из {:.2f} ГБ использовано ({}% занято)</i>\n".format(
-			disk_used_gb,
-			disk_total_gb,
-			int(disk.percent)
-		)
-
-		# etc
-		reply += "<b>Расположение сервера:</b> <i>Марс</i>\n"
-
-		reply += "\n<b>Версия бота:</b> <i>" + str(config.bot.version) + " codename «<b>" + config.bot.version_codename + "</b>»</i>"
-
-		await message.reply(reply)
+@router.message(
+    IsOwnerFilter(),
+    Command("msg", prefix="!/")
+)
+async def cmd_message_from_bot(message: Message) -> None:
+    """Send a message to all main groups from bot (owner only)."""
+    text = remove_prefix(message.text, "!msg ").strip()
+    if text:
+        # Send to all configured main groups
+        for group_id in config.groups.main:
+            try:
+                await message.bot.send_message(group_id, text)
+            except Exception:
+                pass
 
 
-# @dp.message_handler(lambda message: message.chat.type == 'private', commands=["prof", "мат"], commands_prefix="!")
-@dp.message_handler(is_admin=True, commands=["prof", "мат"], commands_prefix="!")
-@dp.message_handler(lambda message: message.chat.type == 'private', is_owner=True, commands=["prof", "мат"], commands_prefix="!")
-async def cmd_profanity_check(message: types.Message):
-	# Check if command is sent by group admin
-	user = await message.bot.get_chat_member(config.groups.main, message.from_user.id)
-	if user.is_chat_admin():
-		_del = False
-		_word = None
-		_pat = None
+@router.message(
+    IsOwnerFilter(),
+    Command("log", prefix="!/")
+)
+async def cmd_write_log_bot(message: Message) -> None:
+    """Write a test log message (owner only)."""
+    from utils import write_log
+    text = remove_prefix(message.text, "!log ").strip()
+    if text:
+        await write_log(message.bot, text, "test")
 
-		line_info_ru = censor_ru.clean_line(utils.remove_prefix(message.text, "!prof "))
-		line_info_en = censor_en.clean_line(utils.remove_prefix(message.text, "!prof "))
 
-		# line, bad_words_count, bad_phrases_count, detected_bad_words, detected_bad_phrases
+@router.message(
+    InMainGroups(),
+    IsAdminFilter(),
+    Command("ping", prefix="!")
+)
+async def cmd_ping_bot(message: Message) -> None:
+    """Check if bot is alive and show system stats."""
+    # Verify admin in current group
+    user = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
+    if user.status not in MemberStatus.admin_statuses():
+        return
 
-		_det_lang = None
+    ram = psutil.virtual_memory()
+    cpu_freq = psutil.cpu_freq().current if psutil.cpu_freq() else 0
 
-		# check RU
-		if line_info_ru[1] or line_info_ru[2]:
-			if line_info_ru[1]:
-				_word = line_info_ru[3][0]
-			else:
-				_word = line_info_ru[4][0]
+    reply = f"<b>{random.choice(['👊 Самурай на месте!', '🫰 Нужно больше золота', '🫡 Тута я, бож :3', '✊ Железо говн@, но я держусь!'])}</b>\n\n"
 
-			_pat = line_info_ru[5][0]
-			_del = True
-			_det_lang = 'ru'
+    # CPU
+    reply += "<b>CPU:</b> <i>{} ядер, {:.0f} MHz, загрузка {}%</i>\n".format(
+        psutil.cpu_count(logical=True),
+        cpu_freq,
+        psutil.cpu_percent(interval=1)
+    )
 
-		# check ENG
-		if line_info_en[1] or line_info_en[2]:
-			if line_info_en[1]:
-				_word = line_info_en[3][0]
-			else:
-				_word = line_info_en[4][0]
+    # RAM
+    reply += "<b>RAM:</b> <i>{} МБ / {} МБ ({}%)</i>\n".format(
+        ram.used // (1024 ** 2),
+        ram.total // (1024 ** 2),
+        ram.percent
+    )
 
-			_pat = line_info_en[5][0]
-			_del = True
-			_det_lang = 'en'
+    # GPU
+    reply += "<b>GPU:</b> <i>N/A</i>\n"
 
-		# process
-		if _del:
-			log_msg = message.text
-			if _word:
-				log_msg = "❌ Profanity detected.\n\n"
-				log_msg += utils.remove_prefix(message.text, "!prof ").replace(_word, '<u><b>'+_word+'</b></u>')
-				log_msg += "\nПаттерн: " + _pat
-				log_msg += "\nЯзык: " + _det_lang
+    # Disk
+    disk = psutil.disk_usage('/')
+    disk_total_gb = disk.total / (1024 ** 3)
+    disk_used_gb = disk.used / (1024 ** 3)
 
-			await message.reply(log_msg)
-		else:
-			await message.reply("✅ No profanity detected.")
+    reply += "<b>SSD:</b> <i>{:.2f} ГБ из {:.2f} ГБ использовано ({}% занято)</i>\n".format(
+        disk_used_gb,
+        disk_total_gb,
+        int(disk.percent)
+    )
+
+    # Location
+    reply += "<b>Расположение сервера:</b> <i>Марс</i>\n"
+
+    # Version
+    reply += f"\n<b>Версия бота:</b> <i>{config.bot.version} codename «<b>{config.bot.version_codename}</b>»</i>"
+
+    await message.reply(reply)
+
+
+@router.message(
+    InMainGroups(),
+    IsAdminFilter(),
+    Command("prof", "мат", prefix="!")
+)
+async def cmd_profanity_check(message: Message) -> None:
+    """Check text for profanity (admin only)."""
+    # Verify admin in current group
+    user = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
+    if user.status not in MemberStatus.admin_statuses():
+        return
+
+    text = remove_prefix(message.text, "!prof ").strip()
+    if not text:
+        text = remove_prefix(message.text, "!мат ").strip()
+    
+    if not text:
+        await message.reply("Укажите текст для проверки после команды.")
+        return
+
+    # Check Russian
+    is_profanity_ru, word_ru, line_info_ru = check_for_profanity(text, "ru")
+    
+    # Check English
+    is_profanity_en, word_en, line_info_en = check_for_profanity(text, "en")
+
+    if is_profanity_ru or is_profanity_en:
+        word = word_ru if is_profanity_ru else word_en
+        pattern = line_info_ru[5][0] if is_profanity_ru else line_info_en[5][0]
+        lang = "ru" if is_profanity_ru else "en"
+
+        log_msg = f"❌ Profanity detected.\n\n"
+        log_msg += text.replace(word, f'<u><b>{word}</b></u>')
+        log_msg += f"\nПаттерн: {pattern}"
+        log_msg += f"\nЯзык: {lang}"
+
+        await message.reply(log_msg)
+    else:
+        await message.reply("✅ No profanity detected.")
+
+
+@router.message(
+    F.chat.type == "private",
+    IsOwnerFilter(),
+    Command("prof", "мат", prefix="!")
+)
+async def cmd_profanity_check_private(message: Message) -> None:
+    """Check text for profanity in private chat (owner only)."""
+    text = remove_prefix(message.text, "!prof ").strip()
+    if not text:
+        text = remove_prefix(message.text, "!мат ").strip()
+    
+    if not text:
+        await message.reply("Укажите текст для проверки после команды.")
+        return
+
+    # Check Russian
+    is_profanity_ru, word_ru, line_info_ru = check_for_profanity(text, "ru")
+    
+    # Check English
+    is_profanity_en, word_en, line_info_en = check_for_profanity(text, "en")
+
+    if is_profanity_ru or is_profanity_en:
+        word = word_ru if is_profanity_ru else word_en
+        pattern = line_info_ru[5][0] if is_profanity_ru else line_info_en[5][0]
+        lang = "ru" if is_profanity_ru else "en"
+
+        log_msg = f"❌ Profanity detected.\n\n"
+        log_msg += text.replace(word, f'<u><b>{word}</b></u>')
+        log_msg += f"\nПаттерн: {pattern}"
+        log_msg += f"\nЯзык: {lang}"
+
+        await message.reply(log_msg)
+    else:
+        await message.reply("✅ No profanity detected.")

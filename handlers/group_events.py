@@ -1,587 +1,106 @@
-from aiogram import types
-from aiogram.types import ChatMemberAdministrator, ChatMemberOwner, ContentType
+"""
+Group event handlers - message processing, profanity/spam detection, reputation system.
 
-from configurator import config
-from dispatcher import dp
-import localization
-from time import time
-import re
-import utils
-import lru_cache
-import datetime
-from aiogram.utils import exceptions
-
+IMPORTANT: Handler order matters in aiogram 3.x!
+- Command handlers must come BEFORE catch-all message handlers
+- The on_user_message handler should be LAST as it catches all text messages
+"""
+import io
 import random
+from typing import Optional
 
-import ormar
-from models.member import Member
-from models.spam import Spam
-
-from ruspam import predict as ruspam_predict
-from nsfw import classify_explicit_content as nsfw_predict
+from aiogram import Router, F, Bot
+from aiogram.types import (
+    Message, ContentType, InlineKeyboardMarkup, InlineKeyboardButton,
+    ChatMemberAdministrator, ChatMemberOwner
+)
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.filters import Command
 
 from PIL import Image
 import numpy as np
-import io
 
-from utils import Gender
-from utils import check_name_for_violations
-
-# blacklist = open("blacklist.txt", mode="r").read().split(',')
-# blacklist_regexp = re.compile(r'(?iu)\b((у|[нз]а|(хитро|не)?вз?[ыьъ]|с[ьъ]|(и|ра)[зс]ъ?|(о[тб]|под)[ьъ]?|(.\B)+?[оаеи])?-?([её]б(?!о[рй])|и[пб][ае][тц]).*?|(н[иеа]|[дп]о|ра[зс]|з?а|с(ме)?|о(т|дно)?|апч)?-?ху([яйиеёю]|ли(?!ган)).*?|(в[зы]|(три|два|четыре)жды|(н|сук)а)?-?бл(я(?!(х|ш[кн]|мб)[ауеыио]).*?|[еэ][дт]ь?)|(ра[сз]|[зн]а|[со]|вы?|п(р[ои]|од)|и[зс]ъ?|[ао]т)?п[иеё]зд.*?|(за)?п[ие]д[аое]?р((ас)?(и(ли)?[нщктл]ь?)?|(о(ч[еи])?)?к|юг)[ауеы]?|манд([ауеы]|ой|[ао]вошь?(е?к[ауе])?|юк(ов|[ауи])?)|муд([аио].*?|е?н([ьюия]|ей))|мля([тд]ь)?|лять|([нз]а|по)х|м[ао]л[ао]фь[яию])\b')
-
-@dp.message_handler(chat_id=config.groups.main, content_types=["new_chat_members"])
-async def on_user_join(message: types.Message):
-    """
-    Removes "user joined" message.
-
-    :param message: Service message "User joined group
-    """
-
-    # remove invite message
-    await message.delete()
-
-    # restrict media for new users
-    '''await message.bot.restrict_chat_member(chat_id=config.groups.main,
-                                          user_id=message.from_user.id,
-                                          permissions=types.ChatPermissions(True),
-                                          until_date=int(time()) + int(config.groups.new_users_nomedia))'''
-
-    await utils.write_log(message.bot, "Присоединился пользователь "+utils.user_mention(message.from_user), "➕ Новый участник")
-
-
-@dp.message_handler(chat_id=config.groups.main, content_types=[types.ContentType.TEXT, types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO])
-@dp.edited_message_handler(chat_id=config.groups.main, content_types=[types.ContentType.TEXT, types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO])
-async def on_user_message(message: types.Message):
-  """
-  Process every user message.
-  I.e. remove, if profanity is detected.
-  Or remove, if spam is detected.
-  Also log every user to database.
-
-  :param message: Message in group
-  """
-  if message.is_automatic_forward:
-      await message.reply(random.choice(["И так сойдет ...", "Бананчики 🍌", "Ну и кто теперь тут первый 😎", "Я не первый, не второй, я таких баню :3",
-                                         "Заходи не бойся, выходи не плачь :3", "Автор ничего не постил уже 1 секунду, всё ясно скатился :3",
-                                         "Самурай на страже порядке 🫡", "Постим живем :3", "Ладно", "Пока ты читаешь, я уже коммент оставил! Успевай 😈",
-                                         "Кто на чем пишет? Я вот на Python :3", "Самурай на месте 😎", "Самурай без меча, как бот без токена :3",
-                                         "Нулевой тутб :3", "Ох, умбаса ..", "Минутка полезной инфы. Сейчас принято считать, что 1МБ = 1000КБ. А 1МиБ = 1024 КиБ. Живи с этим.",
-                                         "✌️ Здоровья и мира тебе, читающий это :3", f"Вышел ёжик из тумана ... вынул <tg-spoiler>{random.choice(['пайтон', 'раст', 'ЖС', 'джаву', 'катану', 'бананчики'])}</tg-spoiler> из кармана :3",
-                                         "жаль, что далеко не все поймут в чем же дело))) действительно тонко))))) не так уж много и образованных в наше время, кто знает, почему это так интересно и необычно))))",
-                                         "С великой силой приходит великая безответственность.", "Где-то однажды появился на свет\nС лаем и мяуканьем зверь, каких нет\nИ тут же сбежал, оставив вопрос,\nСобаче-кошачий малыш Котопес\nКотопес, котопес ...\nЕдинственный в мире малыш котопес.",
-                                         "Его не признали в городе родном\nИ все его шпыняют и ночью и днем\nНе стоит огорчаться, не стоит робеть\nА лучше эту песенку вместе пропеть Котопес, котопес,\nЕдинственный в мире малыш котопес!",
-                                         "Есть программисты, а есть ЖСеры пхпхпх", "100% понимания", "0% осуждения", "Бро как всегда на высоте.",
-
-                                         # upd 2
-                                         # "Я всегда здесь первый, это уже традиция :3", "Когда-то и я был человеком... а теперь я лягух с катаной.", "Оп, Оп. Контент подъехал.",
-                                         # "Кажется, кто-то снова постит — пора комментить 😎", "Не пост, а произведение искусства 🎨",
-                                         # "Ниндзя-комментатор уже тут 🥷", "Лягух-комментатор уже тут 🐸", "Самурай-комментатор уже тут 🇯🇵",
-                                         # "Пост хорош, но комментарии — лучше.", "Я бы лайкнул, да не могу. Бот, всё-таки.",
-                                         # "Ноль токсичности, сто процентов ламповости 🕯", "Вот это ты, конечно, запостил… Уважение.",
-                                         # "Сначала идёт пост. Потом — комментарий. Потом — хаос. Но я слежу за порядком в чате 😎",
-                                         # "Ты постишь, я комментю. Стабильность.", "Я тут по расписанию. И пост — тоже.", "Пока ты думал, я уже комментнул пхпх.",
-                                         # "Где контент, Лебовски?", "Контент пришёл. Самурай доволен.",
-                                         # "Запушил пост, получил коммент — всё по CI/CD.", "На Python пишу, на Rust думаю, на JS страдаю.",
-                                         # "TypeError: пост слишком хорош", "git commit -m 'Топовый пост!'", "Код написан, чай налит, пост прочитан.",
-                                         # "В этом комментарии нет смысла. Но это нормально. Я же бот. Бип-буп ...", "Я пришёл из будущего. Пост всё ещё топ.",
-                                         # "По легенде, этот коммент приносит +10 к удаче 🍀", "Пост хороший. А ты ещё лучше, читатель ❤️",
-                                         # "Ты это лайкни, а я — понаблюдаю 👀", "Каждый пост заслуживает комментария. Даже этот.",
-                                         # "Пост увидел, коммент оставил, порядок навёл 🫡", "Где я? Кто я? А, точно — бот, читающий посты.",
-                                         # "Даже я, бот, прослезился ...", "Контент — 10/10, комменты — 11/10.", "Сам ты бот, пон :3",
-                                         # "На страже постов, как всегда 😎", "Картинка чёткая, постик годный, комментарии — шедевр.",
-                                         # "Сколько бы постов ни было — я везде первый. Бугага!", "Опять пост, опять шедевр. Так держать.",
-                                         # "Прекрасный день для прекрасного поста.", "Каждый день ты пишешь десятки комментариев, - почему бы не написать еще один?",
-                                         # "Зашёл, увидел, откомментил.", "Ты постишь, я комментирую. Симбиоз.", "В любой непонятной ситуации говори - да.",
-
-                                         # upd 3
-                                         "В свободное от модерации время я сочиняю Хокку.", "Лягух с катаной -\nтишина после удара,\nспам канул в омут.",
-                                         "Квакнул — и тишина.\nКатана блеснула в треде —\nбот чист, как пруд ранний.", "В тени чатовой —\nлягух с катаной дышит.\nБан — как ветер с моря.",
-                                         "Имя мне - Лягух, клинок рассекающий шл#х@ботов!", "Бань их, ибо неведуют они что пишут.", "Держи своих друзей близко, а ботов - еще ближе.\n<i>(C) Майкл «Лягух» Корлеоне</i>",
-                                         "Я — Лягух. Альфа и Омега. Тишина перед баном, блеск в темноте .. Последнее, что видят шл#х@боты.", "Не каждый бот — враг. Но каждый враг — бот.",
-                                         "Я забаню всех спамеров. Каждого. До последнего.", "Даже не пытайся. Моя катана быстрее.", "Имя мне — Лягух. Я не воин, я — модуль возмездия.",
-                                         "Я — последняя строка кода между порядком и хаосом.", "Бан — это искусство. И я — его кисть.", "Каждый бан — как утренний росчерк катаны. Быстро и красиво.",
-                                         "В чате — хаос. В душе — дзен. В лапах — банхаммер.", "С каждым баном я всё меньше бот, всё больше легенда.",
-                                         "-Как ты их отличаешь, Лягух?\n-По словам, по запаху .. по походке.", "Ты можешь быть ботом, но ты не пройдёшь.", "Мой код — мой меч. Мой лог — моя летопись.",
-                                         "Я не судья. Я просто нажимаю Delete.", "Человеку нужно спать. Мне нет. Даже ночью ботам не скрыться от меня.", "Я - длань правосудия этого чата.",
-                                         "<b>Квак — и чат снова чист.</b>", "Лягух не банит из злости — лишь из долга.", "Три вещи вечны: баги, апдейты и я.",
-                                         "Сначала был спам. Потом пришёл я.", "Запомни, а то забудешь.", "Как говорил мой дед, - я твой дед.", "Я не верю в зло или добро. Я верю в спам и шл#х@ботов."
-                                         ]))
-
-      # await message.reply(random.choice(["Праздник к нам приходит 🎅", "Веселье приносит и вкус бодрящий\nПраздника вкус всегда настоящий 🎅", "Пачаны авик заберите с окна ...",
-      #                                   "С наступающим, бро 🎅", "⛄️ Вот и наступила снежная пора\nВ этот праздник зимний каждый ждёт добра\nПоделитесь счастьем, нежностью, теплом\nЧтобы радость ваша согревала дом",
-      #                                    "🎅 Новый год несёт любовь и счастье\nВсе мечты сбываются\nХауди Хо в дом приносит праздник\nПусть он продолжается",
-      #                                    "🦌🦌🦌🦌🦌🦌🦌🦌🦌", "🎄 Попрошу у санты новую катану ... :3", "❄️ Зима уже близбко", "🎅 Санта Клавус существует. Change my mind :3",
-      #                                    "🎅 Советую к просмотру фильм «Мальчик по имени Рождество».", "А ты уже посмотрел историю 💚 Гринча похитителя рождества?",
-      #                                    "🎅 Духи рождества показали бы программистам весь их г@внокод ... и его последствия пхпхпх", "🧝 Эльфы на месте?",
-      #                                    f"Вышел 🎅 Санта из тумана ... вынул <tg-spoiler>{random.choice(['пайтон', 'раст', 'ЖС', 'джаву', 'бананчики'])}</tg-spoiler> из кармана :3",
-      #                                    "✌️ Здоровья и мира тебе, читающий это :3", "🌲🌲🌲🌲🌲\n🎄🎄🎄🎄🎄\n🌲В лесу родиласб йолочка :3\n🎄🎄🎄🎄🎄\n🌲🌲🌲🌲🌲"]))
-
-      return # auto-forward channel messages should not be checked
-
-  ### Retrieve member record from DB
-  member = await lru_cache.retrieve_or_create_member(message.from_user.id)
-
-  # Retrieve tg member object
-  tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
-
-  # skip admins
-  if tg_member.is_chat_admin():
-      return
-
-  # Define message text
-  msg_text = None
-
-  if message.content_type == types.ContentType.TEXT:
-      msg_text = message.text
-  elif message.content_type in [types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO]:
-      msg_text = message.caption
-
-  # Quit, if no message to check
-  if msg_text is None:
-      return
-
-  ### CHECK FOR PROFANITY & SPAM
-  _del = False
-  _word = None
-
-  _del, _word = utils.check_for_profanity_all(msg_text)
-
-  # process
-  if _del:
-    # PROFANITY DETECTED
-    # if not (tg_member.is_chat_admin() and tg_member.can_restrict_members):
-    await message.delete()
-
-    # increase member violations count
-    member.violations_count_profanity += 1
-    member.reputation_points -= 20 # every profanity message removes some reputation points from user
-    await member.update()
-
-    log_msg = msg_text
-    if _word:
-      log_msg = log_msg.replace(_word, '<u><b>'+_word+'</b></u>')
-    log_msg += "\n\n<i>Автор:</i> "+utils.user_mention(message.from_user)
-
-    await utils.write_log(message.bot, log_msg, "🤬 Антимат")
-  else:
-    ### NO PROFANITY, GO CHECK FOR SPAM
-    if (member.messages_count < int(config.spam.member_messages_threshold) or member.reputation_points < int(config.spam.member_reputation_threshold)) and ruspam_predict(msg_text):
-        # SPAM DETECTED
-        # if not (tg_member.is_chat_admin() and tg_member.can_restrict_members):
-        await message.delete()
-
-        # increase member violations count
-        member.violations_count_spam += 1
-        member.reputation_points -= 5  # every spam message removes some reputation points from user
-        await member.update()
-
-        # TEMPORARY TURN OFF SPAM DB LOGGING etc
-        # log_msg = msg_text
-        # log_msg += "\n\n<i>Автор:</i> " + utils.user_mention(message.from_user)
-        #
-        # # Create DB record on spam message
-        # spam_rec = await Spam.objects.create(message=msg_text, is_spam=True, user_id=message.from_user.id, chat_id=int(config.groups.main)) # assume is spam by default
-        #
-        # # Generate keyboard with some actions for detected spam
-        # spam_keyboard = types.InlineKeyboardMarkup()
-        #
-        # # is spam + block user
-        # spam_keyboard.add(types.InlineKeyboardButton(
-        #     text="❌ Это спам + заблокировать пользователя",
-        #     callback_data=f"spam_ban_{spam_rec.id}_{message.from_user.id}")
-        # )
-        #
-        # # not a spam
-        # spam_keyboard.add(types.InlineKeyboardButton(
-        #     text="❎ Это НЕ спам",
-        #     callback_data=f"spam_invert_{spam_rec.id}_{member.id}")
-        # )
-        #
-        # # test msg, remove from db
-        # spam_keyboard.add(types.InlineKeyboardButton(
-        #     text="Убрать из БД, это тест",
-        #     callback_data=f"spam_test_{spam_rec.id}_{member.id}")
-        # )
-        #
-        # # send message with a keyboard to log channel
-        # await message.bot.send_message(
-        #     config.groups.logs,
-        #     utils.generate_log_message(log_msg, "❌ АнтиСПАМ"),
-        #     reply_markup=spam_keyboard)
-    else:
-        # if a message doesn't contain violations,
-        # optionally check for post-replies & nsfw
-        additional_checks = await check_for_unwanted(message, msg_text, member, tg_member) # returns True if handled, False otherwise
-
-        if not additional_checks:
-            # finally, we know that's a message without any violations
-            member.messages_count += 1 # increase member's messages count
-            member.reputation_points += 1 # increase member's reputation points
-            await member.update()
-
-
-# @TODO: Only auto-delete women if profile description contains links etc, or it has channel attached idk, or stories with links etc.
-# Also should split this function into two sub-functions.
-# @dp.message_handler(is_admin=False, chat_id=config.groups.main, content_types=[types.ContentType.TEXT, types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO])
-async def check_for_unwanted(message: types.Message, msg_text, member, tg_member) -> bool:
-    if message.reply_to_message and message.reply_to_message.forward_from_chat and message.reply_to_message.forward_from_chat.id == config.groups.linked_channel:
-        # that's a reply to channel message (comment)
-        # remove any messages within N seconds after message posted
-        # exceptions: admins, users with high enough reputation points
-        if (member.reputation_points < int(config.spam.allow_comments_rep_threshold)
-                 and (message.date - message.reply_to_message.forward_date).seconds <= int(config.spam.remove_first_comments_interval)):
-            try:
-                await message.delete()
-                await utils.write_log(message.bot, f"Удалено сообщение: {message.text}\n\n<i>Автор:</i> {utils.user_mention(message.from_user)}", "🤖 Антибот")
-                return True
-            except exceptions.MessageCantBeDeleted:
-                pass
-
-    # check for nsfw, etc.
-    # Try to detect member gender
-    print(f"\nChecking {tg_member.user.first_name} ...")
-    member__gender = lru_cache.detect_gender(tg_member.user.first_name)
-
-    if member__gender == Gender.FEMALE and bool(config.nsfw.enabled):
-        # RECOGNIZED FEMALE, check for NSFW
-        print("Recognized FEMALE.")
-        # skip high rep members
-        if member.reputation_points > int(config.spam.allow_comments_rep_threshold__woman):
-            return False
-
-        # Check name for violations
-        name_valid = check_name_for_violations(message.from_user.full_name)
-
-        # Predict NSFW
-        # currently we don't include 'Pornography' for two reasons
-        # a) It's rare for ad bots to set pornography profile images
-        # b) It works not as accurate in a currently used model
-        nsfw_prediction = None
-        if name_valid:
-            profile_photos = await message.bot.get_user_profile_photos(user_id=message.from_user.id)
-
-            if not profile_photos.photos:
-                # no photos, not nsfw
-                return False
-
-            # Get the largest size of the most recent photo
-            file_id = profile_photos.photos[0][-1].file_id
-            img_file = await message.bot.get_file(file_id)
-
-            # Download file bytes
-            file_bytes = await message.bot.download_file(img_file.file_path)
-
-            # Make the image
-            image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
-            # image.save("test.jpg", "JPEG")
-
-            nsfw_prediction = nsfw_predict(np.asarray(image))
-            print("Prediction:", nsfw_prediction) # temp debug stuff
-        else:
-            print("Invalid name:", message.from_user.full_name)
-
-        if (not name_valid or (
-                # safe checks (allowed detections)
-                not (
-                    (float(nsfw_prediction["Normal"]) > float(config.nsfw.normal_prediction_threshold)
-                    or float(nsfw_prediction["Anime Picture"]) > float(config.nsfw.anime_prediction_threshold))
-                    and
-                    (
-                        float(nsfw_prediction["Enticing or Sensual"]) < float(config.nsfw.normal_comb_sensual_prediction_threshold)
-                        and
-                        float(nsfw_prediction["Pornography"]) < float(config.nsfw.normal_comb_pornography_prediction_threshold)
-                    )
-                )
-
-                # unsafe checks (disallowed detections)
-                and (
-                    # check this flags with AND condition (both should return True to be detected as NSFW
-                    (float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.comb_sensual_prediction_threshold)
-                     and float(nsfw_prediction["Pornography"]) > float(config.nsfw.comb_pornography_prediction_threshold))
-
-                    # separate detections
-                    or float(nsfw_prediction["Enticing or Sensual"]) > float(config.nsfw.sensual_prediction_threshold)
-                    or float(nsfw_prediction["Pornography"]) > float(config.nsfw.pornography_prediction_threshold)
-                    or float(nsfw_prediction["Hentai"]) > float(config.nsfw.hentai_prediction_threshold)
-                )
-            )):
-
-            log_msg = msg_text
-            log_msg += "\n\n<i>Автор:</i> " + utils.user_mention(message.from_user)
-
-            # Generate keyboard with some actions for detected spam
-            nsfw_keyboard = types.InlineKeyboardMarkup()
-
-            # it's nsfw + block user
-            nsfw_keyboard.add(types.InlineKeyboardButton(
-                text="❌ Это NSFW + заблокировать пользователя",
-                callback_data=f"nsfw_ban_{message.from_user.id}")
-            )
-
-            # not nsfw
-            nsfw_keyboard.add(types.InlineKeyboardButton(
-                text="❎ Это НЕ NSFW",
-                callback_data=f"nsfw_safe_{member.id}")
-            )
-
-            # send a message with a keyboard to log channel
-            await message.bot.send_message(
-                config.groups.logs,
-                utils.generate_log_message(log_msg, "🔞 NSFW"),
-                reply_markup=nsfw_keyboard)
-
-            # remove the message
-            await message.delete()
-            return True
-        else:
-            return False
-    else:
-        return False
-
-
-@dp.message_handler(is_owner = True, chat_id=config.groups.main, commands=["spam"], commands_prefix="!")
-async def on_spam(message: types.Message):
-    if not message.reply_to_message:
-        await message.reply("Чего ты от меня хочешь :3")
-        return
-
-    ### Retrieve member record from DB
-    member = await lru_cache.retrieve_or_create_member(message.reply_to_message.from_user.id)
-
-    # Retrieve tg member object
-    tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, message.reply_to_message.from_user.id)
-
-    # Define message text
-    msg_text = None
-    if message.reply_to_message.content_type == types.ContentType.TEXT:
-        msg_text = message.reply_to_message.text
-    elif message.reply_to_message.content_type in [types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO]:
-        msg_text = message.reply_to_message.caption
-
-    # Quit, if no message to check
-    if msg_text is None:
-        await message.reply("Нет текста - нет спама :3")
-        return
-
-    try:
-        log_msg = msg_text
-        log_msg += "\n\n<i>Автор:</i> " + utils.user_mention(message.reply_to_message.from_user)
-
-        # Create DB record on spam message
-        spam_rec = await Spam.objects.create(message=msg_text, is_spam=True, user_id=message.reply_to_message.from_user.id, chat_id=int(config.groups.main)) # assume is spam by default
-
-        # Generate keyboard with some actions for detected spam
-        spam_keyboard = types.InlineKeyboardMarkup()
-
-        # is spam + block user
-        spam_keyboard.add(types.InlineKeyboardButton(
-            text="❌ Это спам + заблокировать пользователя",
-            callback_data=f"spam_ban_{spam_rec.id}_{message.reply_to_message.from_user.id}")
-        )
-
-        # not a spam
-        spam_keyboard.add(types.InlineKeyboardButton(
-            text="❎ Это НЕ спам",
-            callback_data=f"spam_invert_{spam_rec.id}_{member.id}")
-        )
-
-        # test msg, remove from db
-        spam_keyboard.add(types.InlineKeyboardButton(
-            text="Убрать из БД, это тест",
-            callback_data=f"spam_test_{spam_rec.id}_{member.id}")
-        )
-
-        # send message with a keyboard to log channel
-        await message.bot.send_message(
-            config.groups.logs,
-            utils.generate_log_message(log_msg, "❌ АнтиСПАМ"),
-            reply_markup=spam_keyboard)
-
-        # remove marked message from chat afterwards
-        if not tg_member.is_chat_admin():
-            await message.reply_to_message.delete()
-
-        await message.reply(f"🫡 Сообщение помечено как спам.")
-    except ValueError:
-        await message.reply("O_o Мда")
-
-
-@dp.message_handler(chat_id=config.groups.main, content_types=["voice"])
-async def on_user_voice(message: types.Message):
-    if random.random() < 0.75: # 75% chance to react
-        ### Retrieve member record from DB
-        member = await lru_cache.retrieve_or_create_member(message.from_user)
-
-        await message.reply(random.choice(["фу! ФУ Я СКАЗАЛ, НЕЛЬЗЯ. БРОСЬ КАКУ. ПИШИ ТЕКСТОМ.", "Давай без резких движений! Положи телефон на пол ... и больше не записывай ГСки :3",
-                                           "ГСки - бич современного общества. Делай выводы, макарошка :3", "А вот в моё время люди писали текстом ...",
-                                           "ТЫ ПРИШЕЛ В ЭТОТ ЧАТ! Но ты пришел без уважения ...", "Сэр, вынужден сообщить вам, что общаться ГСками это признак отсутствия интеллекта.",
-                                           "ГСки бож ... выйди с чата, не позорься.", "Фу! ФУ Я СКАЗАЛ! Пиши текстом."]))
-
-        member.reputation_points -= 10 # every voice message removes some reputation points
-        await member.update()
-
-
-@dp.message_handler(chat_id=config.groups.main, content_types=['contact'])
-async def on_user_contact(message: types.Message):
-    ### Retrieve member
-    # member = await lru_cache.retrieve_or_create_member(message.from_user.id)
-    tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
-
-    # User is not allowed to post contact type messages
-    # exceptions: admins
-    if not tg_member.is_chat_admin():
-        await message.delete()
-
-
-media_content_types = [
-    ContentType.PHOTO,
-    ContentType.VIDEO,
-    ContentType.AUDIO,
-    ContentType.DOCUMENT,
-    ContentType.VOICE,
-    ContentType.VIDEO_NOTE,
+from config import config
+from filters import IsOwnerFilter, InMainGroups
+from db.models import Member, Spam
+from services import (
+    retrieve_or_create_member, retrieve_tgmember, detect_gender,
+    check_for_profanity_all, check_name_for_violations, Gender
+)
+from services.spam import predict as ruspam_predict
+from services.nsfw import classify_explicit_content as nsfw_predict
+from services.cache import (
+    queue_member_update, 
+    invalidate_member_cache,
+    is_trusted_user,
+    get_cached_nsfw_result,
+    cache_nsfw_result
+)
+from utils import (
+    get_string, _random, user_mention, write_log, 
+    generate_log_message, remove_prefix, get_message_text,
+    MemberStatus
+)
+
+router = Router(name="group_events")
+
+
+MEDIA_CONTENT_TYPES = {
+    ContentType.PHOTO, ContentType.VIDEO, ContentType.AUDIO,
+    ContentType.DOCUMENT, ContentType.VOICE, ContentType.VIDEO_NOTE,
     ContentType.ANIMATION
-]
-@dp.message_handler(chat_id=config.groups.main, content_types=media_content_types)
-async def on_user_media(message: types.Message):
-    ### Retrieve member
-    member = await lru_cache.retrieve_or_create_member(message.from_user.id)
-    tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
-
-    # User is not allowed to post media type messages, until he reaches required reputation points
-    # exceptions: admins
-    if not tg_member.is_chat_admin() and member.reputation_points < int(config.spam.allow_media_threshold):
-        await message.delete()
+}
 
 
-# old method (without nsfw detection)
-# @dp.message_handler(is_admin=False, chat_id=config.groups.main, content_types=[types.ContentType.TEXT, types.ContentType.PHOTO, types.ContentType.DOCUMENT, types.ContentType.VIDEO])
-# async def on_user_message_delete_woman(message: types.Message):
-#     if not(message.reply_to_message and message.reply_to_message.forward_from_chat and message.reply_to_message.forward_from_chat.id == config.groups.linked_channel):
-#         return
-#
-#     ### Retrieve member
-#     member = await lru_cache.retrieve_or_create_member(message.from_user.id)
-#     tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
-#
-#     # Try detect member gender
-#     member__gender = lru_cache.detect_gender(tg_member.user.first_name)
-#
-#     if member__gender == Gender.FEMALE and bool(config.spam.antiwomen):
-#         # RECOGNIZED FEMALE
-#         # Women accounts is not allowed to post messages, until they reach required reputation points
-#         # exceptions: admins
-#         if (not tg_member.is_chat_admin()
-#                 and member.reputation_points < int(config.spam.allow_comments_rep_threshold__woman)
-#                 and (message.date - message.reply_to_message.forward_date).seconds <= int(config.spam.women_remove_first_comments_interval)):
-#             await message.delete()
-#             await utils.write_log(message.bot, f"Удалено сообщение: {message.text}\n\n<i>Автор:</i> {utils.user_mention(message.from_user)}", "🤖 Антивумен")
-#     else:
-#         # OTHER GENDER (or unknown/ambiguous)
-#         # remove any messages within N seconds after message posted
-#         # exceptions: admins, users with high enough reputation points
-#         if (not tg_member.is_chat_admin()
-#                 and member.reputation_points < int(config.spam.allow_comments_rep_threshold)
-#                 and (message.date - message.reply_to_message.forward_date).seconds <= int(config.spam.remove_first_comments_interval)):
-#             try:
-#                 await message.delete()
-#                 await utils.write_log(message.bot, f"Удалено сообщение: {message.text}\n\n<i>Автор:</i> {utils.user_mention(message.from_user)}", "🤖 Антибот")
-#             except exceptions.MessageCantBeDeleted:
-#                 pass
+# ==========================================================================
+# COMMAND HANDLERS - MUST BE DEFINED BEFORE CATCH-ALL MESSAGE HANDLER
+# ==========================================================================
+
+# ========== FUN COMMANDS ==========
+
+@router.message(InMainGroups(), Command("бу", prefix="!/"))
+async def on_bu(message: Message) -> None:
+    """Fun command - bot gets 'scared'."""
+    await message.reply(_random("bu-responses"))
 
 
-@dp.message_handler(chat_id=config.groups.main, commands="бу", commands_prefix="!/")
-async def on_bu(message: types.Message):
-  ### Retrieve member record from DB
-  member = await lru_cache.retrieve_or_create_member(message.from_user.id)
+# ========== USER INFO COMMAND ==========
 
-
-
-  await message.reply(random.choice(["Бугага!", "Не пугай так!", "Боже ..", "Не мешай мне делать сложные компьютерные вычисления :3", "Хватит!",
-                                     "Ладно ...", "Бл я аж вздрогнул ...", "Та за шо :3", "Страшна вырубай",
-                                     "Не смешно :3", "Так и сердешный приступ можно словить!", "Сам ты б/у пон",
-                                     "Я чуть не крашнулся от страха!", "Ты чево творишь ...", "Пугать ботов? Вот это смелость!",
-                                     "АААААА! Ладно, шучу.", "Ты меня выключить хочешь??", "Я щас админов позову!",
-                                     "Не делай так больше, ладно?", "Пфф .. нашел чем пугать.", "Пойду перезапущусь от страха.",
-                                     "Шутки такие себе, если честно...", "БУквально испугался :3", "Ой всё ...", "Ну хоть предупреждай, нечестно же!",
-                                     "ОМГ 😤", "Страшно, аж проц вспотел.", "Бу! А теперь ты испугайся :3", "Ладно, я испугался, но я записал это в лог.",
-                                     "И что дальше?", "Мда ..", "Там где ты пугать учился, я там преподавал.", "🤖 Бип буп, буп бип."]))
-
-
-# @dp.message_handler(chat_id=config.groups.main, commands=["конфеты", "sweets", "сладкое", "хэлоуин", "сладости"], commands_prefix="!/")
-# async def on_sweets(message: types.Message):
-#     ### Retrieve member record from DB
-#     try:
-#         # retrieve existing record
-#         member = await Member.objects.get(user_id=message.from_user.id)
-#     except ormar.NoMatch:
-#         return
-#
-#     if random.random() < 0.05:  # 5% chance to get golden ticket
-#         await message.reply("Поздравляю, в твоей шоколадке оказался <u>золотой билет</u> 🎫")
-#         member.halloween_golden_tickets += 1
-#         await member.update()
-#     else:
-#         if random.random() < 0.25: # 25% to get sweets
-#             sweets_random = random.randrange(1, 100)
-#             await message.reply(f"На тебе 🍬 <i>({sweets_random}шт.)</i>")
-#             member.halloween_sweets += sweets_random
-#             await member.update()
-#         else:
-#             if random.random() < 0.5: # 50% to get anything sweet
-#                 await message.reply(random.choice(["Держи шоколадку 🍫", "Печеньку, сэр 🍪", "Вотб тебе пирог 🥧", "Вотб 🍭"]))
-#                 member.halloween_sweets += 1
-#                 await member.update()
-#
-#             else:
-#                 if random.random() < 0.01: # 1% chance to get a pumpkin
-#                     await message.reply("🎃 Вотб тебе тыква!")
-#                     member.halloween_sweets += 100 # 1 pumpkin = 100 sweets
-#                     await member.update()
-#
-#                 else:
-#                     # no sweets this time :(
-#                     await message.reply(
-#                         random.choice(["Хватит с тебя, сладкоежка :3", "Гадости тебе, а не сладости пон :3\n<i>пхпхпп</i>",
-#                                        "Сладкое вредно для зубов!", "Хватит жрать сладости пон :3",
-#                                        "Будешь много кушатб сладостей, код не будет компилиться пхпхпх :3"]))
-
-@dp.message_handler(chat_id=config.groups.main, commands=["me", "я", "info", "инфо", "lvl", "лвл", "whoami", "neofetch"], commands_prefix="!/")
-async def on_me(message: types.Message):
+@router.message(
+    InMainGroups(),
+    Command("me", "я", "info", "инфо", "lvl", "лвл", "whoami", "neofetch", prefix="!/")
+)
+async def on_me(message: Message) -> None:
+    """Show user info and reputation."""
     if message.reply_to_message and not message.reply_to_message.is_automatic_forward:
         user_id = message.reply_to_message.from_user.id
     else:
         user_id = message.from_user.id
 
-    ### Retrieve member
-    member = await lru_cache.retrieve_or_create_member(user_id)
-    tg_member = await lru_cache.retrieve_tgmember(message.bot, message.chat.id, user_id)
+    member = await retrieve_or_create_member(user_id)
+    tg_member = await retrieve_tgmember(message.bot, message.chat.id, user_id)
 
-    ### Check member name for profanity and censure, if required
-    tg_member__full_name: str = tg_member.user.full_name.strip()
-    _del = False
-    _word = None
-    _del, _word = utils.check_for_profanity_all(tg_member__full_name)
+    # Check name for profanity
+    full_name = tg_member.user.full_name.strip()
+    is_profanity, bad_word = check_for_profanity_all(full_name)
+    if is_profanity and bad_word:
+        full_name = full_name.replace(bad_word, '#' * len(bad_word))
 
-    if _del:
-        tg_member__full_name = tg_member__full_name.replace(_word, '#'*len(_word))
+    # Detect gender
+    member_gender = detect_gender(tg_member.user.first_name)
 
-    # Try detect member gender
-    member__gender = lru_cache.detect_gender(tg_member.user.first_name)
+    # Determine level and avatar
+    is_creator = tg_member.status == MemberStatus.CREATOR
+    is_admin = tg_member.status in MemberStatus.admin_statuses()
 
-    member_level = None
-    if isinstance(tg_member, (ChatMemberAdministrator, ChatMemberOwner)) and tg_member.is_chat_creator():
-        # owner
+    if is_creator:
         member_level = "👑 Король"
         member_rep = "⭐️⭐️⭐️⭐️⭐️ Пять звёзд розыска"
         member_avatar = "✖️"
-    elif isinstance(tg_member, (ChatMemberAdministrator, ChatMemberOwner)) and tg_member.can_restrict_members:
-        # admin (actual)
-        # member_level = random.choice(["🎃 Главная тыковка чата", "🎃 Безголовый всадник", "🎃 Повелитель ночи", "🎃 Тыквенный властелин"])
+    elif is_admin:
         member_level = random.choice(["Полицейский", "S.W.A.T.", "Агент ФБР", "Мститель", "Модератор", "Длань правосудия"])
         member_rep = "🛡 "
-        member_avatar = random.choice(['👮','👮‍♂️','👮‍♀️','🚔','⚖️','🤖','😼','⚔️'])
+        member_avatar = random.choice(['👮', '👮‍♂️', '👮‍♀️', '🚔', '⚖️', '🤖', '😼', '⚔️'])
     else:
         member_rep = ""
 
@@ -600,43 +119,16 @@ async def on_me(message: types.Message):
         else:
             member_level = "🌟 Легенда"
 
-        if member__gender == Gender.FEMALE:
-            member_avatar = random.choice(['👩‍🦰', '👩', '👱‍♀️', '👧', '👩‍🦱', '👩‍🦱', '🤵‍♀️', '👩‍🦳'])
-        elif member__gender == Gender.MALE:
+        if member_gender == Gender.FEMALE:
+            member_avatar = random.choice(['👩‍🦰', '👩', '👱‍♀️', '👧', '👩‍🦱', '🤵‍♀️', '👩‍🦳'])
+        elif member_gender == Gender.MALE:
             member_avatar = random.choice(['👨‍🦳', '🧔', '🧑', '👨', '🧔‍♂️', '🧑‍🦰', '🧑‍🦱', '👨‍🦰', '👦', '🤵‍♂️'])
         else:
             member_avatar = random.choice(['🤖', '😼', '👻', '😺'])
 
-        # if member.messages_count < 100:
-        #     member_level = random.choice(["🧛 Неизвестный вампир", "🎃 Неизвестная тыква", "🐺 Безымянный оборотень"])
-        # elif 100 <= member.messages_count < 500:
-        #     member_level = "🌚 Восходящая луна"
-        # elif 500 <= member.messages_count < 1000:
-        #     member_level = "🎃 Тыковка"
-        # elif 1000 <= member.messages_count < 2000:
-        #     member_level = "👻 Ветеран искусства запугивания"
-        # else:
-        #     member_level = "⭐️🎃 Тыквенный мастер"
-
-        # if member.reputation_points < -2000:
-        #     member_rep = "⭐️⭐️⭐️⭐️⭐️ Пять звёзд розыска"
-        # elif -2000 <= member.reputation_points < -1000:
-        #     member_rep = "☠️ Особо опасный"
-        # elif -1000 <= member.reputation_points < -500:
-        #     member_rep = "💀 Тёмная личность"
-        # elif -500 <= member.reputation_points < 0:
-        #     member_rep = "👿 Плохая печенька"
-        # elif 0 <= member.reputation_points < 100:
-        #     member_rep = "😐 Нейтральный"
-        # elif 100 <= member.reputation_points < 500:
-        #     member_rep = "🙂 Хорошая печенька"
-        # elif 500 <= member.reputation_points < 1000:
-        #     member_rep = "😎 Звезда чата"
-        # else:
-        #     member_rep = "😇 Добрейший добряк"
-
+    # Reputation label
     member_rep_label = ""
-    if not tg_member.is_chat_creator():
+    if not is_creator:
         if member.reputation_points < -2000:
             member_rep_label = "⭐️⭐️⭐️⭐️⭐️ пять звёзд розыска"
         elif -2000 <= member.reputation_points < -1000:
@@ -654,137 +146,441 @@ async def on_me(message: types.Message):
         else:
             member_rep_label = "великодушный"
 
-    answer = f"{member_avatar} <b>{tg_member__full_name}</b>"
-    # answer += f"\n\n<b>Репутация: </b>{member_level} <i>(<tg-spoiler>{member.messages_count}</tg-spoiler>)</i>"
-    # answer += f"\n<b>Репутация: </b>{member_level} <i> • 『{member_rep} (<tg-spoiler>{member.reputation_points}</tg-spoiler>)』</i>"
+    answer = f"{member_avatar} <b>{full_name}</b>"
     answer += f"\n<b>Репутация: </b>{member_level} <i> 『{member_rep}{member_rep_label} (<tg-spoiler>{member.reputation_points}</tg-spoiler>)』</i>"
 
     await message.reply(answer)
 
 
-@dp.message_handler(is_owner = True, chat_id=config.groups.main, commands=["setlvl"], commands_prefix="!")
-async def on_setlvl(message: types.Message):
+# ========== OWNER COMMANDS ==========
+
+@router.message(
+    InMainGroups(),
+    IsOwnerFilter(),
+    Command("spam", prefix="!")
+)
+async def on_spam(message: Message) -> None:
+    """Mark a message as spam (owner only)."""
     if not message.reply_to_message:
         await message.reply("Чего ты от меня хочешь :3")
         return
 
-    ### Retrieve member record from DB
-    member = await lru_cache.retrieve_or_create_member(message.reply_to_message.from_user.id)
+    member = await retrieve_or_create_member(message.reply_to_message.from_user.id)
+    tg_member = await retrieve_tgmember(message.bot, message.chat.id, message.reply_to_message.from_user.id)
+
+    # Get message text
+    msg_text = None
+    if message.reply_to_message.content_type == ContentType.TEXT:
+        msg_text = message.reply_to_message.text
+    elif message.reply_to_message.content_type in (ContentType.PHOTO, ContentType.DOCUMENT, ContentType.VIDEO):
+        msg_text = message.reply_to_message.caption
+
+    if msg_text is None:
+        await message.reply("Нет текста - нет спама :3")
+        return
 
     try:
-        if member.messages_count > 100000:
+        log_msg = msg_text
+        log_msg += f"\n\n<i>Автор:</i> {user_mention(message.reply_to_message.from_user)}"
+
+        # Create DB record
+        spam_rec = await Spam.objects.create(
+            message=msg_text,
+            is_spam=True,
+            user_id=message.reply_to_message.from_user.id,
+            chat_id=message.chat.id
+        )
+
+        # Generate keyboard
+        spam_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="❌ Это спам + заблокировать пользователя",
+                callback_data=f"spam_ban_{spam_rec.id}_{message.reply_to_message.from_user.id}"
+            )],
+            [InlineKeyboardButton(
+                text="❎ Это НЕ спам",
+                callback_data=f"spam_invert_{spam_rec.id}_{member.id}"
+            )],
+            [InlineKeyboardButton(
+                text="Убрать из БД, это тест",
+                callback_data=f"spam_test_{spam_rec.id}_{member.id}"
+            )]
+        ])
+
+        await message.bot.send_message(
+            config.groups.logs,
+            generate_log_message(log_msg, "❌ АнтиСПАМ", message.chat.title),
+            reply_markup=spam_keyboard
+        )
+
+        # Remove message if not admin
+        if tg_member.status not in MemberStatus.admin_statuses():
+            await message.reply_to_message.delete()
+
+        await message.reply("🫡 Сообщение помечено как спам.")
+    except Exception:
+        await message.reply("O_o Мда")
+
+
+@router.message(InMainGroups(), IsOwnerFilter(), Command("setlvl", prefix="!"))
+async def on_setlvl(message: Message) -> None:
+    """Set user level (owner only)."""
+    if not message.reply_to_message:
+        await message.reply("Чего ты от меня хочешь :3")
+        return
+
+    member = await retrieve_or_create_member(message.reply_to_message.from_user.id)
+
+    try:
+        value = abs(int(remove_prefix(message.text, "!setlvl")))
+        if value > 100000:
             await message.reply("Что куришь, другалёк? :3")
         else:
-            member.messages_count = abs(int(utils.remove_prefix(message.text, "!setlvl")))
-            member.reputation_points += abs(int(utils.remove_prefix(message.text, "!setlvl")))
-
+            member.messages_count = value
+            member.reputation_points += value
             await member.update()
             await message.reply("Ладно :3")
     except ValueError:
         await message.reply("O_o Мда")
 
 
-@dp.message_handler(is_owner = True, chat_id=config.groups.main, commands=["reward"], commands_prefix="!")
-async def on_reward(message: types.Message):
+@router.message(InMainGroups(), IsOwnerFilter(), Command("reward", prefix="!"))
+async def on_reward(message: Message) -> None:
+    """Reward reputation points (owner only)."""
     if not message.reply_to_message:
         await message.reply("Чего ты от меня хочешь :3")
         return
-
-    points = abs(int(utils.remove_prefix(message.text, "!reward")))
-
-    ### Retrieve member record from DB
-    member = await lru_cache.retrieve_or_create_member(message.reply_to_message.from_user.id)
 
     try:
-        if points > 100_000:
-            await message.reply("Нетб :3")
-        else:
-            member.reputation_points += points
-
-            await member.update()
-            # await message.reply(f"🎃 <b>Слушаюсь, повелитель!</b>\nУчастник чата благословлён вашей милостью, ему начислено <i><b>{points} очков репутации.</b></i>")
-            await message.reply(f"➕ Участник чата получает <i><b>{points}</b> очков репутации.</i>")
+        points = abs(int(remove_prefix(message.text, "!reward")))
     except ValueError:
         await message.reply("O_o Мда")
+        return
+
+    member = await retrieve_or_create_member(message.reply_to_message.from_user.id)
+
+    if points > 100_000:
+        await message.reply("Нетб :3")
+    else:
+        member.reputation_points += points
+        await member.update()
+        await message.reply(f"➕ Участник чата получает <i><b>{points}</b> очков репутации.</i>")
 
 
-@dp.message_handler(is_owner = True, chat_id=config.groups.main, commands=["rreset"], commands_prefix="!")
-async def on_rep_reset(message: types.Message):
+@router.message(InMainGroups(), IsOwnerFilter(), Command("rreset", prefix="!"))
+async def on_rep_reset(message: Message) -> None:
+    """Reset user reputation (owner only)."""
     if not message.reply_to_message:
         await message.reply("Чего ты от меня хочешь :3")
         return
 
-    ### Retrieve member record from DB
-    member = await lru_cache.retrieve_or_create_member(message.reply_to_message.from_user.id)
+    member = await retrieve_or_create_member(message.reply_to_message.from_user.id)
 
     try:
         member.reputation_points = member.messages_count
-
         await member.update()
-        await message.reply(f"☯ Уровень репутации участника <i><b>сброшен</b>.</i>")
-    except ValueError:
+        await message.reply("☯ Уровень репутации участника <i><b>сброшен</b>.</i>")
+    except Exception:
         await message.reply("O_o Мда")
 
 
-@dp.message_handler(is_owner = True, chat_id=config.groups.main, commands=["punish"], commands_prefix="!")
-async def on_punish(message: types.Message):
+@router.message(InMainGroups(), IsOwnerFilter(), Command("punish", prefix="!"))
+async def on_punish(message: Message) -> None:
+    """Punish user - remove reputation (owner only)."""
     if not message.reply_to_message:
         await message.reply("Чего ты от меня хочешь :3")
         return
 
-    points = abs(int(utils.remove_prefix(message.text, "!punish")))
-
-    ### Retrieve member record from DB
-    member = await lru_cache.retrieve_or_create_member(message.reply_to_message.from_user.id)
-
     try:
-        if points > 100_000:
-            await message.reply("Нетб :3")
-        else:
-            member.reputation_points -= points
-
-            await member.update()
-            await message.reply(f"➖ Участник чата теряет <i><b>{points}</b> очков репутации.</i>")
+        points = abs(int(remove_prefix(message.text, "!punish")))
     except ValueError:
         await message.reply("O_o Мда")
+        return
 
-'''async def on_user_message(message: types.Message):
-  """
-  Removes messages, if they contain black listed words.
+    member = await retrieve_or_create_member(message.reply_to_message.from_user.id)
 
-  :param message: Message in group
-  """
-  _del = False
-  _word = None
+    if points > 100_000:
+        await message.reply("Нетб :3")
+    else:
+        member.reputation_points -= points
+        await member.update()
+        await message.reply(f"➖ Участник чата теряет <i><b>{points}</b> очков репутации.</i>")
 
-  for w in blacklist:
-    if w in message.text:
-      _del = True
-      _word = w
-      break
 
-  _result = blacklist_regexp.search(message.text)
+# ==========================================================================
+# SERVICE MESSAGE HANDLERS
+# ==========================================================================
 
-  if _result:
-    _word = _result.group(0)
-    _del = True
+# ========== USER JOIN ==========
 
-  if _del:
+@router.message(InMainGroups(), F.content_type == ContentType.NEW_CHAT_MEMBERS)
+async def on_user_join(message: Message) -> None:
+    """Remove 'user joined' service message."""
     await message.delete()
+    await write_log(
+        message.bot,
+        f"Присоединился пользователь {user_mention(message.from_user)}",
+        "➕ Новый участник",
+        message.chat.title
+    )
 
-    log_msg = message.text
-    if _word:
-      log_msg = log_msg.replace(_word, '<u><b>'+_word+'</b></u>')
-    log_msg += "\n\n<i>Автор:</i> "+message.from_user.full_name+" ("+message.from_user.mention+")"
 
-    await utils.write_log(message.bot, log_msg, "Антимат")'''
+# ========== VOICE MESSAGES ==========
 
-'''@dp.message_handler(chat_id=config.groups.main)
-async def do_ro_filter_messages(message: types.Message):
-  user = await message.bot.get_chat_member(config.groups.main, message.from_user.id)
+@router.message(InMainGroups(), F.content_type == ContentType.VOICE)
+async def on_user_voice(message: Message) -> None:
+    """React to voice messages (discourage them)."""
+    if random.random() < 0.75:  # 75% chance
+        member = await retrieve_or_create_member(message.from_user.id)
 
-  # @TODO: small optimization can be done, by muting not muted members for a minute (or so)
-  # but in this case there may be problems with restrictions (after restriction period ended, telegram returns
-  # back the default chat restrictions, but not users previous restrictions)
-  if builtins.RO and not user.is_chat_admin():
-    await message.bot.delete_message(config.groups.main, message.message_id)'''
+        await message.reply(_random("voice-responses"))
+
+        member.reputation_points -= 10
+        await member.update()
+
+
+# ========== CONTACT MESSAGES ==========
+
+@router.message(InMainGroups(), F.content_type == ContentType.CONTACT)
+async def on_user_contact(message: Message) -> None:
+    """Delete contact messages from non-admins."""
+    tg_member = await retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
+
+    if tg_member.status not in MemberStatus.admin_statuses():
+        await message.delete()
+
+
+# ========== MEDIA RESTRICTION ==========
+
+@router.message(InMainGroups(), F.content_type.in_(MEDIA_CONTENT_TYPES))
+async def on_user_media(message: Message) -> None:
+    """Delete media from low-rep users."""
+    member = await retrieve_or_create_member(message.from_user.id)
+    tg_member = await retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
+
+    if (tg_member.status not in MemberStatus.admin_statuses() and
+        member.reputation_points < config.spam.allow_media_threshold):
+        await message.delete()
+
+
+# ==========================================================================
+# CATCH-ALL MESSAGE HANDLER - MUST BE LAST!
+# ==========================================================================
+
+@router.message(
+    InMainGroups(),
+    F.content_type.in_({ContentType.TEXT, ContentType.PHOTO, ContentType.DOCUMENT, ContentType.VIDEO})
+)
+@router.edited_message(
+    InMainGroups(),
+    F.content_type.in_({ContentType.TEXT, ContentType.PHOTO, ContentType.DOCUMENT, ContentType.VIDEO})
+)
+async def on_user_message(message: Message) -> None:
+    """
+    Process every user message - profanity, spam, reputation.
+    
+    NOTE: This handler MUST be defined LAST in this file!
+    It catches all text messages, so command handlers must come before it.
+    """
+    # Handle auto-forward from channel (bot comments)
+    if message.is_automatic_forward:
+        await message.reply(_random("bot-comments"))
+        return
+
+    # Retrieve member from DB
+    member = await retrieve_or_create_member(message.from_user.id)
+
+    # Retrieve Telegram member object
+    tg_member = await retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
+
+    # Skip admins (using enum for type safety)
+    if tg_member.status in MemberStatus.admin_statuses():
+        return
+
+    # Get message text using helper
+    msg_text = get_message_text(message)
+
+    # Quit if no text to check
+    if msg_text is None:
+        return
+
+    user_id = message.from_user.id
+
+    # CHECK FOR PROFANITY
+    is_profanity, bad_word = check_for_profanity_all(msg_text)
+
+    if is_profanity:
+        await message.delete()
+
+        # Queue member violations update (batch processing)
+        await queue_member_update(
+            user_id,
+            violations_count_profanity=1,
+            reputation_points=-20
+        )
+
+        # Log
+        log_msg = msg_text
+        if bad_word:
+            log_msg = log_msg.replace(bad_word, f'<u><b>{bad_word}</b></u>')
+        log_msg += f"\n\n<i>Автор:</i> {user_mention(message.from_user)}"
+        await write_log(message.bot, log_msg, "🤬 Антимат", message.chat.title)
+    else:
+        # NO PROFANITY - CHECK FOR SPAM
+        # Skip expensive ML check for trusted users
+        should_check_spam = not is_trusted_user(member) and (
+            member.messages_count < config.spam.member_messages_threshold or 
+            member.reputation_points < config.spam.member_reputation_threshold
+        )
+        
+        if should_check_spam and ruspam_predict(msg_text):
+            # SPAM DETECTED
+            await message.delete()
+
+            await queue_member_update(
+                user_id,
+                violations_count_spam=1,
+                reputation_points=-5
+            )
+        else:
+            # No violations - check for unwanted content (NSFW, etc.)
+            handled = await check_for_unwanted(message, msg_text, member, tg_member)
+
+            if not handled:
+                # Clean message - queue reputation increase
+                await queue_member_update(
+                    user_id,
+                    messages_count=1,
+                    reputation_points=1
+                )
+
+
+# ==========================================================================
+# HELPER FUNCTIONS
+# ==========================================================================
+
+async def check_for_unwanted(message: Message, msg_text: str, member: Member, tg_member) -> bool:
+    """Check for unwanted content (first comments, NSFW profiles)."""
+    # Check if this is a reply to channel message (comment)
+    # Using O(1) set lookup instead of list lookup
+    if (message.reply_to_message and 
+        message.reply_to_message.forward_from_chat and 
+        config.groups.is_linked_channel(message.reply_to_message.forward_from_chat.id)):
+        
+        # Remove early comments from low-rep users
+        threshold = config.spam.allow_comments_rep_threshold
+        interval = config.spam.remove_first_comments_interval
+        
+        if (member.reputation_points < threshold and
+            (message.date - message.reply_to_message.forward_date).seconds <= interval):
+            try:
+                await message.delete()
+                await write_log(
+                    message.bot,
+                    f"Удалено сообщение: {message.text}\n\n<i>Автор:</i> {user_mention(message.from_user)}",
+                    "🤖 Антибот",
+                    message.chat.title
+                )
+                return True
+            except TelegramBadRequest:
+                pass
+
+    # Check for NSFW (only for female profiles)
+    member_gender = detect_gender(tg_member.user.first_name)
+
+    if member_gender == Gender.FEMALE and config.nsfw.enabled:
+        # Skip high-rep members
+        if member.reputation_points > config.spam.allow_comments_rep_threshold__woman:
+            return False
+
+        # Check name for violations
+        name_valid = check_name_for_violations(message.from_user.full_name)
+
+        nsfw_prediction = None
+        if name_valid:
+            # Get profile photos
+            profile_photos = await message.bot.get_user_profile_photos(user_id=message.from_user.id)
+
+            if not profile_photos.photos:
+                return False
+
+            # Get largest size of most recent photo
+            photo = profile_photos.photos[0][-1]
+            file_unique_id = photo.file_unique_id
+            
+            # Check NSFW cache first (avoid expensive re-processing)
+            cached_result = get_cached_nsfw_result(message.from_user.id, file_unique_id)
+            if cached_result is not None:
+                if not cached_result:  # cached as safe
+                    return False
+                # cached as NSFW - continue to handle
+            else:
+                # Not cached - perform NSFW check
+                file_id = photo.file_id
+                img_file = await message.bot.get_file(file_id)
+
+                # Download file bytes
+                file_bytes = await message.bot.download_file(img_file.file_path)
+
+                # Make image
+                image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
+                nsfw_prediction = nsfw_predict(np.asarray(image))
+                
+                # Cache the result
+                is_nsfw = is_nsfw_detected(nsfw_prediction) if nsfw_prediction else False
+                cache_nsfw_result(message.from_user.id, file_unique_id, is_nsfw)
+                
+                if not is_nsfw:
+                    return False
+
+        # Check NSFW thresholds
+        if (not name_valid or (nsfw_prediction and is_nsfw_detected(nsfw_prediction)) or
+            (cached_result is True)):  # Also handle cached NSFW result
+            log_msg = msg_text
+            log_msg += f"\n\n<i>Автор:</i> {user_mention(message.from_user)}"
+
+            # Generate keyboard
+            nsfw_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="❌ Это NSFW + заблокировать пользователя",
+                    callback_data=f"nsfw_ban_{message.from_user.id}_{message.chat.id}"
+                )],
+                [InlineKeyboardButton(
+                    text="❎ Это НЕ NSFW",
+                    callback_data=f"nsfw_safe_{member.id}"
+                )]
+            ])
+
+            await message.bot.send_message(
+                config.groups.logs,
+                generate_log_message(log_msg, "🔞 NSFW", message.chat.title),
+                reply_markup=nsfw_keyboard
+            )
+
+            await message.delete()
+            return True
+
+    return False
+
+
+def is_nsfw_detected(prediction: dict) -> bool:
+    """Check if NSFW is detected based on prediction thresholds."""
+    # Safe checks (allowed)
+    is_safe = (
+        (float(prediction["Normal"]) > config.nsfw.normal_prediction_threshold or
+         float(prediction["Anime Picture"]) > config.nsfw.anime_prediction_threshold)
+        and
+        (float(prediction["Enticing or Sensual"]) < config.nsfw.normal_comb_sensual_prediction_threshold
+         and float(prediction["Pornography"]) < config.nsfw.normal_comb_pornography_prediction_threshold)
+    )
+
+    # Unsafe checks (disallowed)
+    is_unsafe = (
+        (float(prediction["Enticing or Sensual"]) > config.nsfw.comb_sensual_prediction_threshold
+         and float(prediction["Pornography"]) > config.nsfw.comb_pornography_prediction_threshold)
+        or float(prediction["Enticing or Sensual"]) > config.nsfw.sensual_prediction_threshold
+        or float(prediction["Pornography"]) > config.nsfw.pornography_prediction_threshold
+        or float(prediction["Hentai"]) > config.nsfw.hentai_prediction_threshold
+    )
+
+    return not is_safe and is_unsafe

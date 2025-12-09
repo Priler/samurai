@@ -1,25 +1,41 @@
-#aiogram=2.14.3
-aiogram==2.25.2
-asyncio==3.4.3
-aioschedule==0.5.2
-psutil==6.0.0
-easydict
-python-dotenv
-cachetools
+# Aiogram 3.x
+aiogram>=3.4.0
 
-uvloop==0.20.0; sys_platform != 'win32'
-ujson==5.10.0
-aiohttp[speedups]==3.8.6
+# Async
+asyncio>=3.4.3
+aioschedule>=0.5.2
+aiohttp>=3.9.0
 
-ormar
-aiosqlite
-aiomysql
-pymysql
+# System
+psutil>=6.0.0
+python-dotenv>=1.0.0
 
-torch
-transformers
-numpy
+# Data structures
+cachetools>=5.0.0
+pydantic>=2.0.0
 
-pillow
-# gradio
-hf_xet
+# Internationalization (Fluent)
+fluent-compiler>=1.0
+
+# Speed optimizations (optional)
+uvloop>=0.20.0; sys_platform != 'win32'
+ujson>=5.10.0
+
+# Database (Ormar ORM)
+ormar>=0.20.0
+databases>=0.7.0
+aiosqlite>=0.19.0
+sqlalchemy>=1.4.42,<2.0.0
+
+# Optional: MySQL support
+# aiomysql
+# pymysql
+
+# ML models (optional - for spam/nsfw detection)
+torch>=2.0.0
+transformers>=4.30.0
+numpy>=1.24.0
+pillow>=10.0.0
+
+# HuggingFace (for model downloads)
+# hf_xet

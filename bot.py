@@ -1,24 +1,167 @@
-from aiogram import executor
-from dispatcher import dp
-import handlers
-import announcements
+"""
+Samurai Bot - Main entry point.
+
+A Telegram group moderation bot with:
+- Anti-profanity (Russian/English)
+- Anti-spam (ML-based)
+- NSFW profile detection (ML-based)
+- Reputation system
+- Report system
+- Scheduled announcements
+"""
 import asyncio
-import os
+import logging
+import signal
+import sys
+from contextlib import suppress
 
-from db import ormar_config
+from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+
+from config import config
+from db import init_db, close_db
+from handlers import register_all_handlers
+from middlewares import register_all_middlewares
+from services.announcements import setup_announcements, run_scheduler
+from services.healthcheck import start_health_server, stop_health_server, get_health_server
+from services.cache import start_batch_flush_task, stop_batch_flush_task, flush_member_updates
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger(__name__)
 
 
-async def on_startup(dp):
-    # connect (all dbs except sqlite require connection)
-    if ormar_config.database.is_connected:
-        return
-    await ormar_config.database.connect()
+async def on_startup(bot: Bot) -> None:
+    """Startup hook."""
+    logger.info("Bot starting up...")
+
+    # Initialize database
+    await init_db()
+    logger.info("Database connected")
+
+    # Start batch member update flush task (every 30 seconds)
+    start_batch_flush_task(interval=30)
+    logger.info("Batch flush task started")
+
+    # Setup announcements
+    await setup_announcements(bot)
+    logger.info("Announcements scheduled")
+
+    # Set health check to ready
+    if config.healthcheck.enabled:
+        get_health_server().set_ready(True)
+
+    logger.info(f"Bot version: {config.bot.version} ({config.bot.version_codename})")
 
 
-if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    loop.create_task(announcements.scheduler())
-    executor.start_polling(dp, skip_updates=True, on_startup=on_startup)
+async def on_shutdown(bot: Bot) -> None:
+    """Shutdown hook."""
+    logger.info("Bot shutting down...")
 
-    # disconnect from database
-    ormar_config.database.disconnect()
+    # Set health check to not ready
+    if config.healthcheck.enabled:
+        get_health_server().set_ready(False)
+
+    # Stop batch flush task and flush remaining updates
+    stop_batch_flush_task()
+    flushed = await flush_member_updates()
+    logger.info(f"Flushed {flushed} pending member updates")
+
+    # Close database
+    await close_db()
+    logger.info("Database disconnected")
+
+
+async def main() -> None:
+    """Main function."""
+    # Check token
+    if not config.bot.token.get_secret_value():
+        logger.error("No bot token provided")
+        sys.exit(1)
+
+    # Start health check server
+    if config.healthcheck.enabled:
+        await start_health_server(
+            host=config.healthcheck.host,
+            port=config.healthcheck.port
+        )
+
+    # Initialize bot and dispatcher
+    bot = Bot(
+        token=config.bot.token.get_secret_value(),
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+    )
+    dp = Dispatcher()
+
+    # Register handlers
+    register_all_handlers(dp)
+
+    # Register middlewares
+    register_all_middlewares(
+        dp,
+        default_locale=config.locale.default,
+        enable_throttling=config.throttling.enabled,
+        throttle_rate=config.throttling.rate_limit,
+        throttle_max_messages=config.throttling.max_messages,
+        throttle_time_window=config.throttling.time_window
+    )
+
+    # Setup startup/shutdown hooks
+    dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
+
+    # Create stop event for graceful shutdown
+    stop_event = asyncio.Event()
+
+    def signal_handler() -> None:
+        logger.info("Received shutdown signal")
+        stop_event.set()
+
+    # Setup signal handlers
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        with suppress(NotImplementedError):
+            loop.add_signal_handler(sig, signal_handler)
+
+    # Start scheduler task
+    scheduler_task = asyncio.create_task(run_scheduler())
+
+    # Start polling
+    polling_task = asyncio.create_task(
+        dp.start_polling(bot, skip_updates=True)
+    )
+
+    logger.info("Bot started")
+
+    # Wait for stop signal
+    await stop_event.wait()
+
+    # Cancel tasks
+    polling_task.cancel()
+    scheduler_task.cancel()
+
+    with suppress(asyncio.CancelledError):
+        await polling_task
+        await scheduler_task
+
+    # Stop dispatcher
+    await dp.stop_polling()
+
+    # Stop health check server
+    if config.healthcheck.enabled:
+        await stop_health_server()
+
+    # Close bot session
+    await bot.session.close()
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user")
