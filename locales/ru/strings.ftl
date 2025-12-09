@@ -266,3 +266,30 @@ rep-label-good = хороший
 rep-label-very-good = очень хороший
 rep-label-generous = великодушный
 rep-title = Репутация
+
+# Member levels
+level-king = 👑 Король
+level-noname = 🥷 Ноунейм
+level-newbie = 🌚 Новичок
+level-experienced = 😎 Опытный
+level-professional = 🤵 Профессионал
+level-veteran = 😈 Ветеран
+level-master = ⭐️ Мастер
+level-legend = 🌟 Легенда
+
+# Admin roles (random)
+admin-roles =
+    Полицейский
+    ---
+    S.W.A.T.
+    ---
+    Агент ФБР
+    ---
+    Мститель
+    ---
+    Модератор
+    ---
+    Длань правосудия
+
+# Creator rep label
+rep-creator = ⭐️⭐️⭐️⭐️⭐️ Пять звёзд розыска

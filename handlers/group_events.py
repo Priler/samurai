@@ -97,30 +97,30 @@ async def on_me(message: Message) -> None:
     is_admin = tg_member.status in MemberStatus.admin_statuses()
 
     if is_creator:
-        member_level = "👑 Король"
-        member_rep = "⭐️⭐️⭐️⭐️⭐️ Пять звёзд розыска"
+        member_level = get_string("level-king")
+        member_rep = get_string("rep-creator")
         member_avatar = "✖️"
     elif is_admin:
-        member_level = random.choice(["Полицейский", "S.W.A.T.", "Агент ФБР", "Мститель", "Модератор", "Длань правосудия"])
+        member_level = _random("admin-roles")
         member_rep = "🛡 "
         member_avatar = random.choice(['👮', '👮‍♂️', '👮‍♀️', '🚔', '⚖️', '🤖', '😼', '⚔️'])
     else:
         member_rep = ""
 
         if member.messages_count < 100:
-            member_level = "🥷 Ноунейм"
+            member_level = get_string("level-noname")
         elif 100 <= member.messages_count < 500:
-            member_level = "🌚 Новичок"
+            member_level = get_string("level-newbie")
         elif 500 <= member.messages_count < 1000:
-            member_level = "😎 Опытный"
+            member_level = get_string("level-experienced")
         elif 1000 <= member.messages_count < 2000:
-            member_level = "🤵 Профессионал"
+            member_level = get_string("level-professional")
         elif 2000 <= member.messages_count < 3000:
-            member_level = "😈 Ветеран"
+            member_level = get_string("level-veteran")
         elif 3000 <= member.messages_count < 5000:
-            member_level = "⭐️ Мастер"
+            member_level = get_string("level-master")
         else:
-            member_level = "🌟 Легенда"
+            member_level = get_string("level-legend")
 
         if member_gender == Gender.FEMALE:
             member_avatar = random.choice(['👩‍🦰', '👩', '👱‍♀️', '👧', '👩‍🦱', '🤵‍♀️', '👩‍🦳'])

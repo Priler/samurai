@@ -265,3 +265,30 @@ rep-label-good = good
 rep-label-very-good = very good
 rep-label-generous = generous
 rep-title = Reputation
+
+# Member levels
+level-king = 👑 King
+level-noname = 🥷 Noname
+level-newbie = 🌚 Newbie
+level-experienced = 😎 Experienced
+level-professional = 🤵 Professional
+level-veteran = 😈 Veteran
+level-master = ⭐️ Master
+level-legend = 🌟 Legend
+
+# Admin roles (random)
+admin-roles =
+    Police Officer
+    ---
+    S.W.A.T.
+    ---
+    FBI Agent
+    ---
+    Avenger
+    ---
+    Moderator
+    ---
+    Hand of Justice
+
+# Creator rep label
+rep-creator = ⭐️⭐️⭐️⭐️⭐️ Five Star Wanted
