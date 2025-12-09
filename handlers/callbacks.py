@@ -29,7 +29,7 @@ router = Router(name="callbacks")
 async def callback_msg_send(call: CallbackQuery) -> None:
     """Handle message send callbacks."""
     # Verify owner
-    if call.from_user.id not in config.bot.owner_ids:
+    if call.from_user.id != config.bot.owner:
         await call.answer("⛔ Только для владельца", show_alert=True)
         return
     
