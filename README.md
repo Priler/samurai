@@ -139,6 +139,24 @@ docker build -t samurai-bot .
 docker run -d --name samurai-bot -v $(pwd)/config.toml:/app/config.toml samurai-bot
 ```
 
+## RAM usage
+
+Currently bot uses ~800mb of RAM for ML models and for data caching.
+Probably we could reduce ML models RAM usage by implementing ONNX runtime models, but that's plans for future updates.
+
+For now, if your server doesn't handle and the process being killed with *Out of memory (`dmesg | grep -i "killed process"`)*,
+simple solution is to add swap:
+```bash
+# Create 2GB swap file
+fallocate -l 2G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+
+# Make permanent
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+```
+
 ## Configuration
 
 ### Environment Variables

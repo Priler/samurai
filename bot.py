@@ -1,5 +1,14 @@
-# Main entry point.
+"""
+Samurai Bot - Main entry point.
 
+A Telegram group moderation bot with:
+- Anti-profanity (Russian/English)
+- Anti-spam (ML-based)
+- NSFW profile detection (ML-based)
+- Reputation system
+- Report system
+- Scheduled announcements
+"""
 import asyncio
 import logging
 import signal
@@ -35,8 +44,8 @@ async def on_startup(bot: Bot) -> None:
     await init_db()
     logger.info("Database connected")
 
-    # Start batch member update flush task (every 30 seconds)
-    start_batch_flush_task(interval=30)
+    # Start batch member update flush task (interval from config)
+    start_batch_flush_task()
     logger.info("Batch flush task started")
 
     # Setup announcements

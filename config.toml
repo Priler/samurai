@@ -92,6 +92,29 @@ anime_prediction_threshold = 0.7
 url = "sqlite+aiosqlite:///db.sqlite"
 
 
+[cache]
+# Member data cache
+members_maxsize = 500
+members_ttl = 150  # seconds
+
+# Telegram member cache (admin status, etc.)
+tgmembers_maxsize = 1000
+tgmembers_ttl = 600  # seconds
+
+# Gender detection cache (LRU, no TTL - names don't change)
+gender_maxsize = 300
+
+# NSFW detection cache
+nsfw_maxsize = 100
+nsfw_ttl = 3600  # seconds (1 hour)
+
+# How often to flush pending DB updates
+batch_flush_interval = 60  # seconds
+
+# Skip expensive ML checks for users with this many messages
+trusted_user_messages = 100
+
+
 [throttling]
 # rate limiting for private chats
 enabled = true
