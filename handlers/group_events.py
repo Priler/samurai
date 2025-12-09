@@ -6,6 +6,7 @@ IMPORTANT: Handler order matters in aiogram 3.x!
 - The on_user_message handler should be LAST as it catches all text messages
 """
 import io
+import logging
 import random
 from typing import Optional
 
@@ -368,12 +369,26 @@ async def on_user_media(message: Message) -> None:
 
 
 # ==========================================================================
+# CHANNEL AUTO-FORWARD HANDLER (bot comments on channel posts)
+# ==========================================================================
+
+@router.message(InMainGroups(), F.is_automatic_forward)
+async def on_channel_post(message: Message) -> None:
+    """Reply to auto-forwarded channel posts with a random comment."""
+    try:
+        await message.reply(_random("bot-comments"))
+    except TelegramBadRequest as e:
+        logging.getLogger(__name__).warning(f"Failed to reply to channel post: {e}")
+
+
+# ==========================================================================
 # CATCH-ALL MESSAGE HANDLER - MUST BE LAST!
 # ==========================================================================
 
 @router.message(
     InMainGroups(),
-    F.content_type.in_({ContentType.TEXT, ContentType.PHOTO, ContentType.DOCUMENT, ContentType.VIDEO})
+    F.content_type.in_({ContentType.TEXT, ContentType.PHOTO, ContentType.DOCUMENT, ContentType.VIDEO}),
+    ~F.is_automatic_forward  # Exclude auto-forwards (handled above)
 )
 @router.edited_message(
     InMainGroups(),
@@ -386,11 +401,6 @@ async def on_user_message(message: Message) -> None:
     NOTE: This handler MUST be defined LAST in this file!
     It catches all text messages, so command handlers must come before it.
     """
-    # Handle auto-forward from channel (bot comments)
-    if message.is_automatic_forward:
-        await message.reply(_random("bot-comments"))
-        return
-
     # Retrieve member from DB
     member = await retrieve_or_create_member(message.from_user.id)
 
