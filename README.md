@@ -1,31 +1,21 @@
-# Samurai Bot v0.7 (aiogram 3.x)
+# 👹 Samurai Telegram Bot
+![Samurai Telegram Bot](https://i.imgur.com/S9BPDMt.jpeg "te")
+Simple, yet effective **moderator bot for telegram**.  
+With reports, logs, profanity filter, anti-spam AI, NSFW detection, reputation system and more :3
 
-A Telegram group moderation bot with anti-spam, anti-profanity, NSFW detection, and reputation system.
-
-## Features
+## What samurai do?
 
 - **Anti-Profanity**: Automatically detects and removes messages containing profanity (Russian/English)
 - **Anti-Spam**: ML-based spam detection for new users
-- **NSFW Detection**: Profile photo analysis for suspicious accounts
+- **NSFW Detection**: Profile photo analysis for NSFW accounts
 - **Reputation System**: Users gain reputation through positive participation
 - **Report System**: Users can report messages to admins
 - **Scheduled Announcements**: Periodic automated messages
 
-## Migration from aiogram 2.x
-
-This bot has been migrated from aiogram 2.x to aiogram 3.x. Key changes:
-
-- `Dispatcher(bot)` → `Dispatcher()` (bot passed to `start_polling`)
-- `@dp.message_handler()` → `@router.message()`
-- `BoundFilter` → `BaseFilter`
-- `kick_chat_member` → `ban_chat_member`
-- `types.ChatPermissions(True)` → `ChatPermissions(can_send_messages=True, ...)`
-- `executor.start_polling()` → `dp.start_polling(bot)`
-
-## Project Structure
+## Code Hierarchy
 
 ```
-samurai_v3/
+samurai/
 ├── bot.py                 # Main entry point
 ├── config/
 │   ├── __init__.py
@@ -99,7 +89,7 @@ async def handler(message: Message, i18n: Callable) -> None:
 text = _("report-message", date="2024-01-01", chat_id="123", msg_id="456")
 ```
 
-### Adding translations
+### Adding new translations
 
 1. Create/edit `.ftl` files in `locales/{lang}/`
 2. Use hyphenated keys: `error-no-reply`
@@ -116,10 +106,10 @@ report-message = 👆 Отправлено { $date }
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.11+ is required
 - Bot token from [@BotFather](https://t.me/BotFather)
 
-### Setup
+### Setup process
 
 1. Clone the repository
 
@@ -133,12 +123,14 @@ report-message = 👆 Отправлено { $date }
    cp .env.example .env
    ```
 
-4. Configure `config.toml` with your group IDs
+4. Configure `config.toml` with your group IDs and other settings how you like
 
 5. Run the bot:
    ```bash
    python bot.py
    ```
+
+6. Enjoy!
 
 ### Docker
 
@@ -161,35 +153,7 @@ docker run -d --name samurai-bot -v $(pwd)/config.toml:/app/config.toml samurai-
 | `LINKED_CHANNEL` | Linked channel ID |
 | `DB_URL` | Database URL |
 
-### config.toml
-
-```toml
-[bot]
-owner = 123456789
-token = "your_bot_token"
-language = "ru"
-version = "0.7"
-version_codename = "Eternal Ronin"
-
-[groups]
-main = -1001234567890
-reports = -1001234567891
-logs = -1001234567892
-linked_channel = -1001234567893
-
-[spam]
-member_messages_threshold = 10
-member_reputation_threshold = 10
-allow_media_threshold = 20
-
-[nsfw]
-enabled = true
-
-[db]
-url = "sqlite+aiosqlite:///db.sqlite"
-```
-
-## Commands
+## Built-in Commands
 
 ### User Commands
 
@@ -197,7 +161,7 @@ url = "sqlite+aiosqlite:///db.sqlite"
 |---------|-------------|
 | `!report` / `/report` | Report a message (reply) |
 | `!me` / `!info` | Show user info |
-| `!бу` | Fun command |
+| `!бу` | Fun command (bot pretends to be scared lol) |
 | `@admin` | Call admin attention |
 
 ### Admin Commands
@@ -223,16 +187,18 @@ url = "sqlite+aiosqlite:///db.sqlite"
 
 ## External Libraries
 
-The bot uses two external libraries that should be in the `libs/` folder:
+The bot uses two external libraries in the `libs/` folder:
 
 - **censure**: Russian/English profanity detection
 - **gender_extractor**: Gender detection from names
 
-## ML Models
+## Credits
+https://github.com/masteroncluster/py-censure - Profanity filter we used as a base  
+https://github.com/MasterGroosha/telegram-report-bot - Reports system we used as a base  
+https://huggingface.co/RUSpam/spam_deberta_v4 - Anti-Spam AI model we used as a base  
+https://github.com/wwydmanski/gender-extractor - Gender detection we used as a base  
+https://huggingface.co/prithivMLmods/siglip2-x256-explicit-content - Our current NSFW detection model
 
-- **ruspam_model/**: BERT-based spam classifier
-- **NSFW model**: SigLIP-based image classifier (downloaded from HuggingFace)
+## Author of Samurai
 
-## License
-
-MIT License
+(C) 2026 Abraham Tugalov
