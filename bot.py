@@ -13,7 +13,7 @@ from config import config
 from db import init_db, close_db
 from handlers import register_all_handlers
 from middlewares import register_all_middlewares
-from services.announcements import setup_announcements, run_scheduler
+from services.announcements import set_bot as set_announcements_bot, run_scheduler
 from services.healthcheck import start_health_server, stop_health_server, get_health_server
 from services.cache import start_batch_flush_task, stop_batch_flush_task, flush_member_updates
 
@@ -44,7 +44,7 @@ async def on_startup(bot: Bot) -> None:
     logger.info("Batch flush task started")
 
     # Setup announcements
-    await setup_announcements(bot)
+    set_announcements_bot(bot)
     
     # Start scheduler task
     _scheduler_task = asyncio.create_task(run_scheduler())
@@ -96,7 +96,7 @@ async def main() -> None:
         logger.error("No bot token provided")
         sys.exit(1)
 
-    # Start health check server
+    # Start health check server (if needed)
     if config.healthcheck.enabled:
         await start_health_server(
             host=config.healthcheck.host,

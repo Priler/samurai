@@ -5,8 +5,6 @@
 aiogram>=3.4.0
 
 # Async
-asyncio>=3.4.3
-aioschedule>=0.5.2
 aiohttp>=3.9.0
 
 # System

@@ -114,6 +114,17 @@ async def cmd_write_log_bot(message: Message) -> None:
 
 
 @router.message(
+    IsOwnerFilter(),
+    Command("reload", prefix="!/")
+)
+async def cmd_reload_announcements(message: Message) -> None:
+    """Reload announcements from file (owner only)."""
+    from services.announcements import reload_announcements
+    count = reload_announcements()
+    await message.reply(f"✅ Перезагружено {count} объявлений.")
+
+
+@router.message(
     InMainGroups(),
     IsAdminFilter(),
     Command("ping", prefix="!")
