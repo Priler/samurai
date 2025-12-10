@@ -43,9 +43,11 @@ samurai/
 │   └── user_actions.py    # Report command
 ├── locales/
 │   ├── en/
-│   │   └── strings.ftl    # English translations
+│   │   ├── strings.ftl    # English translations
+│   │   └── announcements.ftl
 │   └── ru/
-│       └── strings.ftl    # Russian translations
+│       ├── strings.ftl    # Russian translations
+│       └── announcements.ftl
 ├── middlewares/
 │   ├── __init__.py
 │   └── i18n.py            # I18n middleware
@@ -63,6 +65,8 @@ samurai/
 ├── ruspam_model/          # ML model for spam detection
 ├── requirements.txt
 ├── Dockerfile
+├── config.py              # Configuration of the bot
+├── db_init.py             # Use this to initialize your database tables
 └── .env.example
 ```
 
@@ -131,6 +135,57 @@ report-message = 👆 Отправлено { $date }
    ```
 
 6. Enjoy!
+
+### Environment Variables in Production
+
+For production deployments, you can also set environment variables directly instead of using `.env` file:
+
+```bash
+# Export variables directly
+export BOT_TOKEN="your_bot_token"
+export BOT_OWNER="your_user_id"
+export GROUPS_MAIN="-1001234567890"
+export DB_URL="sqlite:///./samurai.db"
+
+# Or pass them inline
+BOT_TOKEN="..." BOT_OWNER="..." python bot.py
+```
+
+For **systemd** services, add them to the unit file:
+```ini
+[Service]
+Environment="BOT_TOKEN=your_token"
+Environment="BOT_OWNER=123456789"
+```
+
+For **Docker**, use `-e` flags or `--env-file`:
+```bash
+docker run -e BOT_TOKEN="..." -e BOT_OWNER="..." samurai-bot
+# or
+docker run --env-file .env samurai-bot
+```
+
+### Database Initialization
+
+The `db_init.py` script can be used to create or recreate database tables.
+
+⚠️ **WARNING**: This script will **DROP ALL DATA** in the tables!  
+Make sure to backup first if running on an existing database.
+
+```bash
+# 1. Open db_init.py and comment out or delete this line:
+#    exit("COMMENT THIS LINE IN ORDER TO RE-INIT DATABASE TABLES")
+
+# 2. Run the script
+python db_init.py
+
+# 3. Uncomment the exit() line again to prevent accidental runs or just delete this file after usage
+```
+
+Use this script **ONLY** when:
+- Setting up the bot for the first time
+- Migrating to a new database
+- Resetting all data *(development only)*
 
 ### Docker
 
@@ -201,6 +256,8 @@ echo '/swapfile none swap sw 0 0' >> /etc/fstab
 | `!setlvl <level>` | Set user level |
 | `!rreset` | Reset user reputation |
 | `!msg <text>` | Send message from bot |
+| `!chatid` | Get current chat ID |
+| `!reload` | Reload announcements from localization files |
 | `!log <text>` | Write test log |
 
 ## External Libraries
