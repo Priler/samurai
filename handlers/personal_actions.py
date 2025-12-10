@@ -125,6 +125,32 @@ async def cmd_reload_announcements(message: Message) -> None:
 
 
 @router.message(
+    IsOwnerFilter(),
+    Command("chatid", prefix="!/")
+)
+async def cmd_chat_id(message: Message) -> None:
+    """Get current chat ID (owner only)."""
+    chat = message.chat
+    chat_type = chat.type
+    chat_title = chat.title or chat.full_name or "Private"
+    
+    info = (
+        f"<b>Chat ID:</b> <code>{chat.id}</code>\n"
+        f"<b>Type:</b> {chat_type}\n"
+        f"<b>Title:</b> {chat_title}"
+    )
+    
+    # Print to console
+    print(f"\n{'='*40}")
+    print(f"CHAT ID: {chat.id}")
+    print(f"Type: {chat_type}")
+    print(f"Title: {chat_title}")
+    print(f"{'='*40}\n")
+    
+    await message.reply(info)
+
+
+@router.message(
     InMainGroups(),
     IsAdminFilter(),
     Command("ping", prefix="!")

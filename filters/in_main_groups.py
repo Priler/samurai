@@ -28,4 +28,5 @@ class InMainGroups(Filter):
             chat_id = event.chat.id
         
         # Use O(1) set lookup instead of O(n) list lookup
+        # print(chat_id)
         return config.groups.is_main_group(chat_id)
