@@ -56,3 +56,6 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+# Runtime data
+data/

@@ -10,7 +10,6 @@ announcement-1 =
     
     <tg-spoiler><i>Spamming this command is punished with a permanent ban.</i></tg-spoiler>
     @every: 16350
-    @groups: -1001394505089
 
 announcement-2 =
     <b>📁 This is the chat of @howdyho_official channel</b>

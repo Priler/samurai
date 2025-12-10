@@ -3,10 +3,13 @@ Scheduled announcements service.
 
 Loads announcements from locales/<lang>/announcements.ftl files.
 Supports per-group filtering via @groups directive.
+Persists last-sent timestamps to avoid re-sending after restart.
 """
 import asyncio
+import json
 import logging
 import re
+import time
 from pathlib import Path
 
 from config import config
@@ -16,6 +19,34 @@ logger = logging.getLogger(__name__)
 # Store bot reference globally for scheduler
 _bot = None
 _announcements: list[dict] = []
+
+# File to store last-sent timestamps
+TIMESTAMPS_FILE = Path("data/announcement_timestamps.json")
+
+
+def _load_timestamps() -> dict[str, float]:
+    """Load last-sent timestamps from file."""
+    if not TIMESTAMPS_FILE.exists():
+        return {}
+    
+    try:
+        with open(TIMESTAMPS_FILE, 'r') as f:
+            data = json.load(f)
+            logger.info(f"Loaded {len(data)} announcement timestamps")
+            return data
+    except Exception as e:
+        logger.warning(f"Failed to load timestamps: {e}")
+        return {}
+
+
+def _save_timestamps(timestamps: dict[str, float]) -> None:
+    """Save last-sent timestamps to file."""
+    try:
+        TIMESTAMPS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(TIMESTAMPS_FILE, 'w') as f:
+            json.dump(timestamps, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to save timestamps: {e}")
 
 
 def load_announcements(locale: str = "ru") -> list[dict]:
@@ -127,22 +158,36 @@ async def run_scheduler() -> None:
     
     logger.info(f"Scheduler started with {len(_announcements)} announcements")
     
-    # Track last sent time for each announcement
-    last_sent: dict[int, float] = {}
+    # Load persisted timestamps (uses wall-clock time for persistence)
+    last_sent = _load_timestamps()
+    
+    # For new announcements, set their timestamp to now (wait full interval)
+    current_time = time.time()
+    for i in range(len(_announcements)):
+        key = str(i)
+        if key not in last_sent:
+            last_sent[key] = current_time
+            logger.debug(f"New announcement #{i+1} - will send after interval")
+    
+    _save_timestamps(last_sent)
+    logger.info("Announcements initialized with persistent timestamps")
     
     while True:
         try:
-            current_time = asyncio.get_event_loop().time()
+            current_time = time.time()
             
             for i, announcement in enumerate(_announcements):
+                key = str(i)
                 interval = announcement['every']
                 message = announcement['message']
                 groups = announcement.get('groups')
                 
                 # Check if it's time to send
-                if i not in last_sent or (current_time - last_sent[i]) >= interval:
+                time_since_last = current_time - last_sent.get(key, 0)
+                if time_since_last >= interval:
                     await send_announcement(message, groups)
-                    last_sent[i] = current_time
+                    last_sent[key] = current_time
+                    _save_timestamps(last_sent)
                     logger.info(f"Announcement #{i+1} sent (interval: {interval}s)")
             
             await asyncio.sleep(10)  # Check every 10 seconds

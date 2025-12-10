@@ -9,7 +9,7 @@ from .helpers import (
     get_cpu_freq,
     get_message_text,
 )
-from .localization import get_string, _, _random, ANNOUNCEMENTS
+from .localization import get_string, _, _random
 from .enums import MemberStatus
 
 __all__ = [
