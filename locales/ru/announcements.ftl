@@ -1,17 +1,33 @@
 # Announcements configuration
+#
 # Format:
-#   announcement-N = 
-#       Message text (can be multiline)
-#       @every: seconds between sends
-#       @groups: comma-separated group IDs (optional, omit for all groups)
+#   # Define reusable messages (can be referenced multiple times)
+#   msg-name =
+#       Message text here
+#       Can be multiline
+#
+#   # Announcements - either inline or with @message reference
+#   announcement-N =
+#       @message: msg-name     (reference a message defined above)
+#       @every: seconds        (interval between sends, can be defined as range ex. 1000-2000)
+#       @groups: id1, id2      (optional: specific groups, omit for all)
+#
+#   # Or with inline message text
+#   announcement-N =
+#       Inline message text
+#       @every: 3600
 
-announcement-1 =
+
+# =============================
+# MESSAGE TEMPLATES (reusable)
+# =============================
+
+msg-report-reminder =
     ❕ Не забывайте про команду <b>!report</b> благодаря которой Вы можете обратить внимание администрации на <u>нарушителя в чате</u>.
     
     <tg-spoiler><i>Спам данной командой карается вечным баном.</i></tg-spoiler>
-    @every: 16350
 
-announcement-2 =
+msg-chat-rules =
     <b>📁 Это чат канала @howdyho_official</b>
     Общайтесь вежливо и не нарушайте правила!
     
@@ -21,36 +37,51 @@ announcement-2 =
     👹 Оффтоп/спам наказывается 🍌 бананами
     
     <b>Всем мира 🤞</b>
-    @every: 10800
-    @groups: -1001394505089
 
-announcement-3 =
+msg-donate =
     <b>🫰 Донат автору канала:</b>
     
     <i>Мой Boosty:</i> https://boosty.to/howdyho
     <i>Мой Patreon:</i> <a href='https://www.patreon.com/user?u=22843414'>https://www.patreon.com/howdyho</a>
     <i>Наш Discord:</i> <a href='https://discord.gg/6khaudi-kho-1123002520072097953'>https://discord.gg/howdyho</a>
-    @every: 21600
-    @groups: -1001394505089
 
-announcement-4 =
+msg-website =
     <b>😈 У нас есть сайт, ты знал?</b>
     
-    Вотб он - https://howdyho.net
+    Вот он - https://howdyho.net
     Мы там постим топовый софт, обои, игры, и кучу всего для ПК!
     
     <i>Заходи, тебе там всегда рады!</i>
-    @every: 18000
+
+msg-share-bot =
+    <b>🫰 Хочешь чтобы твой мем/пост закинули в канал?</b>
+    Тыкай сюда - @hhsharebot
+
+
+# ================================
+# ANNOUNCEMENTS (scheduled sends)
+# ================================
+
+announcement-1 =
+    @message: msg-report-reminder
+    @every: 10000-20000
+
+announcement-2 =
+    @message: msg-chat-rules
+    @every: 9600-12000
+    @groups: -1001394505089
+
+announcement-3 =
+    @message: msg-donate
+    @every: 19800-23400
+    @groups: -1001394505089
+
+announcement-4 =
+    @message: msg-website
+    @every: 16200-19800
     @groups: -1001394505089
 
 announcement-5 =
-    <b>🫰 Хочешь чтобы твой мем/пост закинули в канал?</b>
-    Тыкай сюда - @hhsharebot
-    @every: 14500
+    @message: msg-share-bot
+    @every: 12600-16200
     @groups: -1001394505089
-
-# Example with specific groups:
-# announcement-6 =
-#     This message only goes to specific groups
-#     @every: 3600
-#     @groups: -1001234567890, -1009876543210
