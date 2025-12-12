@@ -1,20 +1,23 @@
 """
-Spam detection service using ML model.
+Spam detection service using ONNX model.
 
 Features:
-- Lazy loading of ML models (faster startup)
+- Lazy loading of ONNX model (faster startup)
 - Quick substring check before expensive ML inference
+- Lower RAM usage (hopefully) with ONNX
 """
 from typing import Optional
 
-import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import numpy as np
+import onnxruntime as ort
+from transformers import AutoTokenizer
 
 MODEL_PATH = "ruspam_model/"
+ONNX_PATH = "ruspam_model/model.onnx"
 
 # Lazy-loaded model and tokenizer
 _tokenizer: Optional[AutoTokenizer] = None
-_model: Optional[AutoModelForSequenceClassification] = None
+_session: Optional[ort.InferenceSession] = None
 
 # Known spam substrings to check first (faster than ML)
 SPAM_SUBSTRINGS = [
@@ -36,13 +39,17 @@ def _get_tokenizer() -> AutoTokenizer:
     return _tokenizer
 
 
-def _get_model() -> AutoModelForSequenceClassification:
-    """Lazy load model on first use."""
-    global _model
-    if _model is None:
-        _model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH, local_files_only=True)
-        _model.eval()  # Set to evaluation mode
-    return _model
+def _get_session() -> ort.InferenceSession:
+    """Lazy load ONNX session on first use."""
+    global _session
+    if _session is None:
+        # Use CPU provider, limit threads for lower memory
+        opts = ort.SessionOptions()
+        opts.intra_op_num_threads = 2
+        opts.inter_op_num_threads = 2
+        opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        _session = ort.InferenceSession(ONNX_PATH, opts, providers=["CPUExecutionProvider"])
+    return _session
 
 
 def predict(text: str) -> bool:
@@ -60,23 +67,30 @@ def predict(text: str) -> bool:
     if any(sub in text_lower for sub in _SPAM_SUBSTRINGS_LOWER):
         return True
 
-    # ML-based prediction (lazy load models)
+    # ONNX inference (lazy load on first call)
     tokenizer = _get_tokenizer()
-    model = _get_model()
+    session = _get_session()
     
-    inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=256)
-    with torch.no_grad():
-        outputs = model(**inputs)
-        logits = outputs.logits
-        predicted_class = torch.argmax(logits, dim=1).item()
+    inputs = tokenizer(text, return_tensors="np", truncation=True, max_length=256)
+    
+    outputs = session.run(
+        ["logits"],
+        {
+            "input_ids": inputs["input_ids"],
+            "attention_mask": inputs["attention_mask"]
+        }
+    )
+    
+    logits = outputs[0]
+    predicted_class = np.argmax(logits, axis=1)[0]
 
     return predicted_class == 1
 
 
 def preload_model() -> None:
     """
-    Preload the ML model (call during startup if you want eager loading).
+    Preload the ONNX model (call during startup if you want eager loading).
     Useful if you want to avoid latency on first spam check.
     """
     _get_tokenizer()
-    _get_model()
+    _get_session()
