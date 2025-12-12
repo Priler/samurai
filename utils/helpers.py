@@ -150,7 +150,7 @@ def get_report_comment(
     # Build header with chat name if provided
     header = ""
     if chat_title:
-        header = f"[ <b>{chat_title}</b> ]\n\n"
+        header = f"[ {chat_title} ]\n\n"
     
     # Pass variables directly to get_string for Fluent interpolation
     msg = header + get_string(

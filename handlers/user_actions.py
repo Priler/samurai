@@ -145,7 +145,7 @@ async def calling_all_units(message: Message) -> None:
     )
 
     # format report message
-    header = f"[ <b>{message.chat.title}</b> ]\n\n" if message.chat.title else ""
+    header = f"[ {message.chat.title} ]\n\n" if message.chat.title else ""
 
     await message.bot.send_message(
         config.groups.reports,
