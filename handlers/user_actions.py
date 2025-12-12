@@ -128,6 +128,7 @@ async def cmd_report(message: Message) -> None:
             message.chat.title,
             reporter=message.from_user
         ),
+        parse_mode="HTML",
         reply_markup=action_keyboard
     )
 
@@ -153,5 +154,6 @@ async def calling_all_units(message: Message) -> None:
             "need_admins_attention",
             chat_id=get_url_chat_id(message.chat.id),
             msg_id=msg_id
-        )
+        ),
+        parse_mode="HTML"
     )
