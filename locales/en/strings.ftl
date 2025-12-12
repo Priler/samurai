@@ -259,20 +259,18 @@ report-responses =
 report-under-review =
     ⚠️ <i>This message is under review.</i>
     ---
-    ⏳ <i>Admins are checking this message...</i>
+    <i>Admins are checking this message...</i>
     ---
-    🔍 <i>Message sent for review.</i>
+    <i>Message sent for review.</i>
     ---
-    👀 <i>Admins are aware, awaiting decision.</i>
+    <i>Admins are aware, awaiting decision.</i>
 
 report-completed =
-    ✅ <i>Reviewed. Thanks for the report!</i>
+    ✅ <i>Reviewed. Message was removed due to violations of chat rules.</i>
     ---
-    👍 <i>Done! Thanks for your vigilance.</i>
+    <i>UFO removed this message ...</i>
     ---
-    ✨ <i>Admins took action. Thank you!</i>
-    ---
-    🎯 <i>Reviewed.</i>
+    <i>BAM! Message removed.</i>
 
 # ========== REPUTATION LABELS ==========
 rep-label-wanted = ⭐️⭐️⭐️⭐️⭐️ five star wanted
