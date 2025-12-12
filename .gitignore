@@ -61,4 +61,4 @@ temp/
 data/
 
 # AI old unused files
-ruspam_model/old
+ruspam_model/onnx
