@@ -1,9 +1,9 @@
 """
 Callback query handlers for inline buttons.
 
-Note: callback_data format includes chat_id for multi-group support:
-- del_{chat_id}_{msg_id}
-- delban_{chat_id}_{msg_id}_{user_id}
+Note: callback_data format for reports:
+- rdel_{chat_id}_{msg_id}_{reporter_id}_{bot_reply_id}
+- rdelban_{chat_id}_{msg_id}_{user_id}_{reporter_id}_{bot_reply_id}
 - etc.
 """
 from contextlib import suppress
@@ -15,7 +15,9 @@ from aiogram.exceptions import TelegramBadRequest
 
 from config import config
 from db.models import Member, Spam
-from utils import get_string
+from services.reports import remove_report
+from services.cache import queue_member_update
+from utils import get_string, _random
 from handlers.personal_actions import pending_messages
 
 router = Router(name="callbacks")
@@ -96,12 +98,283 @@ async def callback_msg_send(call: CallbackQuery) -> None:
 
 
 # ===============================
-# REPORT CALLBACKS
+# REPORT CALLBACKS (new format with rewards)
+# ===============================
+
+async def _update_bot_reply(bot, chat_id: int, bot_reply_id: int) -> None:
+    """Update bot's reply message in the original chat with completion message."""
+    with suppress(TelegramBadRequest):
+        await bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=bot_reply_id,
+            text=_random("report-completed")
+        )
+
+
+async def _reward_reporter(reporter_id: int, points: int) -> None:
+    """Reward reporter with reputation points."""
+    await queue_member_update(reporter_id, reputation_points=points)
+
+
+@router.callback_query(F.data.startswith("rdel_"))
+async def callback_report_delete(call: CallbackQuery) -> None:
+    """Delete reported message only. Reward: +10 rep."""
+    # Format: rdel_chatId_msgId_reporterId_botReplyId
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    message_id = int(parts[2])
+    reporter_id = int(parts[3])
+    bot_reply_id = int(parts[4])
+
+    with suppress(TelegramBadRequest):
+        await call.bot.delete_message(chat_id, message_id)
+
+    # Remove from tracking
+    remove_report(chat_id, message_id)
+    
+    # Reward reporter (+10 for delete)
+    await _reward_reporter(reporter_id, 10)
+    
+    # Update bot's reply in original chat
+    await _update_bot_reply(call.bot, chat_id, bot_reply_id)
+
+    await call.message.edit_text(
+        call.message.text + get_string("action_deleted")
+    )
+    await call.answer(text="Done")
+
+
+@router.callback_query(F.data.startswith("rdelban_"))
+async def callback_report_delete_and_ban(call: CallbackQuery) -> None:
+    """Delete message and ban user. Reward: +20 rep."""
+    # Format: rdelban_chatId_msgId_userId_reporterId_botReplyId
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    message_id = int(parts[2])
+    user_id = int(parts[3])
+    reporter_id = int(parts[4])
+    bot_reply_id = int(parts[5])
+
+    with suppress(TelegramBadRequest):
+        await call.bot.delete_message(chat_id, message_id)
+
+    await call.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+
+    # Remove from tracking
+    remove_report(chat_id, message_id)
+    
+    # Reward reporter (+20 for ban)
+    await _reward_reporter(reporter_id, 20)
+    
+    # Update bot's reply in original chat
+    await _update_bot_reply(call.bot, chat_id, bot_reply_id)
+
+    await call.message.edit_text(
+        call.message.text + get_string("action_deleted_banned")
+    )
+    await call.answer(text="Done")
+
+
+@router.callback_query(F.data.startswith("rmute_"))
+async def callback_report_delete_and_mute_24h(call: CallbackQuery) -> None:
+    """Delete message and mute user for 24 hours. Reward: +10 rep."""
+    # Format: rmute_chatId_msgId_userId_reporterId_botReplyId
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    message_id = int(parts[2])
+    user_id = int(parts[3])
+    reporter_id = int(parts[4])
+    bot_reply_id = int(parts[5])
+
+    with suppress(TelegramBadRequest):
+        await call.bot.delete_message(chat_id, message_id)
+
+    await call.bot.restrict_chat_member(
+        chat_id=chat_id,
+        user_id=user_id,
+        permissions=ChatPermissions(can_send_messages=False),
+        until_date=datetime.now(timezone.utc) + timedelta(hours=24)
+    )
+
+    # Remove from tracking
+    remove_report(chat_id, message_id)
+    
+    # Reward reporter (+10 for mute)
+    await _reward_reporter(reporter_id, 10)
+    
+    # Update bot's reply in original chat
+    await _update_bot_reply(call.bot, chat_id, bot_reply_id)
+
+    await call.message.edit_text(
+        call.message.text + get_string("action_deleted_readonly")
+    )
+    await call.answer(text="Done")
+
+
+@router.callback_query(F.data.startswith("rmute2_"))
+async def callback_report_delete_and_mute_7d(call: CallbackQuery) -> None:
+    """Delete message and mute user for 7 days. Reward: +15 rep."""
+    # Format: rmute2_chatId_msgId_userId_reporterId_botReplyId
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    message_id = int(parts[2])
+    user_id = int(parts[3])
+    reporter_id = int(parts[4])
+    bot_reply_id = int(parts[5])
+
+    with suppress(TelegramBadRequest):
+        await call.bot.delete_message(chat_id, message_id)
+
+    await call.bot.restrict_chat_member(
+        chat_id=chat_id,
+        user_id=user_id,
+        permissions=ChatPermissions(can_send_messages=False),
+        until_date=datetime.now(timezone.utc) + timedelta(days=7)
+    )
+
+    # Remove from tracking
+    remove_report(chat_id, message_id)
+    
+    # Reward reporter (+15 for 7d mute)
+    await _reward_reporter(reporter_id, 15)
+    
+    # Update bot's reply in original chat
+    await _update_bot_reply(call.bot, chat_id, bot_reply_id)
+
+    await call.message.edit_text(
+        call.message.text + get_string("action_deleted_readonly2")
+    )
+    await call.answer(text="Done")
+
+
+@router.callback_query(F.data.startswith("rdismiss_"))
+async def callback_report_dismiss(call: CallbackQuery) -> None:
+    """Dismiss report (false alarm). No reward."""
+    # Format: rdismiss_chatId_msgId_userId_reporterId_botReplyId
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    message_id = int(parts[2])
+    # user_id = int(parts[3])  # reported user - not used here
+    # reporter_id = int(parts[4])
+    bot_reply_id = int(parts[5])
+
+    # Remove from tracking
+    remove_report(chat_id, message_id)
+    
+    # Delete bot's reply in original chat (false alarm, no need to show completion)
+    with suppress(TelegramBadRequest):
+        await call.bot.delete_message(chat_id, bot_reply_id)
+
+    await call.message.edit_text(
+        call.message.text + get_string("action_dismissed")
+    )
+    await call.answer(text="Done")
+
+
+@router.callback_query(F.data.startswith("rdismiss2_"))
+async def callback_report_dismiss_mute_reporter_1d(call: CallbackQuery) -> None:
+    """Dismiss and mute reporter for 1 day."""
+    # Format: rdismiss2_chatId_msgId_userId_reporterId_botReplyId
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    message_id = int(parts[2])
+    # user_id = int(parts[3])  # reported user
+    reporter_id = int(parts[4])
+    bot_reply_id = int(parts[5])
+
+    # Remove from tracking
+    remove_report(chat_id, message_id)
+
+    # Mute reporter
+    await call.bot.restrict_chat_member(
+        chat_id=chat_id,
+        user_id=reporter_id,
+        permissions=ChatPermissions(can_send_messages=False),
+        until_date=datetime.now(timezone.utc) + timedelta(days=1)
+    )
+    
+    # Punish reporter
+    await queue_member_update(reporter_id, reputation_points=-10)
+    
+    # Delete bot's reply
+    with suppress(TelegramBadRequest):
+        await call.bot.delete_message(chat_id, bot_reply_id)
+
+    await call.message.edit_text(
+        call.message.text + get_string("action_deleted_dismissed2")
+    )
+    await call.answer(text="Done")
+
+
+@router.callback_query(F.data.startswith("rdismiss3_"))
+async def callback_report_dismiss_mute_reporter_7d(call: CallbackQuery) -> None:
+    """Dismiss and mute reporter for 7 days."""
+    # Format: rdismiss3_chatId_msgId_userId_reporterId_botReplyId
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    message_id = int(parts[2])
+    # user_id = int(parts[3])
+    reporter_id = int(parts[4])
+    bot_reply_id = int(parts[5])
+
+    # Remove from tracking
+    remove_report(chat_id, message_id)
+
+    # Mute reporter
+    await call.bot.restrict_chat_member(
+        chat_id=chat_id,
+        user_id=reporter_id,
+        permissions=ChatPermissions(can_send_messages=False),
+        until_date=datetime.now(timezone.utc) + timedelta(days=7)
+    )
+    
+    # Punish reporter
+    await queue_member_update(reporter_id, reputation_points=-20)
+    
+    # Delete bot's reply
+    with suppress(TelegramBadRequest):
+        await call.bot.delete_message(chat_id, bot_reply_id)
+
+    await call.message.edit_text(
+        call.message.text + get_string("action_deleted_dismissed3")
+    )
+    await call.answer(text="Done")
+
+
+@router.callback_query(F.data.startswith("rdismiss4_"))
+async def callback_report_dismiss_ban_reporter(call: CallbackQuery) -> None:
+    """Dismiss and ban reporter."""
+    # Format: rdismiss4_chatId_msgId_userId_reporterId_botReplyId
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    message_id = int(parts[2])
+    # user_id = int(parts[3])
+    reporter_id = int(parts[4])
+    bot_reply_id = int(parts[5])
+
+    # Remove from tracking
+    remove_report(chat_id, message_id)
+
+    # Ban reporter
+    await call.bot.ban_chat_member(chat_id=chat_id, user_id=reporter_id)
+    
+    # Delete bot's reply
+    with suppress(TelegramBadRequest):
+        await call.bot.delete_message(chat_id, bot_reply_id)
+
+    await call.message.edit_text(
+        call.message.text + get_string("action_deleted_dismissed4")
+    )
+    await call.answer(text="Done")
+
+
+# ===============================
+# LEGACY REPORT CALLBACKS (for backwards compatibility)
 # ===============================
 
 @router.callback_query(F.data.startswith("del_"))
 async def callback_delete(call: CallbackQuery) -> None:
-    """Delete reported message only."""
+    """Delete reported message only (legacy)."""
     parts = call.data.split("_")
     chat_id = int(parts[1])
     message_id = int(parts[2])
@@ -117,7 +390,7 @@ async def callback_delete(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("delban_"))
 async def callback_delete_and_ban(call: CallbackQuery) -> None:
-    """Delete message and ban user."""
+    """Delete message and ban user (legacy)."""
     parts = call.data.split("_")
     chat_id = int(parts[1])
     message_id = int(parts[2])
@@ -136,7 +409,7 @@ async def callback_delete_and_ban(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("mute_"))
 async def callback_delete_and_mute_24h(call: CallbackQuery) -> None:
-    """Delete message and mute user for 24 hours."""
+    """Delete message and mute user for 24 hours (legacy)."""
     parts = call.data.split("_")
     chat_id = int(parts[1])
     message_id = int(parts[2])
@@ -160,7 +433,7 @@ async def callback_delete_and_mute_24h(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("mute2_"))
 async def callback_delete_and_mute_7d(call: CallbackQuery) -> None:
-    """Delete message and mute user for 7 days."""
+    """Delete message and mute user for 7 days (legacy)."""
     parts = call.data.split("_")
     chat_id = int(parts[1])
     message_id = int(parts[2])
@@ -184,7 +457,7 @@ async def callback_delete_and_mute_7d(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("dismiss_"))
 async def callback_dismiss(call: CallbackQuery) -> None:
-    """Dismiss report (false alarm)."""
+    """Dismiss report (false alarm) (legacy)."""
     await call.message.edit_text(
         call.message.text + get_string("action_dismissed")
     )
@@ -193,7 +466,7 @@ async def callback_dismiss(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("dismiss2_"))
 async def callback_dismiss_mute_reporter_1d(call: CallbackQuery) -> None:
-    """Dismiss and mute reporter for 1 day."""
+    """Dismiss and mute reporter for 1 day (legacy)."""
     parts = call.data.split("_")
     chat_id = int(parts[1])
     message_id = int(parts[2])
@@ -217,7 +490,7 @@ async def callback_dismiss_mute_reporter_1d(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("dismiss3_"))
 async def callback_dismiss_mute_reporter_7d(call: CallbackQuery) -> None:
-    """Dismiss and mute reporter for 7 days."""
+    """Dismiss and mute reporter for 7 days (legacy)."""
     parts = call.data.split("_")
     chat_id = int(parts[1])
     message_id = int(parts[2])
@@ -241,7 +514,7 @@ async def callback_dismiss_mute_reporter_7d(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("dismiss4_"))
 async def callback_dismiss_ban_reporter(call: CallbackQuery) -> None:
-    """Dismiss and ban reporter."""
+    """Dismiss and ban reporter (legacy)."""
     parts = call.data.split("_")
     chat_id = int(parts[1])
     message_id = int(parts[2])

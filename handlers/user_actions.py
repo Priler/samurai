@@ -7,6 +7,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 from config import config
 from filters import InMainGroups
+from services.reports import is_already_reported, track_report
 from utils import get_string, _random, get_report_comment, get_url_chat_id, MemberStatus
 
 router = Router(name="user_actions")
@@ -23,87 +24,103 @@ async def cmd_report(message: Message) -> None:
         await message.reply(get_string("error_no_reply"))
         return
 
+    reported_msg = message.reply_to_message
+    chat_id = message.chat.id
+    
+    # Delete the /report command message immediately
+    try:
+        await message.delete()
+    except Exception:
+        pass
+
     # Can't report yourself
-    if message.reply_to_message.from_user.id == message.from_user.id:
-        await message.reply(get_string("error_report_self"))
+    if reported_msg.from_user.id == message.from_user.id:
         return
 
     # Can't report admins
-    user = await message.bot.get_chat_member(
-        message.chat.id,
-        message.reply_to_message.from_user.id
-    )
+    user = await message.bot.get_chat_member(chat_id, reported_msg.from_user.id)
     if user.status in MemberStatus.admin_statuses():
-        await message.reply(get_string("error_report_admin"))
         return
 
     # Can't report channel posts (user 777000)
-    if message.reply_to_message.from_user.id == 777000:
-        await message.delete()
+    if reported_msg.from_user.id == 777000:
         return
+
+    # Check if already reported
+    if is_already_reported(chat_id, reported_msg.message_id):
+        return  # Already reported, just return silently
+
+    # Track this report
+    track_report(chat_id, reported_msg.message_id)
 
     # Check for report message (anything after /report)
     msg_parts = message.text.split(maxsplit=1)
     report_message = msg_parts[1] if len(msg_parts) > 1 else None
 
-    # Generate keyboard with actions
-    # Include chat_id in callback_data for multi-group support
-    chat_id = message.chat.id
-    reply_msg_id = message.reply_to_message.message_id
-    reply_user_id = message.reply_to_message.from_user.id
-    reporter_msg_id = message.message_id
+    # Reply to the REPORTED message with "under review" 
+    bot_reply = await reported_msg.reply(_random("report-under-review"))
+    
+    # Build callback data with all needed info:
+    # Format: action_chatId_reportedMsgId_reportedUserId_reporterUserId_botReplyMsgId
+    reply_msg_id = reported_msg.message_id
+    reply_user_id = reported_msg.from_user.id
     reporter_user_id = message.from_user.id
+    bot_reply_id = bot_reply.message_id
+
+    # Callback data helper - all actions need chat_id, msg_id, user_id, reporter_id, bot_reply_id
+    def cb(action: str, include_user: bool = True) -> str:
+        if include_user:
+            return f"{action}_{chat_id}_{reply_msg_id}_{reply_user_id}_{reporter_user_id}_{bot_reply_id}"
+        return f"{action}_{chat_id}_{reply_msg_id}_{reporter_user_id}_{bot_reply_id}"
 
     action_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
             text=get_string("action_del_msg"),
-            callback_data=f"del_{chat_id}_{reply_msg_id}"
+            callback_data=cb("rdel", include_user=False)
         )],
         [InlineKeyboardButton(
             text=get_string("action_del_and_ban"),
-            callback_data=f"delban_{chat_id}_{reply_msg_id}_{reply_user_id}"
+            callback_data=cb("rdelban")
         )],
         [InlineKeyboardButton(
             text=get_string("action_del_and_readonly"),
-            callback_data=f"mute_{chat_id}_{reply_msg_id}_{reply_user_id}"
+            callback_data=cb("rmute")
         )],
         [InlineKeyboardButton(
             text=get_string("action_del_and_readonly2"),
-            callback_data=f"mute2_{chat_id}_{reply_msg_id}_{reply_user_id}"
+            callback_data=cb("rmute2")
         )],
         [InlineKeyboardButton(
             text=get_string("action_false_alarm"),
-            callback_data=f"dismiss_{chat_id}_{reply_msg_id}_{reply_user_id}"
+            callback_data=cb("rdismiss")
         )],
         [InlineKeyboardButton(
             text=get_string("action_false_alarm_2"),
-            callback_data=f"dismiss2_{chat_id}_{reporter_msg_id}_{reporter_user_id}"
+            callback_data=cb("rdismiss2")
         )],
         [InlineKeyboardButton(
             text=get_string("action_false_alarm_3"),
-            callback_data=f"dismiss3_{chat_id}_{reporter_msg_id}_{reporter_user_id}"
+            callback_data=cb("rdismiss3")
         )],
         [InlineKeyboardButton(
             text=get_string("action_false_alarm_4"),
-            callback_data=f"dismiss4_{chat_id}_{reporter_msg_id}_{reporter_user_id}"
+            callback_data=cb("rdismiss4")
         )]
     ])
 
-    # Forward reported message and send report
-    await message.reply_to_message.forward(config.groups.reports)
+    # Forward reported message and send report to admins
+    await reported_msg.forward(config.groups.reports)
     await message.bot.send_message(
         config.groups.reports,
         get_report_comment(
-            message.reply_to_message.date,
-            message.reply_to_message.message_id,
+            reported_msg.date,
+            reported_msg.message_id,
             chat_id,
             report_message,
             message.chat.title
         ),
         reply_markup=action_keyboard
     )
-
-    await message.reply(_random("report-responses"))
 
 
 @router.message(
