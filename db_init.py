@@ -1,33 +1,49 @@
+"""
+Database initialization script.
+
+This script can be used to init or re-init database tables.
+CAUTION: it will DROP ALL DATA in the tables!
+
+Uncomment the exit() line below to run it.
+"""
 exit("COMMENT THIS LINE IN ORDER TO RE-INIT DATABASE TABLES")
 
 import asyncio
 import logging
-from configurator import make_config
 
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-if not make_config("config.ini"):
-    logging.error("Errors while parsing config file. Exiting.")
-    exit(1)
+from db.database import ormar_config
+from db.models import Member, Spam
 
-import heroku_config
 
-# import models n stuff
-from db import ormar_config
-from models.member import Member
-from models.spam import Spam
+async def reinit_db_tables() -> None:
+    """Drop and recreate all database tables."""
+    logger.info("Connecting to database...")
+    
+    if not ormar_config.database.is_connected:
+        await ormar_config.database.connect()
 
-# DROP & INIT tables (async mysql)
-async def reinit_db_tables():
+    logger.warning("Dropping all tables...")
     async with ormar_config.engine.begin() as conn:
         await conn.run_sync(ormar_config.metadata.drop_all)
+    
+    logger.info("Creating tables...")
+    async with ormar_config.engine.begin() as conn:
         await conn.run_sync(ormar_config.metadata.create_all)
 
+    await ormar_config.database.disconnect()
     await ormar_config.engine.dispose()
+    
+    logger.info("Database tables recreated successfully!")
 
-asyncio.run(reinit_db_tables())
-exit("DONE")
 
-# for sqlite use this :3
+if __name__ == "__main__":
+    asyncio.run(reinit_db_tables())
+    exit("DONE")
+
+
+# For SQLite you can also use synchronous version:
 # ormar_config.metadata.drop_all(ormar_config.engine)
 # ormar_config.metadata.create_all(ormar_config.engine)

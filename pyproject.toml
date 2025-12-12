@@ -1,0 +1,70 @@
+[project]
+name = "samurai-bot"
+version = "0.7.0"
+description = "Telegram group moderation bot with anti-spam, anti-profanity, and NSFW detection"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Abraham"}
+]
+keywords = ["telegram", "bot", "moderation", "aiogram"]
+
+dependencies = [
+    "aiogram>=3.4.0",
+    "asyncio>=3.4.3",
+    "aioschedule>=0.5.2",
+    "aiohttp>=3.9.0",
+    "psutil>=6.0.0",
+    "python-dotenv>=1.0.0",
+    "cachetools>=5.0.0",
+    "pydantic>=2.0.0",
+    "fluent-compiler>=1.0",
+    "ormar>=0.20.0",
+    "databases>=0.7.0",
+    "aiosqlite>=0.19.0",
+    "sqlalchemy>=1.4.42,<2.0.0",
+]
+
+[project.optional-dependencies]
+speed = [
+    "uvloop>=0.20.0; sys_platform != 'win32'",
+    "ujson>=5.10.0",
+]
+ml = [
+    "torch>=2.0.0",
+    "transformers>=4.30.0",
+    "numpy>=1.24.0",
+    "pillow>=10.0.0",
+]
+mysql = [
+    "aiomysql",
+    "pymysql",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+samurai = "bot:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*"]
+exclude = ["tests*", "libs*", "ruspam_model*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+select = ["E", "F", "W", "I", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
