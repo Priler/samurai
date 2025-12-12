@@ -40,8 +40,7 @@ msg-chat-rules =
 
 msg-donate =
     <b>🫰 Donate to the channel author:</b>
-    
-    <i>My Boosty:</i> https://boosty.to/howdyho
+
     <i>My Patreon:</i> <a href='https://www.patreon.com/user?u=22843414'>https://www.patreon.com/howdyho</a>
     <i>Our Discord:</i> <a href='https://discord.gg/6khaudi-kho-1123002520072097953'>https://discord.gg/howdyho</a>
 

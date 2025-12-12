@@ -39,6 +39,7 @@ from services.cache import (
     get_member_orm,
     MemberData
 )
+from services.announcements import track_message
 from utils import (
     get_string, _random, user_mention, write_log, 
     generate_log_message, remove_prefix, get_message_text,
@@ -395,6 +396,10 @@ async def on_user_message(message: Message) -> None:
     NOTE: This handler MUST be defined LAST in this file!
     It catches all text messages, so command handlers must come before it.
     """
+    # Track this message for announcement rate limiting (all messages count)
+    # This runs first so even if we return early, we track the message
+    track_message(message.chat.id, is_announcement=False)
+    
     # Retrieve member from DB
     member = await retrieve_or_create_member(message.from_user.id)
 

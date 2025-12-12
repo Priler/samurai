@@ -134,3 +134,36 @@ time_window = 60
 enabled = false
 host = "0.0.0.0"
 port = 8080
+
+
+[announcements]
+# Enable/disable scheduled announcements
+enabled = true
+
+# Track last N messages per group to check announcement frequency
+history_size = 20
+
+# Don't send new announcement if >= this many recent messages were announcements
+# (empty chat announcements stack protection)
+max_stack = 3
+
+# Don't re-send same announcement if it appeared in last N messages
+avoid_duplicate_in_last = 15
+
+# Global sleep time - don't send announcements during this period
+# Format: "HH:MM" (24-hour), leave empty to disable
+sleep_from = "22:00"
+sleep_to = "9:00"
+
+# UTC offset for sleep time calculation (e.g., 5 for UTC+5, -3 for UTC-3)
+# 0 for server default time
+utc_offset = 5
+
+# Per-group overrides (optional)
+# Group-specific settings take priority over global settings
+# We can use this i.e. to make announcements "sleep" in a different time zones
+# Could be useful if a bot is used in multi-chat mode with groups from all over the world
+# [announcements.groups.-1001234567890]
+# sleep_from = "23:00"
+# sleep_to = "08:00"
+# utc_offset = 5

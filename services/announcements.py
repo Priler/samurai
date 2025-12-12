@@ -6,6 +6,12 @@ Supports per-group filtering via @groups directive.
 Supports message references via @message directive.
 Supports interval ranges via @every: min-max directive.
 Persists last-sent timestamps to avoid re-sending after restart.
+
+Features:
+- Per-group independent timing
+- Message history tracking to avoid spam
+- Sleep time configuration (global and per-group)
+- Duplicate detection in recent messages
 """
 import asyncio
 import json
@@ -13,6 +19,8 @@ import logging
 import random
 import re
 import time
+from collections import deque
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from config import config
@@ -26,6 +34,197 @@ _announcements: list[dict] = []
 # File to store last-sent timestamps
 TIMESTAMPS_FILE = Path("data/announcement_timestamps.json")
 
+# Message history per group
+# Key: group_id, Value: deque of {"is_announcement": bool, "announcement_idx": int | None}
+_group_history: dict[int, deque] = {}
+
+
+# =============================================================================
+# MESSAGE HISTORY TRACKING
+# =============================================================================
+
+def track_message(group_id: int, is_announcement: bool = False, announcement_idx: int | None = None) -> None:
+    """
+    Track a message in group history.
+    
+    Call this for every message in the group to maintain accurate history.
+    
+    Args:
+        group_id: The group where message was sent
+        is_announcement: True if this was a bot announcement
+        announcement_idx: Index of the announcement (if is_announcement=True)
+    """
+    history_size = config.announcements.history_size
+    
+    if group_id not in _group_history:
+        _group_history[group_id] = deque(maxlen=history_size)
+    
+    _group_history[group_id].append({
+        "is_announcement": is_announcement,
+        "announcement_idx": announcement_idx
+    })
+
+
+def get_announcement_count_in_history(group_id: int) -> int:
+    """Get count of announcements in recent history for a group."""
+    if group_id not in _group_history:
+        return 0
+    
+    return sum(1 for msg in _group_history[group_id] if msg["is_announcement"])
+
+
+def is_announcement_in_recent(group_id: int, announcement_idx: int, lookback: int | None = None) -> bool:
+    """
+    Check if specific announcement was sent recently.
+    
+    Args:
+        group_id: The group to check
+        announcement_idx: The announcement index to look for
+        lookback: How many recent messages to check (None = use config)
+    """
+    if group_id not in _group_history:
+        return False
+    
+    if lookback is None:
+        lookback = config.announcements.avoid_duplicate_in_last
+    
+    history = list(_group_history[group_id])
+    recent = history[-lookback:] if len(history) > lookback else history
+    
+    return any(
+        msg["is_announcement"] and msg["announcement_idx"] == announcement_idx
+        for msg in recent
+    )
+
+
+# =============================================================================
+# SLEEP TIME CHECKING
+# =============================================================================
+
+def _parse_time(time_str: str) -> tuple[int, int] | None:
+    """Parse "HH:MM" format to (hour, minute) tuple."""
+    if not time_str:
+        return None
+    
+    try:
+        parts = time_str.strip().split(":")
+        return (int(parts[0]), int(parts[1]))
+    except (ValueError, IndexError):
+        logger.warning(f"Invalid time format: {time_str}")
+        return None
+
+
+def is_sleep_time(group_id: int) -> bool:
+    """
+    Check if current time is within sleep period for a group.
+    
+    Uses per-group settings if available, otherwise falls back to global settings.
+    """
+    # Get settings (per-group overrides global)
+    group_settings = config.announcements.groups.get(group_id)
+    
+    if group_settings:
+        sleep_from = group_settings.sleep_from or config.announcements.sleep_from
+        sleep_to = group_settings.sleep_to or config.announcements.sleep_to
+        utc_offset = group_settings.utc_offset if group_settings.utc_offset is not None else config.announcements.utc_offset
+    else:
+        sleep_from = config.announcements.sleep_from
+        sleep_to = config.announcements.sleep_to
+        utc_offset = config.announcements.utc_offset
+    
+    # Parse times
+    from_time = _parse_time(sleep_from)
+    to_time = _parse_time(sleep_to)
+    
+    if not from_time or not to_time:
+        return False  # No sleep time configured
+    
+    # Get current time with UTC offset
+    tz = timezone(timedelta(hours=utc_offset))
+    now = datetime.now(tz)
+    current_minutes = now.hour * 60 + now.minute
+    
+    from_minutes = from_time[0] * 60 + from_time[1]
+    to_minutes = to_time[0] * 60 + to_time[1]
+    
+    # Handle overnight ranges (e.g., 23:00 to 07:00)
+    if from_minutes > to_minutes:
+        # Overnight: sleep if current >= from OR current < to
+        return current_minutes >= from_minutes or current_minutes < to_minutes
+    else:
+        # Same day: sleep if from <= current < to
+        return from_minutes <= current_minutes < to_minutes
+
+
+# =============================================================================
+# SENDING LOGIC
+# =============================================================================
+
+def can_send_announcement(group_id: int, announcement_idx: int) -> tuple[bool, str]:
+    """
+    Check if an announcement can be sent to a group.
+    
+    Returns:
+        (can_send, reason) tuple
+    """
+    # Check if announcements are enabled
+    if not config.announcements.enabled:
+        return False, "announcements disabled"
+    
+    # Check sleep time
+    if is_sleep_time(group_id):
+        return False, "sleep time"
+    
+    # Check max stack (too many announcements in recent history)
+    announcement_count = get_announcement_count_in_history(group_id)
+    if announcement_count >= config.announcements.max_stack:
+        return False, f"max stack reached ({announcement_count})"
+    
+    # Check if this specific announcement was sent recently
+    if is_announcement_in_recent(group_id, announcement_idx):
+        return False, "duplicate in recent history"
+    
+    return True, "ok"
+
+
+async def send_to_group(message: str, group_id: int, announcement_idx: int) -> bool:
+    """
+    Send announcement to a single group.
+    
+    Args:
+        message: The message text to send
+        group_id: Target group ID
+        announcement_idx: Index of the announcement being sent
+        
+    Returns:
+        True if sent successfully, False otherwise
+    """
+    if _bot is None:
+        logger.warning("Bot not initialized, skipping announcement")
+        return False
+    
+    # Check if we can send
+    can_send, reason = can_send_announcement(group_id, announcement_idx)
+    if not can_send:
+        logger.debug(f"Skipping announcement #{announcement_idx+1} to {group_id}: {reason}")
+        return False
+    
+    try:
+        await _bot.send_message(group_id, message)
+        
+        # Track this message in history
+        track_message(group_id, is_announcement=True, announcement_idx=announcement_idx)
+        
+        logger.debug(f"Announcement #{announcement_idx+1} sent to {group_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send announcement to {group_id}: {e}")
+        return False
+
+
+# =============================================================================
+# TIMESTAMP PERSISTENCE
+# =============================================================================
 
 def _load_timestamps() -> dict[str, float]:
     """Load last-sent timestamps from file."""
@@ -92,6 +291,10 @@ def _migrate_timestamps(timestamps: dict[str, float], announcements: list[dict])
     logger.info(f"Migration complete: {len(timestamps)} -> {len(new_timestamps)} keys")
     return new_timestamps
 
+
+# =============================================================================
+# ANNOUNCEMENT LOADING
+# =============================================================================
 
 def _load_messages(locale: str) -> dict[str, str]:
     """
@@ -225,6 +428,7 @@ def load_announcements(locale: str = "ru") -> list[dict]:
                 'message': message,
                 'every_min': every_min,
                 'every_max': every_max,
+                'message_ref': message_ref,  # Store for dedup tracking
             }
             if groups:
                 announcement['groups'] = groups
@@ -236,34 +440,11 @@ def load_announcements(locale: str = "ru") -> list[dict]:
     
     logger.info(f"Loaded {len(announcements)} announcements from {ftl_path}")
     return announcements
-    
-    logger.info(f"Loaded {len(announcements)} announcements from {ftl_path}")
-    return announcements
 
 
-async def send_to_group(message: str, group_id: int) -> bool:
-    """
-    Send announcement to a single group.
-    
-    Args:
-        message: The message text to send
-        group_id: Target group ID
-        
-    Returns:
-        True if sent successfully, False otherwise
-    """
-    if _bot is None:
-        logger.warning("Bot not initialized, skipping announcement")
-        return False
-    
-    try:
-        await _bot.send_message(group_id, message)
-        logger.debug(f"Announcement sent to {group_id}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to send announcement to {group_id}: {e}")
-        return False
-
+# =============================================================================
+# SCHEDULER
+# =============================================================================
 
 async def run_scheduler() -> None:
     """
@@ -277,6 +458,11 @@ async def run_scheduler() -> None:
     # Wait for bot to be set
     while _bot is None:
         await asyncio.sleep(1)
+    
+    # Check if announcements are enabled
+    if not config.announcements.enabled:
+        logger.info("Announcements disabled in config")
+        return
     
     # Load announcements
     _announcements = load_announcements(config.locale.default)
@@ -339,7 +525,8 @@ async def run_scheduler() -> None:
                     # Check if it's time to send to this group
                     time_since_last = current_time - last_sent.get(key, 0)
                     if time_since_last >= interval:
-                        success = await send_to_group(message, group_id)
+                        # send_to_group will check can_send internally
+                        success = await send_to_group(message, group_id, i)
                         
                         if success:
                             last_sent[key] = current_time
@@ -350,6 +537,11 @@ async def run_scheduler() -> None:
                             
                             interval_info = f"{every_min}-{every_max}" if every_min != every_max else str(every_min)
                             logger.info(f"Announcement #{i+1} sent to {group_id} (interval: {interval_info}s, next: {next_intervals[key]}s)")
+                        else:
+                            # If not sent due to conditions (sleep, stack, etc.), retry sooner
+                            # but not immediately - add some jitter
+                            retry_delay = random.randint(60, 300)  # 1-5 minutes
+                            last_sent[key] = current_time - interval + retry_delay
             
             await asyncio.sleep(10)  # Check every 10 seconds
             
@@ -360,6 +552,10 @@ async def run_scheduler() -> None:
             logger.error(f"Scheduler error: {e}")
             await asyncio.sleep(30)
 
+
+# =============================================================================
+# PUBLIC API
+# =============================================================================
 
 def set_bot(bot) -> None:
     """Set the bot instance for announcements."""
@@ -373,3 +569,16 @@ def reload_announcements(locale: str = None) -> int:
     global _announcements
     _announcements = load_announcements(locale or config.locale.default)
     return len(_announcements)
+
+
+def get_group_history(group_id: int) -> list[dict]:
+    """Get message history for a group (for debugging)."""
+    if group_id not in _group_history:
+        return []
+    return list(_group_history[group_id])
+
+
+def clear_group_history(group_id: int) -> None:
+    """Clear message history for a group."""
+    if group_id in _group_history:
+        _group_history[group_id].clear()

@@ -96,6 +96,42 @@ class HealthCheckConfig(BaseModel):
     port: int = 8080
 
 
+class AnnouncementGroupConfig(BaseModel):
+    """Per-group announcement settings override."""
+    sleep_from: str | None = None  # "23:00" format
+    sleep_to: str | None = None    # "07:00" format
+    utc_offset: int | None = None  # UTC offset in hours (e.g., 5 for UTC+5)
+
+
+class AnnouncementsConfig(BaseModel):
+    enabled: bool = True
+    
+    # Track last N messages per group to avoid spam
+    history_size: int = 20
+    
+    # Max announcements in recent history before pausing
+    max_stack: int = 3
+    
+    # Don't re-send same announcement if it's in last N messages
+    avoid_duplicate_in_last: int = 15
+    
+    # Global sleep time (when not to send announcements)
+    sleep_from: str = ""  # "23:00" format, empty = no sleep
+    sleep_to: str = ""    # "07:00" format
+    utc_offset: int = 0   # UTC offset in hours (e.g., 5 for UTC+5)
+    
+    # Per-group overrides (group_id -> settings)
+    groups: dict[int, AnnouncementGroupConfig] = {}
+    
+    @field_validator('groups', mode='before')
+    @classmethod
+    def convert_group_keys(cls, v):
+        """Convert string keys from TOML to int."""
+        if isinstance(v, dict):
+            return {int(k): AnnouncementGroupConfig.model_validate(val) for k, val in v.items()}
+        return v
+
+
 class CacheConfig(BaseModel):
     # Member data cache
     members_maxsize: int = 500
@@ -129,6 +165,7 @@ class Config(BaseModel):
     throttling: ThrottlingConfig = ThrottlingConfig()
     healthcheck: HealthCheckConfig = HealthCheckConfig()
     cache: CacheConfig = CacheConfig()
+    announcements: AnnouncementsConfig = AnnouncementsConfig()
 
 
 def get_config_path() -> Path:
