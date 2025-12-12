@@ -150,7 +150,7 @@ def get_report_comment(
     # Build header with chat name if provided
     header = ""
     if chat_title:
-        header = f"🟢 <b>{chat_title}</b>\n\n"
+        header = f"[ <b>{chat_title}</b> ]\n\n"
     
     # Pass variables directly to get_string for Fluent interpolation
     msg = header + get_string(
@@ -158,14 +158,14 @@ def get_report_comment(
         date=message_date.strftime(get_string("report_date_format")),
         chat_id=get_url_chat_id(chat_id),
         msg_id=message_id
-    )
+    ) + "\n"
 
     # Add reporter info
     if reporter:
-        msg += get_string("report_from", reporter=user_mention(reporter))
+        msg += get_string("report_from", reporter=user_mention(reporter)) + "\n"
 
     if report_message:
-        msg += get_string("report_note", note=report_message)
+        msg += "\n" + get_string("report_note", note=report_message)
     return msg
 
 
