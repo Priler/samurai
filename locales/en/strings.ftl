@@ -20,11 +20,15 @@ error-givestickers-admin = Admins are already allowed to send stickers!
 report-date-format = %d.%m.%Y at %H:%M (server time)
 report-message = 👆 Sent { $date }
     <a href="https://t.me/c/{ $chat_id }/{ $msg_id }">Go to message</a>
+report-from = 
+    
+    👤 Report from: { $reporter }
 report-note = 
     
-    Note: { $note }
+    📝 Note: { $note }
 
 # ========== ACTION BUTTONS ==========
+action-go-to-message = 🔗 Go to message
 action-del-msg = 🗑 Delete message
 action-del-and-ban = 🗑 Delete + ❌ ban forever
 action-del-and-readonly = 🗑 Delete + 🙊 mute for 24h

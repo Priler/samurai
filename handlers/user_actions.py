@@ -73,7 +73,15 @@ async def cmd_report(message: Message) -> None:
             return f"{action}_{chat_id}_{reply_msg_id}_{reply_user_id}_{reporter_user_id}_{bot_reply_id}"
         return f"{action}_{chat_id}_{reply_msg_id}_{reporter_user_id}_{bot_reply_id}"
 
+    # Generate link to message
+    url_chat_id = get_url_chat_id(chat_id)
+    message_url = f"https://t.me/c/{url_chat_id}/{reply_msg_id}"
+
     action_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=get_string("action_go_to_message"),
+            url=message_url
+        )],
         [InlineKeyboardButton(
             text=get_string("action_del_msg"),
             callback_data=cb("rdel", include_user=False)
@@ -117,7 +125,8 @@ async def cmd_report(message: Message) -> None:
             reported_msg.message_id,
             chat_id,
             report_message,
-            message.chat.title
+            message.chat.title,
+            reporter=message.from_user
         ),
         reply_markup=action_keyboard
     )

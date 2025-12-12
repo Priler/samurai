@@ -1,4 +1,11 @@
-# Main entry point.
+"""
+Main bot entry point.
+Handles startup and shutdown procedures, including database connections,
+scheduling tasks, and health checks.
+
+Author: Abraham (Priler)
+Github repo: https://github.com/Priler/samurai
+"""
 
 import asyncio
 import logging

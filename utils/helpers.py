@@ -133,7 +133,8 @@ def get_report_comment(
     message_id: int,
     chat_id: int,
     report_message: Optional[str] = None,
-    chat_title: Optional[str] = None
+    chat_title: Optional[str] = None,
+    reporter = None
 ) -> str:
     """
     Generate report message for admins.
@@ -144,12 +145,12 @@ def get_report_comment(
         chat_id: ID of the chat where message was sent
         report_message: Optional note from reporter
         chat_title: Name of the chat (for multi-group support)
+        reporter: User object of the reporter (from_user)
     """
     # Build header with chat name if provided
     header = ""
     if chat_title:
-        # header = f"🟢 <b>{chat_title}</b>\n\n"
-        header = f"[<b>{chat_title}</b>]\n\n"
+        header = f"🟢 <b>{chat_title}</b>\n\n"
     
     # Pass variables directly to get_string for Fluent interpolation
     msg = header + get_string(
@@ -158,6 +159,10 @@ def get_report_comment(
         chat_id=get_url_chat_id(chat_id),
         msg_id=message_id
     )
+
+    # Add reporter info
+    if reporter:
+        msg += get_string("report_from", reporter=user_mention(reporter))
 
     if report_message:
         msg += get_string("report_note", note=report_message)
