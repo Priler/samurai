@@ -118,7 +118,7 @@ async def _reward_reporter(reporter_id: int, points: int) -> None:
 
 @router.callback_query(F.data.startswith("rdel_"))
 async def callback_report_delete(call: CallbackQuery) -> None:
-    """Delete reported message only. Reward: +10 rep."""
+    """Delete reported message only. Reward rep."""
     # Format: rdel_chatId_msgId_reporterId_botReplyId
     parts = call.data.split("_")
     chat_id = int(parts[1])
@@ -139,14 +139,14 @@ async def callback_report_delete(call: CallbackQuery) -> None:
     await _update_bot_reply(call.bot, chat_id, bot_reply_id)
 
     await call.message.edit_text(
-        call.message.text + get_string("action_deleted")
+        call.message.text + "\n\n" + get_string("action_deleted")
     )
     await call.answer(text="Done")
 
 
 @router.callback_query(F.data.startswith("rdelban_"))
 async def callback_report_delete_and_ban(call: CallbackQuery) -> None:
-    """Delete message and ban user. Reward: +20 rep."""
+    """Delete message and ban user. Reward more rep."""
     # Format: rdelban_chatId_msgId_userId_reporterId_botReplyId
     parts = call.data.split("_")
     chat_id = int(parts[1])
@@ -170,14 +170,14 @@ async def callback_report_delete_and_ban(call: CallbackQuery) -> None:
     await _update_bot_reply(call.bot, chat_id, bot_reply_id)
 
     await call.message.edit_text(
-        call.message.text + get_string("action_deleted_banned")
+        call.message.text + "\n\n" + get_string("action_deleted_banned")
     )
     await call.answer(text="Done")
 
 
 @router.callback_query(F.data.startswith("rmute_"))
 async def callback_report_delete_and_mute_24h(call: CallbackQuery) -> None:
-    """Delete message and mute user for 24 hours. Reward: +10 rep."""
+    """Delete message and mute user for 24 hours. Reward rep."""
     # Format: rmute_chatId_msgId_userId_reporterId_botReplyId
     parts = call.data.split("_")
     chat_id = int(parts[1])
@@ -206,14 +206,14 @@ async def callback_report_delete_and_mute_24h(call: CallbackQuery) -> None:
     await _update_bot_reply(call.bot, chat_id, bot_reply_id)
 
     await call.message.edit_text(
-        call.message.text + get_string("action_deleted_readonly")
+        call.message.text + "\n\n" + get_string("action_deleted_readonly")
     )
     await call.answer(text="Done")
 
 
 @router.callback_query(F.data.startswith("rmute2_"))
 async def callback_report_delete_and_mute_7d(call: CallbackQuery) -> None:
-    """Delete message and mute user for 7 days. Reward: +15 rep."""
+    """Delete message and mute user for 7 days. Reward some more rep."""
     # Format: rmute2_chatId_msgId_userId_reporterId_botReplyId
     parts = call.data.split("_")
     chat_id = int(parts[1])
@@ -242,14 +242,14 @@ async def callback_report_delete_and_mute_7d(call: CallbackQuery) -> None:
     await _update_bot_reply(call.bot, chat_id, bot_reply_id)
 
     await call.message.edit_text(
-        call.message.text + get_string("action_deleted_readonly2")
+        call.message.text + "\n\n" + get_string("action_deleted_readonly2")
     )
     await call.answer(text="Done")
 
 
 @router.callback_query(F.data.startswith("rdismiss_"))
 async def callback_report_dismiss(call: CallbackQuery) -> None:
-    """Dismiss report (false alarm). No reward."""
+    """Dismiss report (false alarm). No rep reward."""
     # Format: rdismiss_chatId_msgId_userId_reporterId_botReplyId
     parts = call.data.split("_")
     chat_id = int(parts[1])
@@ -266,7 +266,7 @@ async def callback_report_dismiss(call: CallbackQuery) -> None:
         await call.bot.delete_message(chat_id, bot_reply_id)
 
     await call.message.edit_text(
-        call.message.text + get_string("action_dismissed")
+        call.message.text + "\n\n" + get_string("action_dismissed")
     )
     await call.answer(text="Done")
 
@@ -301,7 +301,7 @@ async def callback_report_dismiss_mute_reporter_1d(call: CallbackQuery) -> None:
         await call.bot.delete_message(chat_id, bot_reply_id)
 
     await call.message.edit_text(
-        call.message.text + get_string("action_deleted_dismissed2")
+        call.message.text + "\n\n" + get_string("action_deleted_dismissed2")
     )
     await call.answer(text="Done")
 
@@ -336,7 +336,7 @@ async def callback_report_dismiss_mute_reporter_7d(call: CallbackQuery) -> None:
         await call.bot.delete_message(chat_id, bot_reply_id)
 
     await call.message.edit_text(
-        call.message.text + get_string("action_deleted_dismissed3")
+        call.message.text + "\n\n" + get_string("action_deleted_dismissed3")
     )
     await call.answer(text="Done")
 
@@ -363,7 +363,7 @@ async def callback_report_dismiss_ban_reporter(call: CallbackQuery) -> None:
         await call.bot.delete_message(chat_id, bot_reply_id)
 
     await call.message.edit_text(
-        call.message.text + get_string("action_deleted_dismissed4")
+        call.message.text + "\n\n" + get_string("action_deleted_dismissed4")
     )
     await call.answer(text="Done")
 

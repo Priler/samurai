@@ -19,7 +19,6 @@ error-givestickers-admin = Админам итак разрешено отпра
 # ========== REPORT ==========
 report-date-format = %d.%m.%Y в %H:%M (время сервера)
 report-message = 🕗 Отправлено { $date }
-    <a href="https://t.me/c/{ $chat_id }/{ $msg_id }">Перейти к сообщению</a>
 report-from = 
     
     👤 Репорт от: { $reporter }

@@ -19,7 +19,6 @@ error-givestickers-admin = Admins are already allowed to send stickers!
 # ========== REPORT ==========
 report-date-format = %d.%m.%Y at %H:%M (server time)
 report-message = 🕗 Sent { $date }
-    <a href="https://t.me/c/{ $chat_id }/{ $msg_id }">Go to message</a>
 report-from = 
     
     👤 Report from: { $reporter }
