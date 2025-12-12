@@ -23,6 +23,7 @@ from middlewares import register_all_middlewares
 from services.announcements import set_bot as set_announcements_bot, run_scheduler
 from services.healthcheck import start_health_server, stop_health_server, get_health_server
 from services.cache import start_batch_flush_task, stop_batch_flush_task, flush_member_updates
+from services import ml_manager
 
 # Configure logging
 logging.basicConfig(
@@ -57,6 +58,9 @@ async def on_startup(bot: Bot) -> None:
     _scheduler_task = asyncio.create_task(run_scheduler())
     logger.info("Announcements scheduled")
 
+    # Start ML model auto-unload monitor
+    ml_manager.start_monitor()
+
     # Set health check to ready
     if config.healthcheck.enabled:
         get_health_server().set_ready(True)
@@ -73,6 +77,9 @@ async def on_shutdown(bot: Bot) -> None:
     # Set health check to not ready
     if config.healthcheck.enabled:
         get_health_server().set_ready(False)
+
+    # Stop ML model monitor
+    ml_manager.stop_monitor()
 
     # Cancel scheduler task
     if _scheduler_task and not _scheduler_task.done():
@@ -103,7 +110,7 @@ async def main() -> None:
         logger.error("No bot token provided")
         sys.exit(1)
 
-    # Start health check server (if needed)
+    # Start health check server
     if config.healthcheck.enabled:
         await start_health_server(
             host=config.healthcheck.host,

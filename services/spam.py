@@ -4,10 +4,11 @@ Spam detection service using ML model.
 Features:
 - Lazy loading of ML models (faster startup)
 - Quick substring check before expensive ML inference
-
-@TODO: Convert to ONNX for lower RAM usage and possibly faster inference.
+- Auto-unload after TTL to save RAM
 """
 from typing import Optional
+import time
+import gc
 
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -17,6 +18,7 @@ MODEL_PATH = "ruspam_model/torch/"
 # Lazy-loaded model and tokenizer
 _tokenizer: Optional[AutoTokenizer] = None
 _model: Optional[AutoModelForSequenceClassification] = None
+_last_used: float = 0.0  # Timestamp of last usage
 
 # Known spam substrings to check first (faster than ML)
 SPAM_SUBSTRINGS = [
@@ -47,6 +49,12 @@ def _get_model() -> AutoModelForSequenceClassification:
     return _model
 
 
+def _touch() -> None:
+    """Update last used timestamp."""
+    global _last_used
+    _last_used = time.time()
+
+
 def predict(text: str) -> bool:
     """
     Predict if text is spam.
@@ -65,6 +73,7 @@ def predict(text: str) -> bool:
     # ML-based prediction (lazy load models)
     tokenizer = _get_tokenizer()
     model = _get_model()
+    _touch()  # Update last used time
     
     inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=256)
     with torch.no_grad():
@@ -82,3 +91,28 @@ def preload_model() -> None:
     """
     _get_tokenizer()
     _get_model()
+    _touch()
+
+
+def unload_model() -> bool:
+    """Free memory by unloading model."""
+    global _model, _tokenizer, _last_used
+    
+    if _model is None and _tokenizer is None:
+        return False
+    
+    _model = None
+    _tokenizer = None
+    _last_used = 0.0
+    gc.collect()
+    return True
+
+
+def is_loaded() -> bool:
+    """Check if model is currently loaded."""
+    return _model is not None
+
+
+def get_last_used() -> float:
+    """Get timestamp of last model usage."""
+    return _last_used

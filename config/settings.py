@@ -155,6 +155,21 @@ class CacheConfig(BaseModel):
     trusted_user_messages: int = 100
 
 
+class MLConfig(BaseModel):
+    """ML model memory management settings."""
+    # Auto-unload models when not used
+    auto_unload_enabled: bool = True
+    
+    # Time in minutes before unloading spam model
+    spam_ttl_minutes: int = 10
+    
+    # Time in minutes before unloading nsfw model
+    nsfw_ttl_minutes: int = 10
+    
+    # Check interval in seconds
+    check_interval_seconds: int = 60
+
+
 class Config(BaseModel):
     bot: BotConfig = BotConfig()
     locale: LocaleConfig = LocaleConfig()
@@ -166,6 +181,7 @@ class Config(BaseModel):
     healthcheck: HealthCheckConfig = HealthCheckConfig()
     cache: CacheConfig = CacheConfig()
     announcements: AnnouncementsConfig = AnnouncementsConfig()
+    ml: MLConfig = MLConfig()
 
 
 def get_config_path() -> Path:

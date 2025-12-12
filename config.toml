@@ -167,3 +167,16 @@ utc_offset = 5
 # sleep_from = "23:00"
 # sleep_to = "08:00"
 # utc_offset = 5
+
+[ml]
+# Auto-unload ML models when not used to save RAM
+auto_unload_enabled = true
+
+# Unload spam model after this many minutes of inactivity
+spam_ttl_minutes = 60
+
+# Unload NSFW model after this many minutes of inactivity
+nsfw_ttl_minutes = 10
+
+# How often to check for models to unload (seconds)
+check_interval_seconds = 60

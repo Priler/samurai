@@ -4,8 +4,11 @@ NSFW image classification service using SigLIP model.
 Features:
 - Lazy loading (saves RAM at startup)
 - Thumbnail processing (256x256 - model's native size, saves RAM)
+- Auto-unload after TTL to save RAM
 """
 from typing import Optional
+import time
+import gc
 
 from PIL import Image
 import torch
@@ -16,6 +19,7 @@ MODEL_NAME = "prithivMLmods/siglip2-x256-explicit-content"
 # Lazy-loaded model and processor
 _model = None
 _processor = None
+_last_used: float = 0.0  # Timestamp of last usage
 
 # Model expects 256x256 images - resize to this for RAM savings
 TARGET_SIZE = (256, 256)
@@ -49,6 +53,12 @@ def _get_model():
     return _model
 
 
+def _touch() -> None:
+    """Update last used timestamp."""
+    global _last_used
+    _last_used = time.time()
+
+
 def classify_explicit_content(image: np.ndarray) -> dict[str, float]:
     """
     Classify image for explicit content.
@@ -73,6 +83,7 @@ def classify_explicit_content(image: np.ndarray) -> dict[str, float]:
     
     processor = _get_processor()
     model = _get_model()
+    _touch()  # Update last used time
     
     inputs = processor(images=pil_image, return_tensors="pt")
     
@@ -96,13 +107,23 @@ def classify_explicit_content(image: np.ndarray) -> dict[str, float]:
 
 def unload_model() -> bool:
     """Free memory by unloading model."""
-    global _model, _processor
-    import gc
+    global _model, _processor, _last_used
     
     if _model is None and _processor is None:
         return False
     
     _model = None
     _processor = None
+    _last_used = 0.0
     gc.collect()
     return True
+
+
+def is_loaded() -> bool:
+    """Check if model is currently loaded."""
+    return _model is not None
+
+
+def get_last_used() -> float:
+    """Get timestamp of last model usage."""
+    return _last_used
