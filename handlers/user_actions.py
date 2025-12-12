@@ -58,7 +58,7 @@ async def cmd_report(message: Message) -> None:
     report_message = msg_parts[1] if len(msg_parts) > 1 else None
 
     # Reply to the REPORTED message with "under review" 
-    bot_reply = await reported_msg.reply(_random("report-under-review"))
+    bot_reply = await reported_msg.reply(_random("report-under-review"), parse_mode="HTML")
     
     # Build callback data with all needed info:
     # Format: action_chatId_reportedMsgId_reportedUserId_reporterUserId_botReplyMsgId

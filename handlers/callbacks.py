@@ -107,7 +107,8 @@ async def _update_bot_reply(bot, chat_id: int, bot_reply_id: int) -> None:
         await bot.edit_message_text(
             chat_id=chat_id,
             message_id=bot_reply_id,
-            text=_random("report-completed")
+            text=_random("report-completed"),
+            parse_mode="HTML"
         )
 
 
