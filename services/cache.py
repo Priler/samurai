@@ -236,6 +236,9 @@ async def retrieve_or_create_member(user_id: int) -> MemberData:
     
     Returns lightweight MemberData instead of ORM object to prevent
     memory leaks from cached ORM session references.
+    
+    Handles race conditions when multiple requests try to create
+    the same user simultaneously.
     """
     if user_id in members_cache:
         return members_cache[user_id]
@@ -243,7 +246,12 @@ async def retrieve_or_create_member(user_id: int) -> MemberData:
     try:
         member = await Member.objects.get(user_id=user_id)
     except ormar.NoMatch:
-        member = await Member.objects.create(user_id=user_id, messages_count=1)
+        try:
+            member = await Member.objects.create(user_id=user_id, messages_count=1)
+        except Exception:
+            # Race condition: another request created the user first
+            # Just fetch it
+            member = await Member.objects.get(user_id=user_id)
     
     # Cache lightweight dataclass, not ORM object
     member_data = MemberData.from_orm(member)
@@ -259,11 +267,18 @@ async def get_member_orm(user_id: int) -> Member:
     For delta updates (add/subtract), use queue_member_update() instead.
     
     Note: Does not use cache - always fetches fresh from DB.
+    
+    Handles race conditions when multiple requests try to create
+    the same user simultaneously.
     """
     try:
         return await Member.objects.get(user_id=user_id)
     except ormar.NoMatch:
-        return await Member.objects.create(user_id=user_id, messages_count=1)
+        try:
+            return await Member.objects.create(user_id=user_id, messages_count=1)
+        except Exception:
+            # Race condition: another request created the user first
+            return await Member.objects.get(user_id=user_id)
 
 
 def invalidate_member_cache(user_id: int) -> None:
