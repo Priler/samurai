@@ -72,7 +72,7 @@ async def on_bu(message: Message) -> None:
 
 @router.message(
     InMainGroups(),
-    Command("me", "я", "info", "инфо", "lvl", "лвл", "whoami", "neofetch", "fastfetch" prefix="!/")
+    Command("me", "я", "info", "инфо", "lvl", "лвл", "whoami", "neofetch", "fastfetch", prefix="!/")
 )
 async def on_me(message: Message) -> None:
     """Show user info and reputation."""
