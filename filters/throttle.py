@@ -12,7 +12,6 @@ from typing import Union
 from aiogram.filters import BaseFilter
 from aiogram.types import Message, CallbackQuery
 
-throttle_filter_timestamps: dict[tuple, float] = {}
 
 class ThrottleFilter(BaseFilter):
     """
@@ -37,7 +36,7 @@ class ThrottleFilter(BaseFilter):
         self.per_member = per_member
         self.per_group = per_group
         # Instance-level storage for throttle timestamps
-        # self._timestamps: dict[tuple, float] = {}
+        self._timestamps: dict[tuple, float] = {}
     
     def _get_key(self, event: Union[Message, CallbackQuery]) -> tuple:
         """Generate throttle key based on settings."""
@@ -60,9 +59,9 @@ class ThrottleFilter(BaseFilter):
         key = self._get_key(event)
         now = time.time()
         
-        last_call = throttle_filter_timestamps.get(key, 0)
+        last_call = self._timestamps.get(key, 0)
         if now - last_call < self.interval:
             return False  # Throttled
         
-        throttle_filter_timestamps[key] = now
+        self._timestamps[key] = now
         return True  # Allowed

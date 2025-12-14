@@ -72,7 +72,7 @@ async def on_bu(message: Message) -> None:
 
 @router.message(
     InMainGroups(), 
-    ThrottleFilter(interval=60, per_group=True),
+    ThrottleFilter(interval=60, per_member=True, per_group=True),
     Command("rules", "правила", prefix="!/")
 )
 async def on_rules(message: Message) -> None:
