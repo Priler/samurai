@@ -68,6 +68,11 @@ class SpamConfig(BaseModel):
     # Forward restriction for low-rep users
     allow_forwards_threshold: int = 30  # Rep required to forward messages
     forward_violation_penalty: int = 10  # Rep penalty for forwarding
+    
+    # Auto-ban for repeat spam offenders
+    autoban_enabled: bool = True  # Enable auto-ban for spam violations
+    autoban_threshold: int = 100  # Ban user when violations exceed this
+    autoban_rep_threshold: int = 100  # Only auto-ban if rep is below this
 
 
 class NSFWConfig(BaseModel):

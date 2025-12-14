@@ -533,6 +533,28 @@ async def on_user_message(message: Message) -> None:
                 violations_count_spam=1,
                 reputation_points=-5
             )
+            
+            # Check for auto-ban threshold
+            if config.spam.autoban_enabled:
+                new_violations = member.violations_count_spam + 1
+                new_rep = member.reputation_points - 5  # After penalty
+                if (new_violations >= config.spam.autoban_threshold and 
+                    new_rep < config.spam.autoban_rep_threshold):
+                    try:
+                        await message.bot.ban_chat_member(
+                            chat_id=message.chat.id,
+                            user_id=user_id
+                        )
+                        await write_log(
+                            message.bot,
+                            f"Автобан за спам: {new_violations} нарушений\n"
+                            f"<i>Репутация:</i> {new_rep}\n\n"
+                            f"<i>Пользователь:</i> {user_mention(message.from_user)}",
+                            "🚫 Автобан",
+                            message.chat.title
+                        )
+                    except Exception:
+                        pass  # User might have left or already banned
         else:
             # No violations - check for unwanted content (NSFW, etc.)
             handled = await check_for_unwanted(message, msg_text, member, tg_member)

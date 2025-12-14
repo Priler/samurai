@@ -7,7 +7,7 @@ from aiogram.types import Message
 
 from config import config
 from db.models import Member
-from filters import MemberCanRestrictFilter, InMainGroups, IsAdminFilter
+from filters import MemberCanRestrictFilter, InMainGroups, IsOwnerFilter
 from utils import get_string, MemberStatus, user_mention_by_id
 
 router = Router(name="admin_actions")
@@ -89,13 +89,12 @@ def _parse_count(command: CommandObject, default: int = 10, max_val: int = 50) -
 
 
 @router.message(
-    InMainGroups(),
-    IsAdminFilter(),
+    IsOwnerFilter(),
     Command("top_violators_profanity", prefix="!/")
 )
 async def cmd_top_violators_profanity(message: Message, command: CommandObject) -> None:
     """
-    Show top profanity violators.
+    Show top profanity violators (owner only, works in PM and groups).
     
     Usage: /top_violators_profanity [count]
     Default count: 10, Max: 50
@@ -124,13 +123,12 @@ async def cmd_top_violators_profanity(message: Message, command: CommandObject) 
 
 
 @router.message(
-    InMainGroups(),
-    IsAdminFilter(),
+    IsOwnerFilter(),
     Command("top_violators_spam", prefix="!/")
 )
 async def cmd_top_violators_spam(message: Message, command: CommandObject) -> None:
     """
-    Show top spam violators.
+    Show top spam violators (owner only, works in PM and groups).
     
     Usage: /top_violators_spam [count]
     Default count: 10, Max: 50

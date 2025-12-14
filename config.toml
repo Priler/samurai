@@ -7,12 +7,14 @@ version = "1.0"
 version_codename = "Night City Samurai"
 
 
+
 [locale]
 # default locale for bot messages
 default = "ru"
 
 # available locales (must have corresponding folder in locales/)
 available = ["ru", "en"]
+
 
 
 [groups]
@@ -30,6 +32,7 @@ linked_channels = []
 
 # time in seconds for new users media restriction
 new_users_nomedia = 7776000
+
 
 
 [spam]
@@ -58,12 +61,24 @@ women_remove_first_comments_interval = 600
 # affects if profile photo will be checked for NSFW
 allow_comments_rep_threshold__woman = 10
 
+
 # reputation points required to forward messages from other chats/users
 # low-rep users forwarding is a common spam pattern
 allow_forwards_threshold = 50
 
 # reputation penalty for attempting to forward with low rep
 forward_violation_penalty = 10
+
+
+# auto-ban users who exceed spam violations threshold
+autoban_enabled = true
+
+# how much violations required to autoban the member (it's only spam violations)
+autoban_threshold = 100
+
+# only auto ban if a member's rep is lower than this threshold
+autoban_rep_threshold = 100
+
 
 
 # accounts with rep > allow_comments_rep_threshold__woman will be skipped from nsfw checks
@@ -95,6 +110,7 @@ normal_comb_pornography_prediction_threshold = 0.2
 anime_prediction_threshold = 0.7
 
 
+
 [db]
 url = "sqlite+aiosqlite:///db.sqlite"
 
@@ -122,6 +138,7 @@ batch_flush_interval = 60  # seconds
 trusted_user_messages = 100
 
 
+
 [throttling]
 # rate limiting for private chats
 enabled = true
@@ -136,11 +153,13 @@ max_messages = 20
 time_window = 60
 
 
+
 [healthcheck]
 # HTTP health check endpoint for container orchestration
 enabled = false
 host = "0.0.0.0"
 port = 8080
+
 
 
 [announcements]
@@ -174,6 +193,8 @@ utc_offset = 5
 # sleep_from = "23:00"
 # sleep_to = "08:00"
 # utc_offset = 5
+
+
 
 [ml]
 # Auto-unload ML models when not used to save RAM
