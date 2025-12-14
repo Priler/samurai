@@ -57,7 +57,7 @@ class ThrottleFilter(BaseFilter):
     
     async def __call__(self, event: Union[Message, CallbackQuery]) -> bool:
         key = self._get_key(event)
-        now = time.time()
+        now = time.monotonic()
         
         last_call = self._timestamps.get(key, 0)
         if now - last_call < self.interval:
