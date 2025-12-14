@@ -72,8 +72,8 @@ async def on_bu(message: Message) -> None:
 
 @router.message(
     InMainGroups(), 
-    ThrottleFilter(interval=60, per_group=True),
-    Command("rules", "правила", prefix="!/")
+    Command("rules", "правила", prefix="!/"),
+    ThrottleFilter(interval=60, per_group=True)
 )
 async def on_rules(message: Message) -> None:
     """Show chat rules (throttled per group - once per minute)."""
@@ -84,8 +84,8 @@ async def on_rules(message: Message) -> None:
 
 @router.message(
     InMainGroups(),
-    ThrottleFilter(interval=60, per_member=True, per_group=True),
-    Command("me", "я", "info", "инфо", "lvl", "лвл", "whoami", "neofetch", "fastfetch", prefix="!/")
+    Command("me", "я", "info", "инфо", "lvl", "лвл", "whoami", "neofetch", "fastfetch", prefix="!/"),
+    ThrottleFilter(interval=60, per_member=True, per_group=True)
 )
 async def on_me(message: Message) -> None:
     """Show user info and reputation."""
