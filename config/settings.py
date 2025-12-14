@@ -64,6 +64,10 @@ class SpamConfig(BaseModel):
     allow_comments_rep_threshold: int = 50
     women_remove_first_comments_interval: int = 600
     allow_comments_rep_threshold__woman: int = 10
+    
+    # Forward restriction for low-rep users
+    allow_forwards_threshold: int = 30  # Rep required to forward messages
+    forward_violation_penalty: int = 10  # Rep penalty for forwarding
 
 
 class NSFWConfig(BaseModel):

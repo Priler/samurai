@@ -350,6 +350,84 @@ async def on_user_contact(message: Message) -> None:
         await message.delete()
 
 
+# ========== FORWARD RESTRICTION ==========
+
+@router.message(InMainGroups(), F.forward_date)  # forward_date exists = forwarded message
+async def on_user_forward(message: Message) -> None:
+    """
+    Delete forwards from low-rep users (anti-spam measure).
+    
+    Allowed forwards (no rep check):
+    - Auto-forwards from linked channels
+    - Forwards from linked channels (replies to posts)
+    - Forwards from users who are members of this group
+    
+    Blocked forwards (requires rep):
+    - Forwards from external channels
+    - Forwards from users not in this group
+    """
+    # Skip auto-forwards from linked channels
+    if message.is_automatic_forward:
+        return
+    
+    # Check if forward is from a linked channel
+    if message.forward_from_chat:
+        if config.groups.is_linked_channel(message.forward_from_chat.id):
+            return  # Allow forwards from linked channels
+    
+    # Check if forward is from a user in this group
+    if message.forward_from:
+        try:
+            # Try to get the forwarded user's membership in this chat
+            forwarded_member = await message.bot.get_chat_member(
+                message.chat.id, 
+                message.forward_from.id
+            )
+            # If user is a member (not left/kicked), allow forward
+            if forwarded_member.status not in ("left", "kicked"):
+                return
+        except Exception:
+            # User not found in group or privacy settings block lookup
+            pass
+    
+    # At this point, it's a forward from external source
+    # Check user's reputation
+    member = await retrieve_or_create_member(message.from_user.id)
+    tg_member = await retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
+
+    # Skip admins
+    if tg_member.status in MemberStatus.admin_statuses():
+        return
+
+    # Check reputation threshold
+    if member.reputation_points < config.spam.allow_forwards_threshold:
+        await message.delete()
+        
+        # Punish for forward attempt
+        await queue_member_update(
+            message.from_user.id,
+            reputation_points=-config.spam.forward_violation_penalty
+        )
+        
+        # Log
+        forward_from = "Unknown"
+        if message.forward_from:
+            forward_from = f"👤 {message.forward_from.full_name}"
+        elif message.forward_from_chat:
+            forward_from = f"📢 {message.forward_from_chat.title or message.forward_from_chat.id}"
+        elif message.forward_sender_name:
+            forward_from = f"👤 {message.forward_sender_name}"
+        
+        await write_log(
+            message.bot,
+            f"Удалён форвард от: {forward_from}\n\n"
+            f"<i>Автор:</i> {user_mention(message.from_user)}\n"
+            f"<i>Репутация:</i> {member.reputation_points}",
+            "📨 Антиспам",
+            message.chat.title
+        )
+
+
 # ========== MEDIA RESTRICTION ==========
 
 @router.message(InMainGroups(), F.content_type.in_(MEDIA_CONTENT_TYPES))

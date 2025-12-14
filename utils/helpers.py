@@ -51,6 +51,11 @@ def user_mention(from_user) -> str:
     return _s
 
 
+def user_mention_by_id(user_id: int) -> str:
+    """Generate clickable user link from user_id only."""
+    return f'<a href="tg://user?id={user_id}">{user_id}</a>'
+
+
 def generate_log_message(
     message: str,
     log_type: str = "default",
@@ -150,7 +155,7 @@ def get_report_comment(
     # Build header with chat name if provided
     header = ""
     if chat_title:
-        header = f"[ {chat_title} ]\n\n"
+        header = f"🟢 <b>{chat_title}</b>\n\n"
     
     # Pass variables directly to get_string for Fluent interpolation
     msg = header + get_string(
@@ -158,14 +163,14 @@ def get_report_comment(
         date=message_date.strftime(get_string("report_date_format")),
         chat_id=get_url_chat_id(chat_id),
         msg_id=message_id
-    ) + "\n"
+    )
 
     # Add reporter info
     if reporter:
-        msg += get_string("report_from", reporter=user_mention(reporter)) + "\n"
+        msg += get_string("report_from", reporter=user_mention(reporter))
 
     if report_message:
-        msg += "\n" + get_string("report_note", note=report_message)
+        msg += get_string("report_note", note=report_message)
     return msg
 
 

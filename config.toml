@@ -58,6 +58,13 @@ women_remove_first_comments_interval = 600
 # affects if profile photo will be checked for NSFW
 allow_comments_rep_threshold__woman = 10
 
+# reputation points required to forward messages from other chats/users
+# low-rep users forwarding is a common spam pattern
+allow_forwards_threshold = 50
+
+# reputation penalty for attempting to forward with low rep
+forward_violation_penalty = 10
+
 
 # accounts with rep > allow_comments_rep_threshold__woman will be skipped from nsfw checks
 # note that NSFW checks are performed only with FEMALE accounts with low rep
