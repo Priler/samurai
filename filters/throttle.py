@@ -26,10 +26,6 @@ class ThrottleFilter(BaseFilter):
     If both are False, throttles globally for this filter instance.
     """
     
-    # Class-level storage for throttle timestamps
-    # Key format: (filter_id, group_id or 0, user_id or 0) -> timestamp
-    _timestamps: dict[tuple, float] = {}
-    
     def __init__(
         self, 
         interval: int = 60, 
@@ -39,6 +35,8 @@ class ThrottleFilter(BaseFilter):
         self.interval = interval
         self.per_member = per_member
         self.per_group = per_group
+        # Instance-level storage for throttle timestamps
+        self._timestamps: dict[tuple, float] = {}
     
     def _get_key(self, event: Union[Message, CallbackQuery]) -> tuple:
         """Generate throttle key based on settings."""
@@ -55,7 +53,7 @@ class ThrottleFilter(BaseFilter):
             if event.from_user:
                 user_id = event.from_user.id
         
-        return (id(self), group_id, user_id)
+        return (group_id, user_id)
     
     async def __call__(self, event: Union[Message, CallbackQuery]) -> bool:
         key = self._get_key(event)

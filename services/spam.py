@@ -25,7 +25,8 @@ SPAM_SUBSTRINGS = [
     "official_vpnbot",
     "rkt_vpn_bot",
     "vpnbot",
-    "vpn_bot"
+    "vpn_bot",
+    "oflvpn"
 ]
 
 # Precompute lowercase versions for faster matching
