@@ -8,7 +8,6 @@ IMPORTANT: Handler order matters in aiogram 3.x!
 import io
 import logging
 import random
-import time
 from typing import Optional
 
 from aiogram import Router, F, Bot
@@ -23,7 +22,7 @@ from PIL import Image
 import numpy as np
 
 from config import config
-from filters import IsOwnerFilter, InMainGroups
+from filters import IsOwnerFilter, InMainGroups, ThrottleFilter
 from db.models import Member, Spam
 from services import (
     retrieve_or_create_member, retrieve_tgmember, detect_gender,
@@ -49,10 +48,6 @@ from utils import (
 
 router = Router(name="group_events")
 
-# Per-group throttle tracking for rules command (chat_id -> last_call_timestamp)
-_rules_throttle: dict[int, float] = {}
-RULES_COOLDOWN_SECONDS = 60
-
 
 MEDIA_CONTENT_TYPES = {
     ContentType.PHOTO, ContentType.VIDEO, ContentType.AUDIO,
@@ -75,18 +70,13 @@ async def on_bu(message: Message) -> None:
 
 # ========== RULES COMMAND ==========
 
-@router.message(InMainGroups(), Command("rules", "правила", prefix="!/"))
+@router.message(
+    InMainGroups(), 
+    ThrottleFilter(interval=60, per_group=True),
+    Command("rules", "правила", prefix="!/")
+)
 async def on_rules(message: Message) -> None:
     """Show chat rules (throttled per group - once per minute)."""
-    chat_id = message.chat.id
-    now = time.time()
-    
-    # Check throttle
-    last_call = _rules_throttle.get(chat_id, 0)
-    if now - last_call < RULES_COOLDOWN_SECONDS:
-        return  # Silently ignore, don't spam with warnings
-    
-    _rules_throttle[chat_id] = now
     await message.answer(get_string("rules-message"))
 
 
@@ -94,6 +84,7 @@ async def on_rules(message: Message) -> None:
 
 @router.message(
     InMainGroups(),
+    ThrottleFilter(interval=60, per_group=True),
     Command("me", "я", "info", "инфо", "lvl", "лвл", "whoami", "neofetch", "fastfetch", prefix="!/")
 )
 async def on_me(message: Message) -> None:

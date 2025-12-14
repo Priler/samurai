@@ -3,6 +3,7 @@ from .is_admin import IsAdminFilter
 from .member_can_restrict import MemberCanRestrictFilter
 from .chat_id import ChatIdFilter
 from .in_main_groups import InMainGroups
+from .throttle import ThrottleFilter
 
 __all__ = [
     "IsOwnerFilter",
@@ -10,4 +11,5 @@ __all__ = [
     "MemberCanRestrictFilter",
     "ChatIdFilter",
     "InMainGroups",
+    "ThrottleFilter",
 ]

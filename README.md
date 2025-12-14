@@ -232,6 +232,7 @@ echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
 | Command | Description |
 |---------|-------------|
+| `!rules` / `/rules` | Request the chat rules |
 | `!report` / `/report` | Report a message (reply) |
 | `!me` / `!info` | Show user info |
 | `!бу` | Fun command (bot pretends to be scared lol) |

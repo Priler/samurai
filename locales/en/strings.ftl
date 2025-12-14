@@ -90,12 +90,12 @@ need-admins-attention = Dear admins, your presence in chat is needed!
     <a href="https://t.me/c/{ $chat_id }/{ $msg_id }">Go to message</a>
 
 # ========== RULES ==========
-rules-message = 📜 <b>Chat Rules:</b>
+rules-message = <b>Chat Rules:</b>
 
-    - 📈 This chat uses <u>reputation system</u>
-    - ⛔️ Newbies cannot send media
-    - 🤬 Profanity/insults are prohibited and <u>removed automatically</u>
-    - 👹 For flooding/spam/trolling you will be 🍌 banned
+    📈 This chat uses <u>reputation system</u>
+    ⛔️ Newbies cannot send media
+    🤬 Profanity/insults are prohibited and <u>removed automatically</u>
+    👹 For flooding/spam/trolling you will be 🍌 banned
 
     <b>Peace 🤞</b>
 
