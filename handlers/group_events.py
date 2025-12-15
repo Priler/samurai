@@ -365,7 +365,7 @@ async def on_user_contact(message: Message) -> None:
 
 # ========== FORWARD RESTRICTION ==========
 
-@router.message(InMainGroups(), F.forward_date)  # forward_date exists = forwarded message
+@router.message(InMainGroups(), F.forward_origin)  # forward_origin exists = forwarded message
 async def on_user_forward(message: Message) -> None:
     """
     Delete forwards from low-rep users (anti-spam measure).
