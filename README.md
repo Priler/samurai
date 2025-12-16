@@ -33,7 +33,8 @@ samurai/
 ├── filters/
 │   ├── is_owner.py
 │   ├── is_admin.py
-│   └── member_can_restrict.py
+│   ├── throttle.py
+│   └── .. other useful filters
 ├── handlers/
 │   ├── admin_actions.py   # Ban/unban commands
 │   ├── callbacks.py       # Inline button handlers
@@ -50,6 +51,7 @@ samurai/
 │       └── announcements.ftl
 ├── middlewares/
 │   ├── __init__.py
+│   ├── throttling.py      # Middleware for rate limiting
 │   └── i18n.py            # I18n middleware
 ├── services/
 │   ├── announcements.py   # Scheduled announcements
@@ -57,9 +59,12 @@ samurai/
 │   ├── gender.py          # Gender detection
 │   ├── nsfw.py            # NSFW detection
 │   ├── profanity.py       # Profanity detection
+│   ├── healthcheck.py     # Healthcheck server for containers orchestration
+│   ├── ml_manager.py      # Unloads unused ML models from memory after some time
 │   └── spam.py            # Spam detection
 ├── utils/
 │   ├── helpers.py         # Utility functions
+│   ├── enums.py           # Some useful enums to keep the codebase consistent
 │   └── localization.py    # Localization exports
 ├── libs/                  # External libraries (censure, gender_extractor)
 ├── ruspam_model/          # ML model for spam detection
@@ -196,8 +201,9 @@ docker run -d --name samurai-bot -v $(pwd)/config.toml:/app/config.toml samurai-
 
 ## RAM usage
 
-Currently bot uses ~800mb of RAM for ML models and for data caching.
-Probably we could reduce ML models RAM usage by implementing ONNX runtime models, but that's plans for future updates.
+Currently bot uses ~800mb of RAM for ML models and for data caching.  
+~~Probably we could reduce ML models RAM usage by implementing ONNX runtime models, but that's plans for future updates.~~  
+That ain't worked, the only viable solution would be to quantize the models :3
 
 For now, if your server doesn't handle and the process being killed with *Out of memory (`dmesg | grep -i "killed process"`)*,
 simple solution is to add swap:
@@ -220,10 +226,10 @@ echo '/swapfile none swap sw 0 0' >> /etc/fstab
 |----------|-------------|
 | `BOT_TOKEN` | Telegram bot token |
 | `BOT_OWNER` | Owner's Telegram user ID |
-| `GROUPS_MAIN` | Main group chat ID |
+| `GROUPS_MAIN` | Main group chat ID __(can be a comma separated list)__ |
 | `GROUPS_REPORTS` | Reports group chat ID |
 | `GROUPS_LOGS` | Logs group chat ID |
-| `LINKED_CHANNEL` | Linked channel ID |
+| `LINKED_CHANNEL` | Linked channel ID __(can be a comma separated list)__ |
 | `DB_URL` | Database URL |
 
 ## Built-in Commands
