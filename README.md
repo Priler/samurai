@@ -1,6 +1,6 @@
 # 👹 Samurai Telegram Bot
 ![Samurai Telegram Bot](https://i.imgur.com/S9BPDMt.jpeg "te")
-Simple, yet effective **moderator bot for telegram**.  
+Simple, yet effective **auto-moderator bot for telegram**.  
 With reports, logs, profanity filter, anti-spam AI, NSFW detection, reputation system and more :3
 
 ## What samurai do?
