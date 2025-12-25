@@ -24,7 +24,7 @@ async def cmd_ban(message: Message) -> None:
         await message.reply(get_string("error_no_reply"))
         return
 
-    # Admins cannot be banned
+    # admins cannot be banned
     user = await message.bot.get_chat_member(
         message.chat.id,
         message.reply_to_message.from_user.id
@@ -33,10 +33,10 @@ async def cmd_ban(message: Message) -> None:
         await message.reply(get_string("error_ban_admin"))
         return
 
-    # Remove admin's command message
+    # remove admin's command
     await message.delete()
 
-    # Ban the user
+    # ban
     await message.bot.ban_chat_member(
         chat_id=message.chat.id,
         user_id=message.reply_to_message.from_user.id
@@ -56,7 +56,7 @@ async def cmd_unban(message: Message) -> None:
         await message.reply(get_string("error_no_reply"))
         return
 
-    # Admins cannot be unbanned
+    # admins cannot be unbanned
     user = await message.bot.get_chat_member(
         message.chat.id,
         message.reply_to_message.from_user.id
@@ -65,10 +65,10 @@ async def cmd_unban(message: Message) -> None:
         await message.reply(get_string("error_ban_admin"))
         return
 
-    # Remove admin's command message
+    # remove admin's command
     await message.delete()
 
-    # Unban the user
+    # unban
     await message.bot.unban_chat_member(
         chat_id=message.chat.id,
         user_id=message.reply_to_message.from_user.id
@@ -101,7 +101,7 @@ async def cmd_top_violators_profanity(message: Message, command: CommandObject) 
     """
     count = _parse_count(command)
     
-    # Query database
+    # query db
     violators = await Member.objects.filter(
         violations_count_profanity__gt=0
     ).order_by("-violations_count_profanity").limit(count).all()
@@ -110,7 +110,7 @@ async def cmd_top_violators_profanity(message: Message, command: CommandObject) 
         await message.reply("🧼 Нарушителей не найдено")
         return
     
-    # Build response
+    # build response
     lines = [f"🤬 <b>Топ-{len(violators)} нарушителей (мат):</b>\n"]
     
     for i, member in enumerate(violators, 1):
@@ -135,7 +135,7 @@ async def cmd_top_violators_spam(message: Message, command: CommandObject) -> No
     """
     count = _parse_count(command)
     
-    # Query database
+    # query db
     violators = await Member.objects.filter(
         violations_count_spam__gt=0
     ).order_by("-violations_count_spam").limit(count).all()
@@ -144,7 +144,7 @@ async def cmd_top_violators_spam(message: Message, command: CommandObject) -> No
         await message.reply("🧼 Нарушителей не найдено")
         return
     
-    # Build response
+    # build response
     lines = [f"📨 <b>Топ-{len(violators)} нарушителей (спам):</b>\n"]
     
     for i, member in enumerate(violators, 1):

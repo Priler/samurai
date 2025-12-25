@@ -21,9 +21,8 @@ from config import config
 from db.models import Member
 from services.gender import detect_gender as _detect_gender, Gender
 
-# =============================================================================
-# LIGHTWEIGHT MEMBER DATA
-# =============================================================================
+
+### LIGHTWEIGHT MEMBER DATA ###
 
 @dataclass
 class MemberData:
@@ -52,40 +51,37 @@ class MemberData:
         )
 
 
-# =============================================================================
-# CACHE INSTANCES (sizes from config)
-# =============================================================================
+### CACHE INSTANCES (sizes from config) ###
 
-# Member DB records
+# member DB records
 members_cache: TTLCache = TTLCache(
     maxsize=config.cache.members_maxsize, 
     ttl=config.cache.members_ttl
 )
 
-# Telegram member objects
-# Key: (chat_id, user_id) tuple for multi-group support
+# telegram member objects
+# key: (chat_id, user_id) tuple for multi-group support
 tgmembers_cache: TTLCache = TTLCache(
     maxsize=config.cache.tgmembers_maxsize, 
     ttl=config.cache.tgmembers_ttl
 )
 
-# Gender detection (LRU, no TTL - names don't change)
+# gender detection (LRU, no TTL - names don't change)
 gender_detections_cache: LRUCache = LRUCache(
     maxsize=config.cache.gender_maxsize
 )
 
-# NSFW detection results
-# Key: (user_id, photo_file_unique_id) tuple
+# nsfw detection results
+# key: (user_id, photo_file_unique_id) tuple
 nsfw_results_cache: TTLCache = TTLCache(
     maxsize=config.cache.nsfw_maxsize, 
     ttl=config.cache.nsfw_ttl
 )
 
-# =============================================================================
-# BATCH UPDATE SYSTEM
-# =============================================================================
 
-# Pending member updates: {user_id: {"field": delta_value}}
+### BATCH UPDATE SYSTEM ###
+
+# pending updates: {user_id: {"field": delta_value}}
 _pending_updates: dict[int, dict[str, int]] = {}
 _batch_lock = asyncio.Lock()
 _flush_task: Optional[asyncio.Task] = None
@@ -167,9 +163,7 @@ def stop_batch_flush_task() -> None:
         _flush_task = None
 
 
-# =============================================================================
-# GENDER DETECTION CACHE
-# =============================================================================
+### GENDER DETECTION CACHE ###
 
 def cache_gender_detection(func):
     """Decorator for caching gender detection results."""
@@ -191,9 +185,7 @@ def detect_gender(name: str) -> Gender:
     return _detect_gender(name)
 
 
-# =============================================================================
-# TELEGRAM MEMBER CACHE (Multi-group aware)
-# =============================================================================
+### TELEGRAM MEMBER CACHE (multi-group aware) ###
 
 async def retrieve_tgmember(bot, chat_id: int, user_id: int):
     """
@@ -226,9 +218,7 @@ def invalidate_tgmember_cache_all(user_id: int) -> None:
         del tgmembers_cache[key]
 
 
-# =============================================================================
-# DATABASE MEMBER CACHE (stores lightweight dataclass, not ORM object)
-# =============================================================================
+### DATABASE MEMBER CACHE (lightweight dataclass, not ORM) ###
 
 async def retrieve_or_create_member(user_id: int) -> MemberData:
     """
@@ -253,7 +243,7 @@ async def retrieve_or_create_member(user_id: int) -> MemberData:
             # Just fetch it
             member = await Member.objects.get(user_id=user_id)
     
-    # Cache lightweight dataclass, not ORM object
+    # cache lightweight dataclass, not ORM object
     member_data = MemberData.from_orm(member)
     members_cache[user_id] = member_data
     return member_data
@@ -267,9 +257,6 @@ async def get_member_orm(user_id: int) -> Member:
     For delta updates (add/subtract), use queue_member_update() instead.
     
     Note: Does not use cache - always fetches fresh from DB.
-    
-    Handles race conditions when multiple requests try to create
-    the same user simultaneously.
     """
     try:
         return await Member.objects.get(user_id=user_id)
@@ -277,7 +264,7 @@ async def get_member_orm(user_id: int) -> Member:
         try:
             return await Member.objects.create(user_id=user_id, messages_count=1)
         except Exception:
-            # Race condition: another request created the user first
+            # race condition: another request created the user first
             return await Member.objects.get(user_id=user_id)
 
 
@@ -292,9 +279,7 @@ def update_member_cache(user_id: int, member: Member) -> None:
     members_cache[user_id] = MemberData.from_orm(member)
 
 
-# =============================================================================
-# NSFW DETECTION CACHE
-# =============================================================================
+### NSFW DETECTION CACHE ###
 
 def get_cached_nsfw_result(user_id: int, photo_file_unique_id: str) -> Optional[bool]:
     """
@@ -320,9 +305,7 @@ def invalidate_nsfw_cache(user_id: int) -> None:
         del nsfw_results_cache[key]
 
 
-# =============================================================================
-# UTILITY FUNCTIONS
-# =============================================================================
+### UTILITY FUNCTIONS ###
 
 def is_trusted_user(member: MemberData) -> bool:
     """Check if user is trusted (has many messages)."""

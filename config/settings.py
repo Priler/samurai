@@ -22,18 +22,18 @@ class LocaleConfig(BaseModel):
 
 
 class GroupsConfig(BaseModel):
-    # List of main chat IDs where bot operates
+    # list of main chat IDs where bot operates
     main: List[int] = []
-    # Single channel for reports
+    # single channel for reports
     reports: int = 0
-    # Single channel for logs
+    # single channel for logs
     logs: int = 0
-    # List of linked channels (for auto-forward detection)
+    # list of linked channels (for auto-forward detection)
     linked_channels: List[int] = []
-    # Time in seconds for new users media restriction
+    # time in seconds for new users media restriction
     new_users_nomedia: int = 7776000
     
-    # Cached sets for O(1) lookup (populated after init)
+    # cached sets for O(1) lookup (populated after init)
     _main_set: set = set()
     _linked_channels_set: set = set()
     
@@ -65,14 +65,14 @@ class SpamConfig(BaseModel):
     women_remove_first_comments_interval: int = 600
     allow_comments_rep_threshold__woman: int = 10
     
-    # Forward restriction for low-rep users
-    allow_forwards_threshold: int = 30  # Rep required to forward messages
-    forward_violation_penalty: int = 10  # Rep penalty for forwarding
+    # forward restriction for low-rep users
+    allow_forwards_threshold: int = 30  # rep required to forward messages
+    forward_violation_penalty: int = 10  # rep penalty for forwarding
     
-    # Auto-ban for repeat spam offenders
-    autoban_enabled: bool = True  # Enable auto-ban for spam violations
-    autoban_threshold: int = 100  # Ban user when violations exceed this
-    autoban_rep_threshold: int = 100  # Only auto-ban if rep is below this
+    # auto-ban for repeat spam offenders
+    autoban_enabled: bool = True  # enable auto-ban for spam violations
+    autoban_threshold: int = 100  # ban user when violations exceed this
+    autoban_rep_threshold: int = 100  # only auto-ban if rep is below this
 
 
 class NSFWConfig(BaseModel):
@@ -115,21 +115,21 @@ class AnnouncementGroupConfig(BaseModel):
 class AnnouncementsConfig(BaseModel):
     enabled: bool = True
     
-    # Track last N messages per group to avoid spam
+    # track last N messages per group to avoid spam
     history_size: int = 20
     
-    # Max announcements in recent history before pausing
+    # max announcements in recent history before pausing
     max_stack: int = 3
     
-    # Don't re-send same announcement if it's in last N messages
+    # don't re-send same announcement if it's in last N messages
     avoid_duplicate_in_last: int = 15
     
-    # Global sleep time (when not to send announcements)
+    # global sleep time (when not to send announcements)
     sleep_from: str = ""  # "23:00" format, empty = no sleep
     sleep_to: str = ""    # "07:00" format
     utc_offset: int = 0   # UTC offset in hours (e.g., 5 for UTC+5)
     
-    # Per-group overrides (group_id -> settings)
+    # per-group overrides (group_id -> settings)
     groups: dict[int, AnnouncementGroupConfig] = {}
     
     @field_validator('groups', mode='before')
@@ -142,40 +142,40 @@ class AnnouncementsConfig(BaseModel):
 
 
 class CacheConfig(BaseModel):
-    # Member data cache
+    # member data cache
     members_maxsize: int = 500
     members_ttl: int = 60  # seconds
     
-    # Telegram member cache
+    # telegram member cache
     tgmembers_maxsize: int = 1000
     tgmembers_ttl: int = 300  # seconds
     
-    # Gender detection cache (LRU, no TTL)
+    # gender detection cache (LRU, no TTL)
     gender_maxsize: int = 500
     
-    # NSFW detection cache
+    # nsfw detection cache
     nsfw_maxsize: int = 200
     nsfw_ttl: int = 3600  # seconds
     
-    # Batch update interval
+    # batch update interval
     batch_flush_interval: int = 30  # seconds
     
-    # Trusted user threshold (skip expensive checks)
+    # trusted user threshold (skip expensive checks)
     trusted_user_messages: int = 100
 
 
 class MLConfig(BaseModel):
     """ML model memory management settings."""
-    # Auto-unload models when not used
+    # auto-unload models when not used
     auto_unload_enabled: bool = True
     
-    # Time in minutes before unloading spam model
+    # time in minutes before unloading spam model
     spam_ttl_minutes: int = 10
     
-    # Time in minutes before unloading nsfw model
+    # time in minutes before unloading nsfw model
     nsfw_ttl_minutes: int = 10
     
-    # Check interval in seconds
+    # check interval in seconds
     check_interval_seconds: int = 60
 
 
@@ -236,7 +236,7 @@ def apply_env_overrides(config: Config) -> Config:
     if os.environ.get("BOT_LOCALE"):
         config.locale.default = os.environ["BOT_LOCALE"]
     
-    # Groups - now supports comma-separated lists
+    # groups - now supports comma-separated lists
     groups_changed = False
     if os.environ.get("GROUPS_MAIN"):
         config.groups.main = _parse_int_list(os.environ["GROUPS_MAIN"])
@@ -249,7 +249,7 @@ def apply_env_overrides(config: Config) -> Config:
         config.groups.linked_channels = _parse_int_list(os.environ["LINKED_CHANNELS"])
         groups_changed = True
     
-    # Rebuild sets after modifying lists
+    # rebuild sets after modifying lists
     if groups_changed:
         config.groups.rebuild_sets()
     

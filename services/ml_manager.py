@@ -19,7 +19,7 @@ async def _check_and_unload() -> None:
     """Check model TTLs and unload if expired."""
     current_time = time.time()
     
-    # Check spam model
+    # check spam model
     if spam.is_loaded():
         last_used = spam.get_last_used()
         ttl_seconds = config.ml.spam_ttl_minutes * 60
@@ -28,7 +28,7 @@ async def _check_and_unload() -> None:
             spam.unload_model()
             logger.info(f"Unloaded spam model (unused for {config.ml.spam_ttl_minutes} min)")
     
-    # Check NSFW model
+    # check NSFW model
     if nsfw.is_loaded():
         last_used = nsfw.get_last_used()
         ttl_seconds = config.ml.nsfw_ttl_minutes * 60

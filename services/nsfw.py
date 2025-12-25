@@ -16,15 +16,15 @@ import numpy as np
 
 MODEL_NAME = "prithivMLmods/siglip2-x256-explicit-content"
 
-# Lazy-loaded model and processor
+# lazy-loaded model and processor
 _model = None
 _processor = None
-_last_used: float = 0.0  # Timestamp of last usage
+_last_used: float = 0.0  # timestamp of last usage
 
-# Model expects 256x256 images - resize to this for RAM savings
+# model expects 256x256 images - resize to this for RAM savings
 TARGET_SIZE = (256, 256)
 
-# ID to Label mapping
+# ID to label mapping
 ID2LABEL = {
     "0": "Anime Picture",
     "1": "Hentai",
@@ -74,20 +74,20 @@ def classify_explicit_content(image: np.ndarray) -> dict[str, float]:
         - 'Pornography'
         - 'Enticing or Sensual'
     """
-    # Convert to PIL and resize to model's expected size (saves RAM)
+    # convert to PIL and resize (saves RAM)
     pil_image = Image.fromarray(image).convert("RGB")
     pil_image = pil_image.resize(TARGET_SIZE, Image.Resampling.LANCZOS)
     
-    # Free original array memory
+    # free original array memory
     del image
     
     processor = _get_processor()
     model = _get_model()
-    _touch()  # Update last used time
+    _touch()  # update last used time
     
     inputs = processor(images=pil_image, return_tensors="pt")
     
-    # Free PIL image memory
+    # free PIL image memory
     del pil_image
 
     with torch.no_grad():
@@ -95,7 +95,7 @@ def classify_explicit_content(image: np.ndarray) -> dict[str, float]:
         logits = outputs.logits
         probs = torch.nn.functional.softmax(logits, dim=1).squeeze().tolist()
     
-    # Free tensors
+    # free tensors
     del inputs, outputs, logits
 
     prediction = {

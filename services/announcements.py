@@ -39,9 +39,7 @@ TIMESTAMPS_FILE = Path("data/announcement_timestamps.json")
 _group_history: dict[int, deque] = {}
 
 
-# =============================================================================
-# MESSAGE HISTORY TRACKING
-# =============================================================================
+### MESSAGE HISTORY TRACKING ###
 
 def track_message(group_id: int, is_announcement: bool = False, announcement_idx: int | None = None) -> None:
     """
@@ -97,9 +95,7 @@ def is_announcement_in_recent(group_id: int, announcement_idx: int, lookback: in
     )
 
 
-# =============================================================================
-# SLEEP TIME CHECKING
-# =============================================================================
+### SLEEP TIME CHECKING ###
 
 def _parse_time(time_str: str) -> tuple[int, int] | None:
     """Parse "HH:MM" format to (hour, minute) tuple."""
@@ -156,9 +152,7 @@ def is_sleep_time(group_id: int) -> bool:
         return from_minutes <= current_minutes < to_minutes
 
 
-# =============================================================================
-# SENDING LOGIC
-# =============================================================================
+### SENDING LOGIC ###
 
 def can_send_announcement(group_id: int, announcement_idx: int) -> tuple[bool, str]:
     """
@@ -222,9 +216,7 @@ async def send_to_group(message: str, group_id: int, announcement_idx: int) -> b
         return False
 
 
-# =============================================================================
-# TIMESTAMP PERSISTENCE
-# =============================================================================
+### TIMESTAMP PERSISTENCE ###
 
 def _load_timestamps() -> dict[str, float]:
     """Load last-sent timestamps from file."""
@@ -292,9 +284,7 @@ def _migrate_timestamps(timestamps: dict[str, float], announcements: list[dict])
     return new_timestamps
 
 
-# =============================================================================
-# ANNOUNCEMENT LOADING
-# =============================================================================
+### ANNOUNCEMENT LOADING ###
 
 def _load_messages(locale: str) -> dict[str, str]:
     """
@@ -442,9 +432,7 @@ def load_announcements(locale: str = "ru") -> list[dict]:
     return announcements
 
 
-# =============================================================================
-# SCHEDULER
-# =============================================================================
+### SCHEDULER ###
 
 async def run_scheduler() -> None:
     """
@@ -553,9 +541,7 @@ async def run_scheduler() -> None:
             await asyncio.sleep(30)
 
 
-# =============================================================================
-# PUBLIC API
-# =============================================================================
+### PUBLIC API ###
 
 def set_bot(bot) -> None:
     """Set the bot instance for announcements."""

@@ -15,12 +15,12 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 MODEL_PATH = "ruspam_model/torch/"
 
-# Lazy-loaded model and tokenizer
+# lazy-loaded model and tokenizer
 _tokenizer: Optional[AutoTokenizer] = None
 _model: Optional[AutoModelForSequenceClassification] = None
-_last_used: float = 0.0  # Timestamp of last usage
+_last_used: float = 0.0  # timestamp of last usage
 
-# Known spam substrings to check first (faster than ML)
+# known spam substrings to check first (faster than ML)
 SPAM_SUBSTRINGS = [
     "official_vpnbot",
     "rkt_vpn_bot",
@@ -29,7 +29,7 @@ SPAM_SUBSTRINGS = [
     "oflvpn"
 ]
 
-# Precompute lowercase versions for faster matching
+# precompute lowercase versions for faster matching
 _SPAM_SUBSTRINGS_LOWER = [s.lower() for s in SPAM_SUBSTRINGS]
 
 
@@ -66,15 +66,15 @@ def predict(text: str) -> bool:
     Returns:
         True if spam, False otherwise
     """
-    # Quick check for known spam patterns (O(n) string search)
+    # quick check for known spam patterns (O(n) string search)
     text_lower = text.lower()
     if any(sub in text_lower for sub in _SPAM_SUBSTRINGS_LOWER):
         return True
 
-    # ML-based prediction (lazy load models)
+    # ML prediction (lazy load models)
     tokenizer = _get_tokenizer()
     model = _get_model()
-    _touch()  # Update last used time
+    _touch()  # update last used time
     
     inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=256)
     with torch.no_grad():

@@ -56,31 +56,35 @@ MEDIA_CONTENT_TYPES = {
 }
 
 
-### COMMAND HANDLERS (must be before catch-all) ###
+# ==========================================================================
+# COMMAND HANDLERS - MUST BE DEFINED BEFORE CATCH-ALL MESSAGE HANDLER
+# ==========================================================================
 
-# fun command
+# ========== FUN COMMANDS ==========
+
 @router.message(InMainGroups(), Command("бу", prefix="!/"))
 async def on_bu(message: Message) -> None:
     """Fun command - bot gets 'scared'."""
     await message.reply(_random("bu-responses"))
 
 
-# rules (throttled per group)
+# ========== RULES COMMAND ==========
+
 @router.message(
     InMainGroups(), 
-    Command("rules", "правила", prefix="!/"),
-    ThrottleFilter(interval=60, per_group=True)
+    ThrottleFilter(interval=60, per_group=True),
+    Command("rules", "правила", prefix="!/")
 )
 async def on_rules(message: Message) -> None:
     """Show chat rules (throttled per group - once per minute)."""
     await message.answer(get_string("rules-message"))
 
 
-# user info
+# ========== USER INFO COMMAND ==========
+
 @router.message(
     InMainGroups(),
-    Command("me", "я", "info", "инфо", "lvl", "лвл", "whoami", "neofetch", "fastfetch", prefix="!/"),
-    ThrottleFilter(interval=60, per_member=True, per_group=True)
+    Command("me", "я", "info", "инфо", "lvl", "лвл", "whoami", "neofetch", "fastfetch", prefix="!/")
 )
 async def on_me(message: Message) -> None:
     """Show user info and reputation."""
@@ -92,15 +96,16 @@ async def on_me(message: Message) -> None:
     member = await retrieve_or_create_member(user_id)
     tg_member = await retrieve_tgmember(message.bot, message.chat.id, user_id)
 
-    # censor profanity in name
+    # Check name for profanity
     full_name = tg_member.user.full_name.strip()
     is_profanity, bad_word = check_for_profanity_all(full_name)
     if is_profanity and bad_word:
         full_name = full_name.replace(bad_word, '#' * len(bad_word))
 
+    # Detect gender
     member_gender = detect_gender(tg_member.user.first_name)
 
-    # level and avatar
+    # Determine level and avatar
     is_creator = tg_member.status == MemberStatus.CREATOR
     is_admin = tg_member.status in MemberStatus.admin_statuses()
 
@@ -137,7 +142,7 @@ async def on_me(message: Message) -> None:
         else:
             member_avatar = random.choice(['🤖', '😼', '👻', '😺'])
 
-    # rep label
+    # Reputation label
     member_rep_label = ""
     if not is_creator:
         if member.reputation_points < -2000:
@@ -163,10 +168,11 @@ async def on_me(message: Message) -> None:
     try:
         await message.reply(answer)
     except TelegramBadRequest:
-        pass  # original msg was deleted
+        # Original message was deleted before we could reply
+        pass
 
 
-### OWNER COMMANDS ###
+# ========== OWNER COMMANDS ==========
 
 @router.message(
     InMainGroups(),
@@ -182,7 +188,7 @@ async def on_spam(message: Message) -> None:
     member = await retrieve_or_create_member(message.reply_to_message.from_user.id)
     tg_member = await retrieve_tgmember(message.bot, message.chat.id, message.reply_to_message.from_user.id)
 
-    # get msg text
+    # Get message text
     msg_text = None
     if message.reply_to_message.content_type == ContentType.TEXT:
         msg_text = message.reply_to_message.text
@@ -197,7 +203,7 @@ async def on_spam(message: Message) -> None:
         log_msg = msg_text
         log_msg += f"\n\n<i>Автор:</i> {user_mention(message.reply_to_message.from_user)}"
 
-        # create DB record
+        # Create DB record
         spam_rec = await Spam.objects.create(
             message=msg_text,
             is_spam=True,
@@ -205,6 +211,7 @@ async def on_spam(message: Message) -> None:
             chat_id=message.chat.id
         )
 
+        # Generate keyboard
         spam_keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(
                 text="❌ Это спам + заблокировать пользователя",
@@ -226,7 +233,7 @@ async def on_spam(message: Message) -> None:
             reply_markup=spam_keyboard
         )
 
-        # remove msg if not admin
+        # Remove message if not admin
         if tg_member.status not in MemberStatus.admin_statuses():
             await message.reply_to_message.delete()
 
@@ -247,6 +254,7 @@ async def on_setlvl(message: Message) -> None:
         if value > 100000:
             await message.reply("Что куришь, другалёк? :3")
         else:
+            # Need ORM object for absolute value set
             member = await get_member_orm(message.reply_to_message.from_user.id)
             member.messages_count = value
             member.reputation_points += value
@@ -285,6 +293,7 @@ async def on_rep_reset(message: Message) -> None:
         return
 
     try:
+        # Need ORM object for absolute value set
         member = await get_member_orm(message.reply_to_message.from_user.id)
         member.reputation_points = member.messages_count
         await member.update()
@@ -314,9 +323,12 @@ async def on_punish(message: Message) -> None:
         await message.reply(f"➖ Участник чата теряет <i><b>{points}</b> очков репутации.</i>")
 
 
-### SERVICE MESSAGE HANDLERS ###
+# ==========================================================================
+# SERVICE MESSAGE HANDLERS
+# ==========================================================================
 
-# user join
+# ========== USER JOIN ==========
+
 @router.message(InMainGroups(), F.content_type == ContentType.NEW_CHAT_MEMBERS)
 async def on_user_join(message: Message) -> None:
     """Remove 'user joined' service message."""
@@ -329,7 +341,8 @@ async def on_user_join(message: Message) -> None:
     )
 
 
-# voice messages (discourage)
+# ========== VOICE MESSAGES ==========
+
 @router.message(InMainGroups(), F.content_type == ContentType.VOICE)
 async def on_user_voice(message: Message) -> None:
     """React to voice messages (discourage them)."""
@@ -338,7 +351,8 @@ async def on_user_voice(message: Message) -> None:
         await queue_member_update(message.from_user.id, reputation_points=-10)
 
 
-# contacts
+# ========== CONTACT MESSAGES ==========
+
 @router.message(InMainGroups(), F.content_type == ContentType.CONTACT)
 async def on_user_contact(message: Message) -> None:
     """Delete contact messages from non-admins."""
@@ -348,53 +362,67 @@ async def on_user_contact(message: Message) -> None:
         await message.delete()
 
 
-# forwards restriction
-@router.message(InMainGroups(), F.forward_origin)
+# ========== FORWARD RESTRICTION ==========
+
+@router.message(InMainGroups(), F.forward_origin)  # forward_origin exists = forwarded message (aiogram 3.x)
 async def on_user_forward(message: Message) -> None:
     """
-    Delete forwards from low-rep users (anti-spam).
+    Delete forwards from low-rep users (anti-spam measure).
     
-    Allowed: auto-forwards, linked channels, group members
-    Blocked: external channels, non-members
+    Allowed forwards (no rep check):
+    - Auto-forwards from linked channels
+    - Forwards from linked channels (replies to posts)
+    - Forwards from users who are members of this group
+    
+    Blocked forwards (requires rep):
+    - Forwards from external channels
+    - Forwards from users not in this group
     """
-    # skip auto-forwards
+    # Skip auto-forwards from linked channels
     if message.is_automatic_forward:
         return
     
-    # allow forwards from linked channels
+    # Check if forward is from a linked channel
     if message.forward_from_chat:
         if config.groups.is_linked_channel(message.forward_from_chat.id):
-            return
+            return  # Allow forwards from linked channels
     
-    # allow forwards from group members
+    # Check if forward is from a user in this group
     if message.forward_from:
         try:
+            # Try to get the forwarded user's membership in this chat
             forwarded_member = await message.bot.get_chat_member(
                 message.chat.id, 
                 message.forward_from.id
             )
+            # If user is a member (not left/kicked), allow forward
             if forwarded_member.status not in ("left", "kicked"):
                 return
         except Exception:
-            pass  # user not found or privacy settings
+            # User not found in group or privacy settings block lookup
+            pass
     
-    # external forward - check rep
+    # At this point, it's a forward from external source
+    # Check user's reputation
     member = await retrieve_or_create_member(message.from_user.id)
     tg_member = await retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
 
-    # skip admins
+    # Skip admins
     if tg_member.status in MemberStatus.admin_statuses():
         return
 
+    # Check reputation threshold
     if member.reputation_points < config.spam.allow_forwards_threshold:
         await message.delete()
         
+        # Punish for forward attempt
         await queue_member_update(
             message.from_user.id,
-            reputation_points=-config.spam.forward_violation_penalty
+            reputation_points=-config.spam.forward_violation_penalty,
+            violations_count_spam=1
         )
         
-        # log
+        # Log
         forward_from = "Unknown"
         if message.forward_from:
             forward_from = f"👤 {message.forward_from.full_name}"
@@ -413,11 +441,12 @@ async def on_user_forward(message: Message) -> None:
         )
 
 
-# media restriction
+# ========== MEDIA RESTRICTION ==========
+
 @router.message(
     InMainGroups(), 
     F.content_type.in_(MEDIA_CONTENT_TYPES),
-    ~F.is_automatic_forward
+    ~F.is_automatic_forward  # Don't block channel posts
 )
 async def on_user_media(message: Message) -> None:
     """Delete media from low-rep users."""
@@ -429,7 +458,9 @@ async def on_user_media(message: Message) -> None:
         await message.delete()
 
 
-### CHANNEL AUTO-FORWARD (bot comments on posts) ###
+# ==========================================================================
+# CHANNEL AUTO-FORWARD HANDLER (bot comments on channel posts)
+# ==========================================================================
 
 @router.message(InMainGroups(), F.is_automatic_forward)
 async def on_channel_post(message: Message) -> None:
@@ -440,12 +471,14 @@ async def on_channel_post(message: Message) -> None:
         logging.getLogger(__name__).warning(f"Failed to reply to channel post: {e}")
 
 
-### CATCH-ALL MESSAGE HANDLER (must be last!) ###
+# ==========================================================================
+# CATCH-ALL MESSAGE HANDLER - MUST BE LAST!
+# ==========================================================================
 
 @router.message(
     InMainGroups(),
     F.content_type.in_({ContentType.TEXT, ContentType.PHOTO, ContentType.DOCUMENT, ContentType.VIDEO}),
-    ~F.is_automatic_forward
+    ~F.is_automatic_forward  # Exclude auto-forwards (handled above)
 )
 @router.edited_message(
     InMainGroups(),
@@ -455,52 +488,61 @@ async def on_user_message(message: Message) -> None:
     """
     Process every user message - profanity, spam, reputation.
     
-    NOTE: This handler MUST be last in this file!
+    NOTE: This handler MUST be defined LAST in this file!
+    It catches all text messages, so command handlers must come before it.
     """
-    # track for announcement rate limiting
+    # Track this message for announcement rate limiting (all messages count)
+    # This runs first so even if we return early, we track the message
     track_message(message.chat.id, is_announcement=False)
     
+    # Retrieve member from DB
     member = await retrieve_or_create_member(message.from_user.id)
+
+    # Retrieve Telegram member object
     tg_member = await retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
 
-    # skip admins
+    # Skip admins (using enum for type safety)
     if tg_member.status in MemberStatus.admin_statuses():
         return
 
+    # Get message text using helper
     msg_text = get_message_text(message)
 
+    # Quit if no text to check
     if msg_text is None:
         return
 
     user_id = message.from_user.id
 
-    # check profanity
+    # CHECK FOR PROFANITY
     is_profanity, bad_word = check_for_profanity_all(msg_text)
 
     if is_profanity:
         await message.delete()
 
+        # Queue member violations update (batch processing)
         await queue_member_update(
             user_id,
             violations_count_profanity=1,
             reputation_points=-20
         )
 
+        # Log
         log_msg = msg_text
         if bad_word:
             log_msg = log_msg.replace(bad_word, f'<u><b>{bad_word}</b></u>')
         log_msg += f"\n\n<i>Автор:</i> {user_mention(message.from_user)}"
         await write_log(message.bot, log_msg, "🤬 Антимат", message.chat.title)
     else:
-        # no profanity - check spam
-        # skip expensive ML for trusted users
+        # NO PROFANITY - CHECK FOR SPAM
+        # Skip expensive ML check for trusted users
         should_check_spam = not is_trusted_user(member) and (
             member.messages_count < config.spam.member_messages_threshold or 
             member.reputation_points < config.spam.member_reputation_threshold
         )
         
         if should_check_spam and ruspam_predict(msg_text):
-            # spam detected
+            # SPAM DETECTED
             await message.delete()
 
             await queue_member_update(
@@ -509,10 +551,10 @@ async def on_user_message(message: Message) -> None:
                 reputation_points=-5
             )
             
-            # auto-ban check
+            # Check for auto-ban threshold
             if config.spam.autoban_enabled:
                 new_violations = member.violations_count_spam + 1
-                new_rep = member.reputation_points - 5
+                new_rep = member.reputation_points - 5  # After penalty
                 if (new_violations >= config.spam.autoban_threshold and 
                     new_rep < config.spam.autoban_rep_threshold):
                     try:
@@ -529,13 +571,13 @@ async def on_user_message(message: Message) -> None:
                             message.chat.title
                         )
                     except Exception:
-                        pass  # user left or already banned
+                        pass  # User might have left or already banned
         else:
-            # check for unwanted content (nsfw etc)
+            # No violations - check for unwanted content (NSFW, etc.)
             handled = await check_for_unwanted(message, msg_text, member, tg_member)
 
             if not handled:
-                # clean msg - increase rep
+                # Clean message - queue reputation increase
                 await queue_member_update(
                     user_id,
                     messages_count=1,
@@ -543,16 +585,19 @@ async def on_user_message(message: Message) -> None:
                 )
 
 
-### HELPER FUNCTIONS ###
+# ==========================================================================
+# HELPER FUNCTIONS
+# ==========================================================================
 
 async def check_for_unwanted(message: Message, msg_text: str, member: MemberData, tg_member) -> bool:
     """Check for unwanted content (first comments, NSFW profiles)."""
-    # check if reply to channel post (comment)
+    # Check if this is a reply to channel message (comment)
+    # Using O(1) set lookup instead of list lookup
     if (message.reply_to_message and 
         message.reply_to_message.forward_from_chat and 
         config.groups.is_linked_channel(message.reply_to_message.forward_from_chat.id)):
         
-        # remove early comments from low-rep users
+        # Remove early comments from low-rep users
         threshold = config.spam.allow_comments_rep_threshold
         interval = config.spam.remove_first_comments_interval
         
@@ -570,52 +615,61 @@ async def check_for_unwanted(message: Message, msg_text: str, member: MemberData
             except TelegramBadRequest:
                 pass
 
-    # nsfw check (female profiles only)
+    # Check for NSFW (only for female profiles)
     member_gender = detect_gender(tg_member.user.first_name)
 
     if member_gender == Gender.FEMALE and config.nsfw.enabled:
-        # skip high-rep
+        # Skip high-rep members
         if member.reputation_points > config.spam.allow_comments_rep_threshold__woman:
             return False
 
+        # Check name for violations
         name_valid = check_name_for_violations(message.from_user.full_name)
 
         nsfw_prediction = None
         if name_valid:
+            # Get profile photos
             profile_photos = await message.bot.get_user_profile_photos(user_id=message.from_user.id)
 
             if not profile_photos.photos:
                 return False
 
+            # Get largest size of most recent photo
             photo = profile_photos.photos[0][-1]
             file_unique_id = photo.file_unique_id
             
-            # check cache first
+            # Check NSFW cache first (avoid expensive re-processing)
             cached_result = get_cached_nsfw_result(message.from_user.id, file_unique_id)
             if cached_result is not None:
-                if not cached_result:
+                if not cached_result:  # cached as safe
                     return False
+                # cached as NSFW - continue to handle
             else:
-                # not cached - do nsfw check
+                # Not cached - perform NSFW check
                 file_id = photo.file_id
                 img_file = await message.bot.get_file(file_id)
+
+                # Download file bytes
                 file_bytes = await message.bot.download_file(img_file.file_path)
 
+                # Make image
                 image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
                 nsfw_prediction = nsfw_predict(np.asarray(image))
                 
+                # Cache the result
                 is_nsfw = is_nsfw_detected(nsfw_prediction) if nsfw_prediction else False
                 cache_nsfw_result(message.from_user.id, file_unique_id, is_nsfw)
                 
                 if not is_nsfw:
                     return False
 
-        # check thresholds
+        # Check NSFW thresholds
         if (not name_valid or (nsfw_prediction and is_nsfw_detected(nsfw_prediction)) or
-            (cached_result is True)):
+            (cached_result is True)):  # Also handle cached NSFW result
             log_msg = msg_text
             log_msg += f"\n\n<i>Автор:</i> {user_mention(message.from_user)}"
 
+            # Generate keyboard
             nsfw_keyboard = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(
                     text="❌ Это NSFW + заблокировать пользователя",
@@ -640,8 +694,8 @@ async def check_for_unwanted(message: Message, msg_text: str, member: MemberData
 
 
 def is_nsfw_detected(prediction: dict) -> bool:
-    """Check if NSFW is detected based on thresholds."""
-    # safe checks
+    """Check if NSFW is detected based on prediction thresholds."""
+    # Safe checks (allowed)
     is_safe = (
         (float(prediction["Normal"]) > config.nsfw.normal_prediction_threshold or
          float(prediction["Anime Picture"]) > config.nsfw.anime_prediction_threshold)
@@ -650,7 +704,7 @@ def is_nsfw_detected(prediction: dict) -> bool:
          and float(prediction["Pornography"]) < config.nsfw.normal_comb_pornography_prediction_threshold)
     )
 
-    # unsafe checks
+    # Unsafe checks (disallowed)
     is_unsafe = (
         (float(prediction["Enticing or Sensual"]) > config.nsfw.comb_sensual_prediction_threshold
          and float(prediction["Pornography"]) > config.nsfw.comb_pornography_prediction_threshold)

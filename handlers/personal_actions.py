@@ -20,8 +20,8 @@ sys.path.append("./libs")
 
 router = Router(name="personal_actions")
 
-# Temporary storage for pending messages (auto-cleanup after 5 minutes)
-# Exported for use by callbacks.py
+# temp storage for pending msgs (auto-cleanup after 5 minutes)
+# used by callbacks.py
 pending_messages: dict[str, tuple[str, datetime]] = {}
 
 
@@ -49,13 +49,13 @@ async def _build_chat_keyboard(bot, msg_id: str) -> InlineKeyboardMarkup:
             callback_data=f"msg_{msg_id}_{chat_id}"
         )])
     
-    # Add "Send to all" button
+    # send to all btn
     buttons.append([InlineKeyboardButton(
         text="📢 Отправить во все чаты",
         callback_data=f"msg_{msg_id}_all"
     )])
     
-    # Add cancel button
+    # cancel btn
     buttons.append([InlineKeyboardButton(
         text="❌ Отмена",
         callback_data=f"msg_{msg_id}_cancel"
@@ -87,11 +87,11 @@ async def cmd_message_from_bot(message: Message) -> None:
         )
         return
     
-    # Generate unique ID and store message
+    # generate unique ID
     msg_id = uuid.uuid4().hex[:8]
     pending_messages[msg_id] = (text, datetime.now())
     
-    # Build keyboard
+    # build keyboard
     keyboard = await _build_chat_keyboard(message.bot, msg_id)
     
     await message.reply(
@@ -140,7 +140,7 @@ async def cmd_chat_id(message: Message) -> None:
         f"<b>Title:</b> {chat_title}"
     )
     
-    # Print to console
+    # print to console
     print(f"\n{'='*40}")
     print(f"CHAT ID: {chat.id}")
     print(f"Type: {chat_type}")
@@ -157,7 +157,7 @@ async def cmd_chat_id(message: Message) -> None:
 )
 async def cmd_ping_bot(message: Message) -> None:
     """Check if bot is alive and show system stats."""
-    # Verify admin in current group
+    # verify admin
     user = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
     if user.status not in MemberStatus.admin_statuses():
         return
@@ -167,24 +167,24 @@ async def cmd_ping_bot(message: Message) -> None:
 
     reply = f"<b>{random.choice(['👊 Самурай на месте!', '🫰 Нужно больше золота', '🫡 Тута я, бож :3', '✊ Железо говн@, но я держусь!'])}</b>\n\n"
 
-    # CPU
+    # cpu
     reply += "<b>CPU:</b> <i>{} ядер, {:.0f} MHz, загрузка {}%</i>\n".format(
         psutil.cpu_count(logical=True),
         cpu_freq,
         psutil.cpu_percent(interval=1)
     )
 
-    # RAM
+    # ram
     reply += "<b>RAM:</b> <i>{} МБ / {} МБ ({}%)</i>\n".format(
         ram.used // (1024 ** 2),
         ram.total // (1024 ** 2),
         ram.percent
     )
 
-    # GPU
+    # gpu
     reply += "<b>GPU:</b> <i>N/A</i>\n"
 
-    # Disk
+    # disk
     disk = psutil.disk_usage('/')
     disk_total_gb = disk.total / (1024 ** 3)
     disk_used_gb = disk.used / (1024 ** 3)
@@ -195,10 +195,10 @@ async def cmd_ping_bot(message: Message) -> None:
         int(disk.percent)
     )
 
-    # Location
+    # location
     reply += "<b>Расположение сервера:</b> <i>Марс</i>\n"
 
-    # Version
+    # version
     reply += f"\n<b>Версия бота:</b> <i>{config.bot.version} codename «<b>{config.bot.version_codename}</b>»</i>"
 
     await message.reply(reply)
@@ -211,7 +211,7 @@ async def cmd_ping_bot(message: Message) -> None:
 )
 async def cmd_profanity_check(message: Message) -> None:
     """Check text for profanity (admin only)."""
-    # Verify admin in current group
+    # verify admin
     user = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
     if user.status not in MemberStatus.admin_statuses():
         return
@@ -224,10 +224,10 @@ async def cmd_profanity_check(message: Message) -> None:
         await message.reply("Укажите текст для проверки после команды.")
         return
 
-    # Check Russian
+    # check russian
     is_profanity_ru, word_ru, line_info_ru = check_for_profanity(text, "ru")
     
-    # Check English
+    # check english
     is_profanity_en, word_en, line_info_en = check_for_profanity(text, "en")
 
     if is_profanity_ru or is_profanity_en:
@@ -260,10 +260,10 @@ async def cmd_profanity_check_private(message: Message) -> None:
         await message.reply("Укажите текст для проверки после команды.")
         return
 
-    # Check Russian
+    # check russian
     is_profanity_ru, word_ru, line_info_ru = check_for_profanity(text, "ru")
     
-    # Check English
+    # check english
     is_profanity_en, word_en, line_info_en = check_for_profanity(text, "en")
 
     if is_profanity_ru or is_profanity_en:
