@@ -488,6 +488,21 @@ async def on_user_message(message: Message) -> None:
 
     user_id = message.from_user.id
 
+    # chinese spam bots
+    if _contains_chinese(msg_text):
+        await message.delete()
+
+        await queue_member_update(
+            user_id,
+            violations_count_spam=1,
+            reputation_points=-5
+        )
+
+        log_msg = msg_text
+        log_msg += f"\n\n<i>Автор:</i> {user_mention(message.from_user)}"
+        await write_log(message.bot, log_msg, "🈲 Антиспам (CN)", message.chat.title)
+        return
+
     # check profanity
     is_profanity, bad_word = check_for_profanity_all(msg_text)
 
@@ -651,6 +666,18 @@ async def check_for_unwanted(message: Message, msg_text: str, member: MemberData
             await message.delete()
             return True
 
+    return False
+
+
+def _contains_chinese(text: str) -> bool:
+    """Check if text contains Chinese characters (CJK Unified Ideographs)."""
+    for ch in text:
+        cp = ord(ch)
+        if (0x4E00 <= cp <= 0x9FFF or      # CJK Unified
+            0x3400 <= cp <= 0x4DBF or      # CJK Extension A
+            0x20000 <= cp <= 0x2A6DF or    # CJK Extension B
+            0xF900 <= cp <= 0xFAFF):       # CJK Compatibility
+            return True
     return False
 
 
