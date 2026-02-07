@@ -86,6 +86,8 @@ class NSFWConfig(BaseModel):
     normal_comb_sensual_prediction_threshold: float = 0.5
     normal_comb_pornography_prediction_threshold: float = 0.2
     anime_prediction_threshold: float = 0.7
+    check_rep_threshold: int = 50
+    profile_check_cooldown: int = 3600
 
 
 class DatabaseConfig(BaseModel):

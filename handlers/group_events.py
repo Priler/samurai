@@ -37,6 +37,8 @@ from services.cache import (
     is_trusted_user,
     get_cached_nsfw_result,
     cache_nsfw_result,
+    is_nsfw_profile_on_cooldown,
+    mark_nsfw_profile_checked,
     get_member_orm,
     MemberData
 )
@@ -482,45 +484,43 @@ async def on_user_message(message: Message) -> None:
             return
 
     msg_text = get_message_text(message)
-
-    if msg_text is None:
-        return
-
     user_id = message.from_user.id
 
-    # chinese spam bots
-    if _contains_chinese(msg_text):
-        await message.delete()
+    if msg_text is not None:
+        # chinese spam bots
+        if _contains_chinese(msg_text):
+            await message.delete()
 
-        await queue_member_update(
-            user_id,
-            violations_count_spam=1,
-            reputation_points=-5
-        )
+            await queue_member_update(
+                user_id,
+                violations_count_spam=1,
+                reputation_points=-5
+            )
 
-        log_msg = msg_text
-        log_msg += f"\n\n<i>Автор:</i> {user_mention(message.from_user)}"
-        await write_log(message.bot, log_msg, "🈲 Антиспам (CN)", message.chat.title)
-        return
+            log_msg = msg_text
+            log_msg += f"\n\n<i>Автор:</i> {user_mention(message.from_user)}"
+            await write_log(message.bot, log_msg, "🈲 Антиспам (CN)", message.chat.title)
+            return
 
-    # check profanity
-    is_profanity, bad_word = check_for_profanity_all(msg_text)
+        # check profanity
+        is_profanity, bad_word = check_for_profanity_all(msg_text)
 
-    if is_profanity:
-        await message.delete()
+        if is_profanity:
+            await message.delete()
 
-        await queue_member_update(
-            user_id,
-            violations_count_profanity=1,
-            reputation_points=-20
-        )
+            await queue_member_update(
+                user_id,
+                violations_count_profanity=1,
+                reputation_points=-20
+            )
 
-        log_msg = msg_text
-        if bad_word:
-            log_msg = log_msg.replace(bad_word, f'<u><b>{bad_word}</b></u>')
-        log_msg += f"\n\n<i>Автор:</i> {user_mention(message.from_user)}"
-        await write_log(message.bot, log_msg, "🤬 Антимат", message.chat.title)
-    else:
+            log_msg = msg_text
+            if bad_word:
+                log_msg = log_msg.replace(bad_word, f'<u><b>{bad_word}</b></u>')
+            log_msg += f"\n\n<i>Автор:</i> {user_mention(message.from_user)}"
+            await write_log(message.bot, log_msg, "🤬 Антимат", message.chat.title)
+            return
+
         # no profanity - check spam
         # skip expensive ML for trusted users
         should_check_spam = not is_trusted_user(member) and (
@@ -559,23 +559,24 @@ async def on_user_message(message: Message) -> None:
                         )
                     except Exception:
                         pass  # user left or already banned
-        else:
-            # check for unwanted content (nsfw etc)
-            handled = await check_for_unwanted(message, msg_text, member, tg_member)
+            return
 
-            if not handled:
-                # clean msg - increase rep
-                await queue_member_update(
-                    user_id,
-                    messages_count=1,
-                    reputation_points=1
-                )
+    # check for unwanted content (nsfw, suspicious profiles)
+    handled = await check_for_unwanted(message, msg_text, member)
+
+    if not handled:
+        # clean msg - increase rep
+        await queue_member_update(
+            user_id,
+            messages_count=1,
+            reputation_points=1
+        )
 
 
 ### HELPER FUNCTIONS ###
 
-async def check_for_unwanted(message: Message, msg_text: str, member: MemberData, tg_member) -> bool:
-    """Check for unwanted content (first comments, NSFW profiles)."""
+async def check_for_unwanted(message: Message, msg_text: str, member: MemberData) -> bool:
+    """Check for unwanted content (first comments, NSFW images, suspicious profiles)."""
     # check if reply to channel post (comment)
     if (message.reply_to_message and 
         message.reply_to_message.forward_from_chat and 
@@ -599,74 +600,107 @@ async def check_for_unwanted(message: Message, msg_text: str, member: MemberData
             except TelegramBadRequest:
                 pass
 
-    # nsfw check (female profiles only)
-    member_gender = detect_gender(tg_member.user.first_name)
+    if not config.nsfw.enabled:
+        return False
 
-    if member_gender == Gender.FEMALE and config.nsfw.enabled:
-        # skip high-rep
-        if member.reputation_points > config.spam.allow_comments_rep_threshold__woman:
-            return False
+    user_id = message.from_user.id
+    is_low_rep = member.reputation_points < config.nsfw.check_rep_threshold
 
-        name_valid = check_name_for_violations(message.from_user.full_name)
+    # in-chat image nsfw check
+    if message.content_type == ContentType.PHOTO and is_low_rep:
+        photo = message.photo[-1]
+        cached = get_cached_nsfw_result(user_id, photo.file_unique_id)
 
-        nsfw_prediction = None
-        cached_result = None
-        if name_valid:
-            profile_photos = await message.bot.get_user_profile_photos(user_id=message.from_user.id)
+        if cached is None:
+            img_file = await message.bot.get_file(photo.file_id)
+            file_bytes = await message.bot.download_file(img_file.file_path)
+            image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
+            prediction = await asyncio.to_thread(nsfw_predict, np.asarray(image))
+            is_nsfw = is_nsfw_detected(prediction)
+            cache_nsfw_result(user_id, photo.file_unique_id, is_nsfw)
+        else:
+            is_nsfw = cached
+            prediction = None
 
-            if not profile_photos.photos:
-                return False
-
-            photo = profile_photos.photos[0][-1]
-            file_unique_id = photo.file_unique_id
-            
-            # check cache first
-            cached_result = get_cached_nsfw_result(message.from_user.id, file_unique_id)
-            if cached_result is not None:
-                if not cached_result:
-                    return False
-            else:
-                # not cached - do nsfw check
-                file_id = photo.file_id
-                img_file = await message.bot.get_file(file_id)
-                file_bytes = await message.bot.download_file(img_file.file_path)
-
-                image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
-                nsfw_prediction = await asyncio.to_thread(nsfw_predict, np.asarray(image))
-                
-                is_nsfw = is_nsfw_detected(nsfw_prediction) if nsfw_prediction else False
-                cache_nsfw_result(message.from_user.id, file_unique_id, is_nsfw)
-                
-                if not is_nsfw:
-                    return False
-
-        # check thresholds
-        if (not name_valid or (nsfw_prediction and is_nsfw_detected(nsfw_prediction)) or
-            (cached_result is True)):
-            log_msg = msg_text
-            log_msg += f"\n\n<i>Автор:</i> {user_mention(message.from_user)}"
-
-            nsfw_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(
-                    text="❌ Это NSFW + заблокировать пользователя",
-                    callback_data=f"nsfw_ban_{message.from_user.id}_{message.chat.id}"
-                )],
-                [InlineKeyboardButton(
-                    text="❎ Это НЕ NSFW",
-                    callback_data=f"nsfw_safe_{member.id}"
-                )]
-            ])
-
-            await message.bot.send_message(
-                config.groups.logs,
-                generate_log_message(log_msg, "🔞 NSFW", message.chat.title),
-                reply_markup=nsfw_keyboard
-            )
-
-            await message.delete()
+        if is_nsfw:
+            extra = f"<i>Scores:</i> {_format_nsfw_scores(prediction)}" if prediction else None
+            await _report_nsfw(message, msg_text, member, "🔞 NSFW (фото)", extra)
             return True
 
+    # profile-based checks with per-user cooldown
+    if is_low_rep and not is_nsfw_profile_on_cooldown(user_id):
+        mark_nsfw_profile_checked(user_id)
+
+        # name violation check (spam names like "посмотри мой профиль")
+        if not check_name_for_violations(message.from_user.full_name):
+            await _report_nsfw(
+                message, msg_text, member, "🚫 Антиспам (имя)",
+                f"<i>Имя:</i> {message.from_user.full_name}"
+            )
+            return True
+
+        # profile photo nsfw check
+        profile_photos = await message.bot.get_user_profile_photos(user_id=user_id)
+
+        if profile_photos.photos:
+            photo = profile_photos.photos[0][-1]
+            cached = get_cached_nsfw_result(user_id, photo.file_unique_id)
+
+            if cached is None:
+                img_file = await message.bot.get_file(photo.file_id)
+                file_bytes = await message.bot.download_file(img_file.file_path)
+                image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
+                prediction = await asyncio.to_thread(nsfw_predict, np.asarray(image))
+                is_nsfw = is_nsfw_detected(prediction)
+                cache_nsfw_result(user_id, photo.file_unique_id, is_nsfw)
+            else:
+                is_nsfw = cached
+                prediction = None
+
+            if is_nsfw:
+                extra = f"<i>Scores:</i> {_format_nsfw_scores(prediction)}" if prediction else None
+                await _report_nsfw(message, msg_text, member, "🔞 NSFW (профиль)", extra)
+                return True
+
     return False
+
+
+async def _report_nsfw(
+    message: Message, msg_text: Optional[str], member: MemberData,
+    log_label: str, extra_info: str = None
+) -> None:
+    """Delete message and report to log channel with action buttons."""
+    log_msg = msg_text or "[медиа без текста]"
+    if extra_info:
+        log_msg += f"\n\n{extra_info}"
+    log_msg += f"\n\n<i>Автор:</i> {user_mention(message.from_user)}"
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="❌ NSFW + бан",
+            callback_data=f"nsfw_ban_{message.from_user.id}_{message.chat.id}"
+        )],
+        [InlineKeyboardButton(
+            text="❎ Это НЕ NSFW",
+            callback_data=f"nsfw_safe_{member.id}"
+        )]
+    ])
+
+    await message.bot.send_message(
+        config.groups.logs,
+        generate_log_message(log_msg, log_label, message.chat.title),
+        reply_markup=keyboard
+    )
+    await message.delete()
+
+
+def _format_nsfw_scores(prediction: dict) -> str:
+    """Format NSFW prediction scores for log messages."""
+    labels = {
+        "Normal": "N", "Pornography": "P", "Enticing or Sensual": "S",
+        "Hentai": "H", "Anime Picture": "A"
+    }
+    return " | ".join(f"{labels.get(k, k)}: {v}" for k, v in prediction.items())
 
 
 def _contains_chinese(text: str) -> bool:

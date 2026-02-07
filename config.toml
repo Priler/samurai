@@ -109,6 +109,11 @@ normal_comb_pornography_prediction_threshold = 0.2
 # > will NOT be detected as nsfw
 anime_prediction_threshold = 0.7
 
+# check all the profiles with rep lower that this
+check_rep_threshold = 50
+
+# delay between profile checks (if the user changes the profile picture, etc)
+profile_check_cooldown = 3600
 
 
 [db]

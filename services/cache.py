@@ -81,6 +81,12 @@ nsfw_results_cache: TTLCache = TTLCache(
     ttl=config.cache.nsfw_ttl
 )
 
+# per-user cooldown for profile photo nsfw checks
+nsfw_profile_cooldown: TTLCache = TTLCache(
+    maxsize=config.cache.nsfw_maxsize,
+    ttl=config.nsfw.profile_check_cooldown
+)
+
 
 ### BATCH UPDATE SYSTEM ###
 
@@ -349,6 +355,16 @@ def invalidate_nsfw_cache(user_id: int) -> None:
     del _nsfw_user_keys[user_id]
 
 
+def is_nsfw_profile_on_cooldown(user_id: int) -> bool:
+    """Check if user's profile was checked recently."""
+    return user_id in nsfw_profile_cooldown
+
+
+def mark_nsfw_profile_checked(user_id: int) -> None:
+    """Mark user's profile as recently checked."""
+    nsfw_profile_cooldown[user_id] = True
+
+
 ### UTILITY FUNCTIONS ###
 
 def is_trusted_user(member: MemberData) -> bool:
@@ -362,5 +378,6 @@ def clear_all_caches() -> None:
     tgmembers_cache.clear()
     gender_detections_cache.clear()
     nsfw_results_cache.clear()
+    nsfw_profile_cooldown.clear()
     _tgmember_user_keys.clear()
     _nsfw_user_keys.clear()
