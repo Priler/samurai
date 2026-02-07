@@ -74,10 +74,10 @@ forward_violation_penalty = 10
 autoban_enabled = true
 
 # how much violations required to autoban the member (it's only spam violations)
-autoban_threshold = 100
+autoban_threshold = 20
 
 # only auto ban if a member's rep is lower than this threshold
-autoban_rep_threshold = 100
+autoban_rep_threshold = 50
 
 
 
