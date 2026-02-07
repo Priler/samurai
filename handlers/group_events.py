@@ -5,6 +5,7 @@ IMPORTANT: Handler order matters in aiogram 3.x!
 - Command handlers must come BEFORE catch-all message handlers
 - The on_user_message handler should be LAST as it catches all text messages
 """
+import asyncio
 import io
 import logging
 import random
@@ -53,6 +54,12 @@ MEDIA_CONTENT_TYPES = {
     ContentType.PHOTO, ContentType.VIDEO, ContentType.AUDIO,
     ContentType.DOCUMENT, ContentType.VOICE, ContentType.VIDEO_NOTE,
     ContentType.ANIMATION
+}
+
+# media types only handled by on_user_media (not covered by on_user_message)
+# VOICE is handled by on_user_voice separately
+MEDIA_ONLY_CONTENT_TYPES = {
+    ContentType.AUDIO, ContentType.VIDEO_NOTE, ContentType.ANIMATION
 }
 
 
@@ -391,7 +398,8 @@ async def on_user_forward(message: Message) -> None:
         
         await queue_member_update(
             message.from_user.id,
-            reputation_points=-config.spam.forward_violation_penalty
+            reputation_points=-config.spam.forward_violation_penalty,
+            violations_count_spam=1
         )
         
         # log
@@ -416,7 +424,7 @@ async def on_user_forward(message: Message) -> None:
 # media restriction
 @router.message(
     InMainGroups(), 
-    F.content_type.in_(MEDIA_CONTENT_TYPES),
+    F.content_type.in_(MEDIA_ONLY_CONTENT_TYPES),
     ~F.is_automatic_forward
 )
 async def on_user_media(message: Message) -> None:
@@ -467,6 +475,12 @@ async def on_user_message(message: Message) -> None:
     if tg_member.status in MemberStatus.admin_statuses():
         return
 
+    # media restriction for low-rep users (photos, videos, documents)
+    if message.content_type != ContentType.TEXT:
+        if member.reputation_points < config.spam.allow_media_threshold:
+            await message.delete()
+            return
+
     msg_text = get_message_text(message)
 
     if msg_text is None:
@@ -499,7 +513,7 @@ async def on_user_message(message: Message) -> None:
             member.reputation_points < config.spam.member_reputation_threshold
         )
         
-        if should_check_spam and ruspam_predict(msg_text):
+        if should_check_spam and await asyncio.to_thread(ruspam_predict, msg_text):
             # spam detected
             await message.delete()
 
@@ -581,6 +595,7 @@ async def check_for_unwanted(message: Message, msg_text: str, member: MemberData
         name_valid = check_name_for_violations(message.from_user.full_name)
 
         nsfw_prediction = None
+        cached_result = None
         if name_valid:
             profile_photos = await message.bot.get_user_profile_photos(user_id=message.from_user.id)
 
@@ -602,7 +617,7 @@ async def check_for_unwanted(message: Message, msg_text: str, member: MemberData
                 file_bytes = await message.bot.download_file(img_file.file_path)
 
                 image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
-                nsfw_prediction = nsfw_predict(np.asarray(image))
+                nsfw_prediction = await asyncio.to_thread(nsfw_predict, np.asarray(image))
                 
                 is_nsfw = is_nsfw_detected(nsfw_prediction) if nsfw_prediction else False
                 cache_nsfw_result(message.from_user.id, file_unique_id, is_nsfw)

@@ -10,6 +10,7 @@ Features:
 - Configurable cache sizes via config.toml
 """
 import asyncio
+import logging
 from dataclasses import dataclass
 from functools import wraps
 from typing import Optional
@@ -20,6 +21,8 @@ from cachetools import TTLCache, LRUCache
 from config import config
 from db.models import Member
 from services.gender import detect_gender as _detect_gender, Gender
+
+logger = logging.getLogger(__name__)
 
 
 ### LIGHTWEIGHT MEMBER DATA ###
@@ -119,6 +122,8 @@ async def flush_member_updates() -> int:
         _pending_updates.clear()
     
     count = 0
+    failed_updates: dict[int, dict[str, int]] = {}
+    
     for user_id, changes in updates_copy.items():
         try:
             member = await Member.objects.get(user_id=user_id)
@@ -132,8 +137,20 @@ async def flush_member_updates() -> int:
             invalidate_member_cache(user_id)
         except ormar.NoMatch:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to flush updates for user {user_id}: {e}")
+            failed_updates[user_id] = changes
+    
+    # re-queue failed updates so they aren't lost
+    if failed_updates:
+        async with _batch_lock:
+            for user_id, changes in failed_updates.items():
+                if user_id not in _pending_updates:
+                    _pending_updates[user_id] = {}
+                for field, delta in changes.items():
+                    current = _pending_updates[user_id].get(field, 0)
+                    _pending_updates[user_id][field] = current + delta
+        logger.warning(f"Re-queued {len(failed_updates)} failed member updates")
     
     return count
 
@@ -187,6 +204,10 @@ def detect_gender(name: str) -> Gender:
 
 ### TELEGRAM MEMBER CACHE (multi-group aware) ###
 
+# reverse index: user_id -> set of (chat_id, user_id) cache keys
+_tgmember_user_keys: dict[int, set[tuple]] = {}
+
+
 async def retrieve_tgmember(bot, chat_id: int, user_id: int):
     """
     Retrieve Telegram member with caching.
@@ -201,6 +222,12 @@ async def retrieve_tgmember(bot, chat_id: int, user_id: int):
     
     result = await bot.get_chat_member(chat_id, user_id)
     tgmembers_cache[cache_key] = result
+    
+    # track in reverse index
+    if user_id not in _tgmember_user_keys:
+        _tgmember_user_keys[user_id] = set()
+    _tgmember_user_keys[user_id].add(cache_key)
+    
     return result
 
 
@@ -209,13 +236,18 @@ def invalidate_tgmember_cache(chat_id: int, user_id: int) -> None:
     cache_key = (chat_id, user_id)
     if cache_key in tgmembers_cache:
         del tgmembers_cache[cache_key]
+    if user_id in _tgmember_user_keys:
+        _tgmember_user_keys[user_id].discard(cache_key)
 
 
 def invalidate_tgmember_cache_all(user_id: int) -> None:
     """Invalidate TG member cache for user across all chats."""
-    keys_to_delete = [k for k in tgmembers_cache.keys() if k[1] == user_id]
-    for key in keys_to_delete:
-        del tgmembers_cache[key]
+    if user_id not in _tgmember_user_keys:
+        return
+    for key in list(_tgmember_user_keys[user_id]):
+        if key in tgmembers_cache:
+            del tgmembers_cache[key]
+    del _tgmember_user_keys[user_id]
 
 
 ### DATABASE MEMBER CACHE (lightweight dataclass, not ORM) ###
@@ -281,6 +313,10 @@ def update_member_cache(user_id: int, member: Member) -> None:
 
 ### NSFW DETECTION CACHE ###
 
+# reverse index: user_id -> set of (user_id, photo_id) cache keys
+_nsfw_user_keys: dict[int, set[tuple]] = {}
+
+
 def get_cached_nsfw_result(user_id: int, photo_file_unique_id: str) -> Optional[bool]:
     """
     Get cached NSFW detection result.
@@ -296,13 +332,21 @@ def cache_nsfw_result(user_id: int, photo_file_unique_id: str, is_nsfw: bool) ->
     """Cache NSFW detection result."""
     cache_key = (user_id, photo_file_unique_id)
     nsfw_results_cache[cache_key] = is_nsfw
+    
+    # track in reverse index
+    if user_id not in _nsfw_user_keys:
+        _nsfw_user_keys[user_id] = set()
+    _nsfw_user_keys[user_id].add(cache_key)
 
 
 def invalidate_nsfw_cache(user_id: int) -> None:
     """Invalidate all NSFW cache entries for a user."""
-    keys_to_delete = [k for k in nsfw_results_cache.keys() if k[0] == user_id]
-    for key in keys_to_delete:
-        del nsfw_results_cache[key]
+    if user_id not in _nsfw_user_keys:
+        return
+    for key in list(_nsfw_user_keys[user_id]):
+        if key in nsfw_results_cache:
+            del nsfw_results_cache[key]
+    del _nsfw_user_keys[user_id]
 
 
 ### UTILITY FUNCTIONS ###
@@ -318,3 +362,5 @@ def clear_all_caches() -> None:
     tgmembers_cache.clear()
     gender_detections_cache.clear()
     nsfw_results_cache.clear()
+    _tgmember_user_keys.clear()
+    _nsfw_user_keys.clear()

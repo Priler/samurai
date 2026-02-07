@@ -1,3 +1,9 @@
+import sys
+
+# ensure libs are importable (censure, gender_extractor)
+if "./libs" not in sys.path:
+    sys.path.insert(0, "./libs")
+
 from .profanity import check_for_profanity_all, check_name_for_violations
 from .gender import Gender, detect_gender
 from .cache import (

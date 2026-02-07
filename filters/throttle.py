@@ -11,6 +11,7 @@ from typing import Union
 
 from aiogram.filters import BaseFilter
 from aiogram.types import Message, CallbackQuery
+from cachetools import TTLCache
 
 
 class ThrottleFilter(BaseFilter):
@@ -35,8 +36,8 @@ class ThrottleFilter(BaseFilter):
         self.interval = interval
         self.per_member = per_member
         self.per_group = per_group
-        # Instance-level storage for throttle timestamps
-        self._timestamps: dict[tuple, float] = {}
+        # TTL-based storage so old entries are auto-evicted
+        self._timestamps: TTLCache = TTLCache(maxsize=10000, ttl=interval)
     
     def _get_key(self, event: Union[Message, CallbackQuery]) -> tuple:
         """Generate throttle key based on settings."""
@@ -57,11 +58,9 @@ class ThrottleFilter(BaseFilter):
     
     async def __call__(self, event: Union[Message, CallbackQuery]) -> bool:
         key = self._get_key(event)
-        now = time.monotonic()
         
-        last_call = self._timestamps.get(key, 0)
-        if now - last_call < self.interval:
+        if key in self._timestamps:
             return False  # Throttled
         
-        self._timestamps[key] = now
+        self._timestamps[key] = True
         return True  # Allowed

@@ -6,12 +6,17 @@ import re
 import unicodedata
 from enum import Enum
 
-# Add libs path for gender_extractor module
-sys.path.insert(0, "./libs")
+# path setup is centralized in services/__init__.py, guard for direct imports
+if "./libs" not in sys.path:
+    sys.path.insert(0, "./libs")
 
 from libs.gender_extractor import GenderExtractor
+from libs.censure import Censor
 
 g_ext = GenderExtractor()
+
+# single censor instance for name preparation
+_censor_ru = Censor.get(lang='ru')
 
 
 class Gender(Enum):
@@ -141,12 +146,8 @@ def detect_gender_compare(name: str, country: str = None) -> Gender:
 
 def prepare_word(word: str) -> str:
     """Prepare word for analysis (fix masked letters)."""
-    # Import here to avoid circular import
-    sys.path.insert(0, "./libs")
-    from libs.censure import Censor
-    censor_ru = Censor.get(lang='ru')
     word = word.lower().strip()
-    return censor_ru.prepare_word(word)
+    return _censor_ru.prepare_word(word)
 
 
 def detect_gender(name: str) -> Gender:
@@ -187,7 +188,7 @@ def detect_gender(name: str) -> Gender:
     # Preprocess name
     _name_lang = detect_name_language(name)
     name = prepare_word(name)
-    name = transliterate_name(name, 'english' if _name_lang == 'russian' else 'english')
+    name = transliterate_name(name, 'english')
 
     if _name_lang == 'russian':
         det_gen = detect_gender_compare(name, "Russia")

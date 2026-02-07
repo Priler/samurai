@@ -6,8 +6,10 @@ Note: callback_data format for reports:
 - rdelban_{chat_id}_{msg_id}_{user_id}_{reporter_id}_{bot_reply_id}
 - etc.
 """
+import logging
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
+from functools import wraps
 
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, ChatPermissions
@@ -21,11 +23,25 @@ from utils import get_string, _random
 from handlers.personal_actions import pending_messages
 
 router = Router(name="callbacks")
+logger = logging.getLogger(__name__)
+
+
+def safe_callback(func):
+    """Catch malformed callback data so bad payloads don't crash handlers."""
+    @wraps(func)
+    async def wrapper(call: CallbackQuery) -> None:
+        try:
+            return await func(call)
+        except (ValueError, IndexError) as e:
+            logger.warning(f"Malformed callback data in {func.__name__}: {call.data!r} ({e})")
+            await call.answer("❌ Ошибка данных", show_alert=True)
+    return wrapper
 
 
 ### MSG SEND CALLBACKS (owner broadcast) ###
 
 @router.callback_query(F.data.startswith("msg_"))
+@safe_callback
 async def callback_msg_send(call: CallbackQuery) -> None:
     """Handle message send callbacks."""
     # verify owner
@@ -114,6 +130,7 @@ async def _reward_reporter(reporter_id: int, points: int) -> None:
 
 
 @router.callback_query(F.data.startswith("rdel_"))
+@safe_callback
 async def callback_report_delete(call: CallbackQuery) -> None:
     """Delete reported message only. Reward rep."""
     # format: rdel_chatId_msgId_reporterId_botReplyId
@@ -142,6 +159,7 @@ async def callback_report_delete(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("rdelban_"))
+@safe_callback
 async def callback_report_delete_and_ban(call: CallbackQuery) -> None:
     """Delete message and ban user. Reward more rep."""
     # format: rdelban_chatId_msgId_userId_reporterId_botReplyId
@@ -173,6 +191,7 @@ async def callback_report_delete_and_ban(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("rmute_"))
+@safe_callback
 async def callback_report_delete_and_mute_24h(call: CallbackQuery) -> None:
     """Delete message and mute user for 24 hours. Reward rep."""
     # format: rmute_chatId_msgId_userId_reporterId_botReplyId
@@ -209,6 +228,7 @@ async def callback_report_delete_and_mute_24h(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("rmute2_"))
+@safe_callback
 async def callback_report_delete_and_mute_7d(call: CallbackQuery) -> None:
     """Delete message and mute user for 7 days. Reward some more rep."""
     # format: rmute2_chatId_msgId_userId_reporterId_botReplyId
@@ -245,6 +265,7 @@ async def callback_report_delete_and_mute_7d(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("rdismiss_"))
+@safe_callback
 async def callback_report_dismiss(call: CallbackQuery) -> None:
     """Dismiss report (false alarm). No rep reward."""
     # format: rdismiss_chatId_msgId_userId_reporterId_botReplyId
@@ -269,6 +290,7 @@ async def callback_report_dismiss(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("rdismiss2_"))
+@safe_callback
 async def callback_report_dismiss_mute_reporter_1d(call: CallbackQuery) -> None:
     """Dismiss and mute reporter for 1 day."""
     # format: rdismiss2_chatId_msgId_userId_reporterId_botReplyId
@@ -304,6 +326,7 @@ async def callback_report_dismiss_mute_reporter_1d(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("rdismiss3_"))
+@safe_callback
 async def callback_report_dismiss_mute_reporter_7d(call: CallbackQuery) -> None:
     """Dismiss and mute reporter for 7 days."""
     # format: rdismiss3_chatId_msgId_userId_reporterId_botReplyId
@@ -339,6 +362,7 @@ async def callback_report_dismiss_mute_reporter_7d(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("rdismiss4_"))
+@safe_callback
 async def callback_report_dismiss_ban_reporter(call: CallbackQuery) -> None:
     """Dismiss and ban reporter."""
     # format: rdismiss4_chatId_msgId_userId_reporterId_botReplyId
@@ -368,6 +392,7 @@ async def callback_report_dismiss_ban_reporter(call: CallbackQuery) -> None:
 ### LEGACY REPORT CALLBACKS (backwards compat) ###
 
 @router.callback_query(F.data.startswith("del_"))
+@safe_callback
 async def callback_delete(call: CallbackQuery) -> None:
     """Delete reported message only (legacy)."""
     parts = call.data.split("_")
@@ -384,6 +409,7 @@ async def callback_delete(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("delban_"))
+@safe_callback
 async def callback_delete_and_ban(call: CallbackQuery) -> None:
     """Delete message and ban user (legacy)."""
     parts = call.data.split("_")
@@ -403,6 +429,7 @@ async def callback_delete_and_ban(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("mute_"))
+@safe_callback
 async def callback_delete_and_mute_24h(call: CallbackQuery) -> None:
     """Delete message and mute user for 24 hours (legacy)."""
     parts = call.data.split("_")
@@ -427,6 +454,7 @@ async def callback_delete_and_mute_24h(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("mute2_"))
+@safe_callback
 async def callback_delete_and_mute_7d(call: CallbackQuery) -> None:
     """Delete message and mute user for 7 days (legacy)."""
     parts = call.data.split("_")
@@ -451,6 +479,7 @@ async def callback_delete_and_mute_7d(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("dismiss_"))
+@safe_callback
 async def callback_dismiss(call: CallbackQuery) -> None:
     """Dismiss report (false alarm) (legacy)."""
     await call.message.edit_text(
@@ -460,6 +489,7 @@ async def callback_dismiss(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("dismiss2_"))
+@safe_callback
 async def callback_dismiss_mute_reporter_1d(call: CallbackQuery) -> None:
     """Dismiss and mute reporter for 1 day (legacy)."""
     parts = call.data.split("_")
@@ -484,6 +514,7 @@ async def callback_dismiss_mute_reporter_1d(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("dismiss3_"))
+@safe_callback
 async def callback_dismiss_mute_reporter_7d(call: CallbackQuery) -> None:
     """Dismiss and mute reporter for 7 days (legacy)."""
     parts = call.data.split("_")
@@ -508,6 +539,7 @@ async def callback_dismiss_mute_reporter_7d(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("dismiss4_"))
+@safe_callback
 async def callback_dismiss_ban_reporter(call: CallbackQuery) -> None:
     """Dismiss and ban reporter (legacy)."""
     parts = call.data.split("_")
@@ -529,6 +561,7 @@ async def callback_dismiss_ban_reporter(call: CallbackQuery) -> None:
 ### SPAM CALLBACKS ###
 
 @router.callback_query(F.data.startswith("spam_test_"))
+@safe_callback
 async def callback_spam_test(call: CallbackQuery) -> None:
     """Remove spam record (it was a test)."""
     parts = call.data.split("_")
@@ -556,6 +589,7 @@ async def callback_spam_test(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("spam_ban_"))
+@safe_callback
 async def callback_spam_ban(call: CallbackQuery) -> None:
     """Ban user for spam."""
     parts = call.data.split("_")
@@ -583,6 +617,7 @@ async def callback_spam_ban(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("spam_invert_"))
+@safe_callback
 async def callback_spam_not_spam(call: CallbackQuery) -> None:
     """Mark message as not spam."""
     parts = call.data.split("_")
@@ -616,6 +651,7 @@ async def callback_spam_not_spam(call: CallbackQuery) -> None:
 ### NSFW CALLBACKS ###
 
 @router.callback_query(F.data.startswith("nsfw_ban_"))
+@safe_callback
 async def callback_nsfw_ban(call: CallbackQuery) -> None:
     """Ban user for NSFW profile picture."""
     parts = call.data.split("_")
@@ -634,6 +670,7 @@ async def callback_nsfw_ban(call: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("nsfw_safe_"))
+@safe_callback
 async def callback_nsfw_safe(call: CallbackQuery) -> None:
     """Mark as not NSFW."""
     member_id = int(call.data.split("_")[2])

@@ -2,7 +2,6 @@
 Personal/owner action handlers (ping, profanity check, message from bot).
 """
 import random
-import sys
 import uuid
 from datetime import datetime, timedelta
 
@@ -14,23 +13,27 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from config import config
 from filters import IsOwnerFilter, IsAdminFilter, InMainGroups
 from services.profanity import check_for_profanity
-from utils import remove_prefix, MemberStatus
-
-sys.path.append("./libs")
+from utils import remove_prefix
 
 router = Router(name="personal_actions")
 
 # temp storage for pending msgs (auto-cleanup after 5 minutes)
 # used by callbacks.py
 pending_messages: dict[str, tuple[str, datetime]] = {}
+MAX_PENDING_MESSAGES = 50
 
 
 def _cleanup_old_messages() -> None:
-    """Remove messages older than 5 minutes."""
+    """Remove messages older than 5 minutes and enforce size limit."""
     now = datetime.now()
     expired = [k for k, (_, ts) in pending_messages.items() if now - ts > timedelta(minutes=5)]
     for k in expired:
         del pending_messages[k]
+    
+    # if still over limit, drop oldest
+    while len(pending_messages) > MAX_PENDING_MESSAGES:
+        oldest_key = min(pending_messages, key=lambda k: pending_messages[k][1])
+        del pending_messages[oldest_key]
 
 
 async def _build_chat_keyboard(bot, msg_id: str) -> InlineKeyboardMarkup:
@@ -157,11 +160,6 @@ async def cmd_chat_id(message: Message) -> None:
 )
 async def cmd_ping_bot(message: Message) -> None:
     """Check if bot is alive and show system stats."""
-    # verify admin
-    user = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
-    if user.status not in MemberStatus.admin_statuses():
-        return
-
     ram = psutil.virtual_memory()
     cpu_freq = psutil.cpu_freq().current if psutil.cpu_freq() else 0
 
@@ -211,11 +209,6 @@ async def cmd_ping_bot(message: Message) -> None:
 )
 async def cmd_profanity_check(message: Message) -> None:
     """Check text for profanity (admin only)."""
-    # verify admin
-    user = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
-    if user.status not in MemberStatus.admin_statuses():
-        return
-
     text = remove_prefix(message.text, "!prof ").strip()
     if not text:
         text = remove_prefix(message.text, "!мат ").strip()
