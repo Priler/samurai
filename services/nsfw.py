@@ -7,12 +7,15 @@ Features:
 - Auto-unload after TTL to save RAM
 """
 from typing import Optional
+import logging
 import time
 import gc
 
 from PIL import Image
 import torch
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 MODEL_NAME = "prithivMLmods/siglip2-x256-explicit-content"
 
@@ -59,6 +62,34 @@ def _touch() -> None:
     _last_used = time.time()
 
 
+def _force_reload() -> None:
+    """Force full model reload, clearing corrupted torch state."""
+    global _model, _processor
+
+    logger.warning("Forcing full NSFW model reload (torch state recovery)")
+
+    _model = None
+    _processor = None
+
+    # clear torch internal caches that accumulate over load/unload cycles
+    torch.clear_autocast_cache()
+    if hasattr(torch._C, '_jit_clear_class_registry'):
+        torch._C._jit_clear_class_registry()
+    if hasattr(torch, 'compiler') and hasattr(torch.compiler, 'reset'):
+        torch.compiler.reset()
+    elif hasattr(torch, '_dynamo'):
+        try:
+            torch._dynamo.reset()
+        except Exception:
+            pass
+
+    gc.collect()
+
+    # reload fresh
+    _get_processor()
+    _get_model()
+
+
 def classify_explicit_content(image: np.ndarray) -> dict[str, float]:
     """
     Classify image for explicit content.
@@ -77,44 +108,72 @@ def classify_explicit_content(image: np.ndarray) -> dict[str, float]:
     # convert to PIL and resize (saves RAM)
     pil_image = Image.fromarray(image).convert("RGB")
     pil_image = pil_image.resize(TARGET_SIZE, Image.Resampling.LANCZOS)
-    
+
     # free original array memory
     del image
-    
-    processor = _get_processor()
-    model = _get_model()
-    _touch()  # update last used time
-    
-    inputs = processor(images=pil_image, return_tensors="pt")
-    
-    # free PIL image memory
-    del pil_image
 
-    with torch.no_grad():
-        outputs = model(**inputs)
-        logits = outputs.logits
-        probs = torch.nn.functional.softmax(logits, dim=1).squeeze().tolist()
-    
-    # free tensors
-    del inputs, outputs, logits
+    result = _run_inference(pil_image)
+    if result is not None:
+        return result
 
-    prediction = {
-        ID2LABEL[str(i)]: round(probs[i], 3) for i in range(len(probs))
-    }
+    # torch state is corrupted - force reload and retry once
+    logger.warning("NSFW inference failed, attempting recovery...")
+    _force_reload()
 
-    return prediction
+    result = _run_inference(pil_image)
+    if result is not None:
+        return result
+
+    logger.error("NSFW inference failed after recovery, returning safe fallback")
+    return {v: 0.0 for v in ID2LABEL.values()}
+
+
+def _run_inference(pil_image: Image.Image) -> Optional[dict[str, float]]:
+    """Run model inference, returns None on torch device errors."""
+    try:
+        processor = _get_processor()
+        model = _get_model()
+        _touch()
+
+        inputs = processor(images=pil_image, return_tensors="pt")
+
+        with torch.no_grad():
+            outputs = model(**inputs)
+            logits = outputs.logits
+            probs = torch.nn.functional.softmax(logits, dim=1).squeeze().tolist()
+
+        del inputs, outputs, logits
+
+        return {
+            ID2LABEL[str(i)]: round(probs[i], 3) for i in range(len(probs))
+        }
+    except RuntimeError as e:
+        if "meta" in str(e) or "expected device" in str(e).lower():
+            return None
+        raise
 
 
 def unload_model() -> bool:
     """Free memory by unloading model."""
     global _model, _processor, _last_used
-    
+
     if _model is None and _processor is None:
         return False
-    
+
     _model = None
     _processor = None
     _last_used = 0.0
+
+    # clear torch dispatch caches to prevent meta device corruption on next load
+    torch.clear_autocast_cache()
+    if hasattr(torch, 'compiler') and hasattr(torch.compiler, 'reset'):
+        torch.compiler.reset()
+    elif hasattr(torch, '_dynamo'):
+        try:
+            torch._dynamo.reset()
+        except Exception:
+            pass
+
     gc.collect()
     return True
 
