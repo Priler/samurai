@@ -1,10 +1,10 @@
 [bot]
-# <heroku-var>
+# <env-var>
 owner = 0
-# <heroku-var>
+# <env-var>
 token = ""
-version = "1.0"
-version_codename = "Night City Samurai"
+version = "1.1"
+version_codename = "Gojo Satoru"
 
 
 
@@ -36,14 +36,14 @@ new_users_nomedia = 7776000
 
 
 [spam]
-# after what amount of messages, anti-spam will stop checking this user
-member_messages_threshold = 10
+# after what amount of messages, anti-spam AI will stop checking this user
+member_messages_threshold = 15
 
 # OR after what amount of reputation points, anti-spam will stop checking this user
-member_reputation_threshold = 10
+member_reputation_threshold = 15
 
 # reputation points user must have, to be allowed to send media type messages
-allow_media_threshold = 20
+allow_media_threshold = 15
 
 # remove messages during this interval after a post to channel has been made (any other gender/unknown)
 # set to 0 to allow all
@@ -73,7 +73,6 @@ allow_forwards_threshold = 50
 
 # reputation penalty for attempting to forward with low rep
 forward_violation_penalty = 10
-
 
 # auto-ban users who exceed spam violations threshold
 autoban_enabled = true
