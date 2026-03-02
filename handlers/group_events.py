@@ -459,7 +459,8 @@ async def on_channel_post(message: Message) -> None:
 )
 @router.edited_message(
     InMainGroups(),
-    F.content_type.in_({ContentType.TEXT, ContentType.PHOTO, ContentType.DOCUMENT, ContentType.VIDEO})
+    F.content_type.in_({ContentType.TEXT, ContentType.PHOTO, ContentType.DOCUMENT, ContentType.VIDEO}),
+    ~F.is_automatic_forward
 )
 async def on_user_message(message: Message) -> None:
     """
@@ -469,7 +470,11 @@ async def on_user_message(message: Message) -> None:
     """
     # track for announcement rate limiting
     track_message(message.chat.id, is_announcement=False)
-    
+
+    # skip channel-originated messages (sender_chat set, from_user is None)
+    if message.from_user is None:
+        return
+
     member = await retrieve_or_create_member(message.from_user.id)
     tg_member = await retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
 
