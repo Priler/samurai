@@ -65,6 +65,12 @@ class SpamConfig(BaseModel):
     women_remove_first_comments_interval: int = 600
     allow_comments_rep_threshold__woman: int = 10
     
+    # single-emoji spam (bots spamming lone emojis)
+    single_emoji_rep_threshold: int = 30  # delete single-emoji messages below this rep
+
+    # link spam (t.me invites, external URLs)
+    links_rep_threshold: int = 50  # delete messages with links below this rep
+
     # forward restriction for low-rep users
     allow_forwards_threshold: int = 30  # rep required to forward messages
     forward_violation_penalty: int = 10  # rep penalty for forwarding

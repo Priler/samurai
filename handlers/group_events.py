@@ -526,6 +526,44 @@ async def on_user_message(message: Message) -> None:
             await write_log(message.bot, log_msg, "🤬 Антимат", message.chat.title)
             return
 
+        # single-emoji spam (bots flooding with lone emojis)
+        if (member.reputation_points < config.spam.single_emoji_rep_threshold and
+                _is_single_emoji(msg_text)):
+            await message.delete()
+
+            await queue_member_update(
+                user_id,
+                violations_count_spam=1,
+                reputation_points=-5
+            )
+
+            await write_log(
+                message.bot,
+                f"{msg_text}\n\n<i>Автор:</i> {user_mention(message.from_user)}",
+                "🤖 Антиспам (эмодзи)",
+                message.chat.title
+            )
+            return
+
+        # link spam (t.me invites, external URLs) from low-rep users
+        if (member.reputation_points < config.spam.links_rep_threshold and
+                _contains_link(message)):
+            await message.delete()
+
+            await queue_member_update(
+                user_id,
+                violations_count_spam=1,
+                reputation_points=-10
+            )
+
+            await write_log(
+                message.bot,
+                f"{msg_text}\n\n<i>Автор:</i> {user_mention(message.from_user)}",
+                "🔗 Антиспам (ссылка)",
+                message.chat.title
+            )
+            return
+
         # no profanity - check spam
         # skip expensive ML for trusted users
         should_check_spam = not is_trusted_user(member) and (
@@ -706,6 +744,69 @@ def _format_nsfw_scores(prediction: dict) -> str:
         "Hentai": "H", "Anime Picture": "A"
     }
     return " | ".join(f"{labels.get(k, k)}: {v}" for k, v in prediction.items())
+
+
+def _contains_link(message: Message) -> bool:
+    """Return True if message contains any URL or clickable link.
+
+    Uses Telegram's own entity parsing - covers plain URLs (http/https/t.me)
+    and inline hyperlinks (text_link entities).
+    """
+    entities = message.entities or message.caption_entities or []
+    return any(e.type in ("url", "text_link") for e in entities)
+
+
+def _is_single_emoji(text: str) -> bool:
+    """Return True if text contains exactly one emoji and nothing else.
+
+    Handles simple emoji, emoji + variation selector / skin-tone modifier,
+    and two-regional-indicator flag sequences (e.g. 🇺🇸).
+    ZWJ sequences (👨‍👩‍👧) are intentionally treated as multi-emoji so they
+    are NOT flagged — only trivial single-character bot spam is caught.
+    """
+    stripped = text.strip()
+    if not stripped:
+        return False
+    # Even the most exotic single emoji is < 10 UTF-16 code units
+    if len(stripped) > 10:
+        return False
+
+    _SKIP = {0xFE0F, 0x200D, 0x20E3}  # variation selector, ZWJ, combining keycap
+
+    base_count = 0
+    all_regional = True
+
+    for char in stripped:
+        cp = ord(char)
+
+        # Non-base combiners: skip without counting
+        if cp in _SKIP or 0x1F3FB <= cp <= 0x1F3FF:
+            continue
+
+        is_emoji = (
+            0x1F600 <= cp <= 0x1F64F or  # emoticons
+            0x1F300 <= cp <= 0x1F5FF or  # misc symbols & pictographs
+            0x1F680 <= cp <= 0x1F6FF or  # transport & map
+            0x1F700 <= cp <= 0x1FA6F or  # alchemical → chess symbols
+            0x1FA70 <= cp <= 0x1FAFF or  # symbols & pictographs extended-A
+            0x2600  <= cp <= 0x27BF  or  # misc symbols + dingbats
+            0x1F1E0 <= cp <= 0x1F1FF or  # regional indicators (flags)
+            0x2300  <= cp <= 0x23FF  or  # misc technical (⌚ etc.)
+            0x2B00  <= cp <= 0x2BFF  or  # misc symbols and arrows
+            cp in (0x00A9, 0x00AE, 0x2122)  # ©®™
+        )
+        if not is_emoji:
+            return False  # contains real text
+
+        if not (0x1F1E0 <= cp <= 0x1F1FF):
+            all_regional = False
+        base_count += 1
+
+    if base_count == 1:
+        return True  # ordinary single emoji
+    if base_count == 2 and all_regional:
+        return True  # flag (two regional indicator chars)
+    return False
 
 
 def _contains_chinese(text: str) -> bool:

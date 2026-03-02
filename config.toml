@@ -61,6 +61,11 @@ women_remove_first_comments_interval = 600
 # affects if profile photo will be checked for NSFW
 allow_comments_rep_threshold__woman = 10
 
+# reputation points below which single-emoji messages are deleted (bot spam pattern)
+single_emoji_rep_threshold = 15
+
+# reputation points required to post any links (URLs, t.me invites, etc.)
+links_rep_threshold = 20
 
 # reputation points required to forward messages from other chats/users
 # low-rep users forwarding is a common spam pattern
