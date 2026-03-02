@@ -208,7 +208,7 @@ utc_offset = 5
 
 [ml]
 # Auto-unload ML models when not used to save RAM
-auto_unload_enabled = true
+auto_unload_enabled = false
 
 # Unload spam model after this many minutes of inactivity
 spam_ttl_minutes = 60
