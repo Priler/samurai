@@ -889,10 +889,11 @@ def is_nsfw_detected(prediction: dict) -> bool:
     # strong pornography alone
     is_porn = porn > config.nsfw.pornography_prediction_threshold
 
-    # high sensual - only with some porn signal (avoids FP on safe attractive images)
+    # high sensual - needs some porn signal at moderate confidence,
+    # but very high sensual (>0.95) is conclusive on its own
     is_sensual = (
         sensual > config.nsfw.sensual_prediction_threshold
-        and porn > 0.01
+        and (sensual > 0.95 or porn > 0.01)
     )
 
     # high hentai - only with explicit companion (avoids FP on clean anime art)
