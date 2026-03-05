@@ -1,17 +1,22 @@
 """
-Personal/owner action handlers (ping, profanity check, message from bot).
+Personal/owner action handlers (ping, profanity check, message from bot, NSFW test).
 """
+import asyncio
+import io
 import random
 import uuid
 from datetime import datetime, timedelta
 
+import numpy as np
 import psutil
+from PIL import Image
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 from config import config
 from filters import IsOwnerFilter, IsAdminFilter, InMainGroups
+from services.nsfw import classify_explicit_content as nsfw_predict
 from services.profanity import check_for_profanity
 from utils import remove_prefix
 
@@ -248,14 +253,14 @@ async def cmd_profanity_check_private(message: Message) -> None:
     text = remove_prefix(message.text, "!prof ").strip()
     if not text:
         text = remove_prefix(message.text, "!мат ").strip()
-    
+
     if not text:
         await message.reply("Укажите текст для проверки после команды.")
         return
 
     # check russian
     is_profanity_ru, word_ru, line_info_ru = check_for_profanity(text, "ru")
-    
+
     # check english
     is_profanity_en, word_en, line_info_en = check_for_profanity(text, "en")
 
@@ -272,3 +277,36 @@ async def cmd_profanity_check_private(message: Message) -> None:
         await message.reply(log_msg)
     else:
         await message.reply("✅ No profanity detected.")
+
+
+@router.message(
+    IsOwnerFilter(),
+    Command("nsfw", prefix="!"),
+    F.photo
+)
+async def cmd_nsfw_test(message: Message) -> None:
+    """
+    Test NSFW detection on an attached photo (owner only).
+
+    Usage: attach a photo and add !nsfw as caption
+    """
+    photo = message.photo[-1]
+
+    img_file = await message.bot.get_file(photo.file_id)
+    file_bytes = await message.bot.download_file(img_file.file_path)
+    image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
+
+    prediction = await asyncio.to_thread(nsfw_predict, np.asarray(image))
+
+    # lazy import to avoid circular dep (personal_actions loads before group_events)
+    from handlers.group_events import is_nsfw_detected
+    verdict = is_nsfw_detected(prediction)
+
+    lines = ["🔞 <b>NSFW Test Results:</b>\n"]
+    for label, score in prediction.items():
+        bar = "█" * int(float(score) * 20)
+        lines.append(f"  <b>{label}:</b> {score} {bar}")
+
+    lines.append(f"\n<b>Verdict:</b> {'🚫 NSFW' if verdict else '✅ Safe'}")
+
+    await message.reply("\n".join(lines))

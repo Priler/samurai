@@ -859,23 +859,46 @@ def _contains_chinese(text: str) -> bool:
 
 
 def is_nsfw_detected(prediction: dict) -> bool:
-    """Check if NSFW is detected based on thresholds."""
-    # safe checks
+    """Check if NSFW is detected based on thresholds.
+
+    Detection requires *companion signals* — a single elevated category
+    alone is not enough (the model produces too many false positives on
+    clean anime art / attractive-but-safe photos).
+    """
+    normal = float(prediction["Normal"])
+    anime = float(prediction["Anime Picture"])
+    sensual = float(prediction["Enticing or Sensual"])
+    porn = float(prediction["Pornography"])
+    hentai = float(prediction["Hentai"])
+
+    # safe: high Normal or Anime with low explicit signals
     is_safe = (
-        (float(prediction["Normal"]) > config.nsfw.normal_prediction_threshold or
-         float(prediction["Anime Picture"]) > config.nsfw.anime_prediction_threshold)
+        (normal > config.nsfw.normal_prediction_threshold or
+         anime > config.nsfw.anime_prediction_threshold)
         and
-        (float(prediction["Enticing or Sensual"]) < config.nsfw.normal_comb_sensual_prediction_threshold
-         and float(prediction["Pornography"]) < config.nsfw.normal_comb_pornography_prediction_threshold)
+        (sensual < config.nsfw.normal_comb_sensual_prediction_threshold
+         and porn < config.nsfw.normal_comb_pornography_prediction_threshold)
     )
 
-    # unsafe checks
-    is_unsafe = (
-        (float(prediction["Enticing or Sensual"]) > config.nsfw.comb_sensual_prediction_threshold
-         and float(prediction["Pornography"]) > config.nsfw.comb_pornography_prediction_threshold)
-        or float(prediction["Enticing or Sensual"]) > config.nsfw.sensual_prediction_threshold
-        or float(prediction["Pornography"]) > config.nsfw.pornography_prediction_threshold
-        or float(prediction["Hentai"]) > config.nsfw.hentai_prediction_threshold
+    # combined sensual + pornography - most reliable signal
+    is_combined = (
+        sensual > config.nsfw.comb_sensual_prediction_threshold
+        and porn > config.nsfw.comb_pornography_prediction_threshold
     )
 
-    return not is_safe and is_unsafe
+    # strong pornography alone
+    is_porn = porn > config.nsfw.pornography_prediction_threshold
+
+    # high sensual - only with some porn signal (avoids FP on safe attractive images)
+    is_sensual = (
+        sensual > config.nsfw.sensual_prediction_threshold
+        and porn > 0.01
+    )
+
+    # high hentai - only with explicit companion (avoids FP on clean anime art)
+    is_hentai = (
+        hentai > config.nsfw.hentai_prediction_threshold
+        and (porn > 0.05 or sensual > 0.1)
+    )
+
+    return not is_safe and (is_combined or is_porn or is_sensual or is_hentai)

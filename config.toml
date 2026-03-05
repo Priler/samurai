@@ -100,13 +100,13 @@ comb_sensual_prediction_threshold = 0.15
 comb_pornography_prediction_threshold = 0.15
 
 # > will be detected as nsfw
-sensual_prediction_threshold = 0.8
+sensual_prediction_threshold = 0.7
 
-# > will be detected as nsfw
-pornography_prediction_threshold = 0.3
+# > will be detected as nsfw (standalone — requires high confidence since model has many FPs)
+pornography_prediction_threshold = 0.85
 
-# > will be detected as nsfw
-hentai_prediction_threshold = 0.5
+# > will be detected as nsfw (only if accompanied by some pornography or sensual signal)
+hentai_prediction_threshold = 0.9
 
 # > will NOT be detected as nsfw
 # these values works as: normal and (comb_sensual and comb_pornography)

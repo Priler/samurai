@@ -1,7 +1,7 @@
 """
 Admin action handlers (ban, unban, etc.).
 """
-from aiogram import Router, F
+from aiogram import Router
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 
@@ -152,5 +152,5 @@ async def cmd_top_violators_spam(message: Message, command: CommandObject) -> No
             f"{i}. {user_mention_by_id(member.user_id)} — "
             f"<b>{member.violations_count_spam}</b> нарушений"
         )
-    
+
     await message.reply("\n".join(lines))

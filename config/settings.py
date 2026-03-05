@@ -88,9 +88,9 @@ class NSFWConfig(BaseModel):
     enabled: bool = True
     comb_sensual_prediction_threshold: float = 0.15
     comb_pornography_prediction_threshold: float = 0.15
-    sensual_prediction_threshold: float = 0.8
-    pornography_prediction_threshold: float = 0.3
-    hentai_prediction_threshold: float = 0.5
+    sensual_prediction_threshold: float = 0.7
+    pornography_prediction_threshold: float = 0.85
+    hentai_prediction_threshold: float = 0.9
     normal_prediction_threshold: float = 0.3
     normal_comb_sensual_prediction_threshold: float = 0.5
     normal_comb_pornography_prediction_threshold: float = 0.2
