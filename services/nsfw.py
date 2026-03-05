@@ -118,7 +118,11 @@ def classify_explicit_content(image: np.ndarray) -> dict[str, float]:
 
     # torch state is corrupted - force reload and retry once
     logger.warning("NSFW inference failed, attempting recovery...")
-    _force_reload()
+    try:
+        _force_reload()
+    except Exception as e:
+        logger.error(f"NSFW model reload failed: {e}, returning safe fallback")
+        return {v: 0.0 for v in ID2LABEL.values()}
 
     result = _run_inference(pil_image)
     if result is not None:
