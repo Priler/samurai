@@ -42,7 +42,7 @@ def _get_processor():
     global _processor
     if _processor is None:
         from transformers import AutoImageProcessor
-        _processor = AutoImageProcessor.from_pretrained(MODEL_NAME)
+        _processor = AutoImageProcessor.from_pretrained(MODEL_NAME, use_fast=True)
     return _processor
 
 
@@ -51,7 +51,9 @@ def _get_model():
     global _model
     if _model is None:
         from transformers import SiglipForImageClassification
-        _model = SiglipForImageClassification.from_pretrained(MODEL_NAME)
+        _model = SiglipForImageClassification.from_pretrained(
+            MODEL_NAME, low_cpu_mem_usage=False, device_map=None
+        )
         _model.eval()
     return _model
 
