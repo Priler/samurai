@@ -67,6 +67,10 @@ single_emoji_rep_threshold = 15
 # reputation points required to post any links (URLs, t.me invites, etc.)
 links_rep_threshold = 20
 
+# reputation points required to use "Reply in Another Chat" (cross-chat replies)
+# bots and spammers abuse this to inject messages with external context
+external_reply_rep_threshold = 50
+
 # reputation points required to forward messages from other chats/users
 # low-rep users forwarding is a common spam pattern
 allow_forwards_threshold = 50

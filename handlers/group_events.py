@@ -357,6 +357,43 @@ async def on_user_contact(message: Message) -> None:
         await message.delete()
 
 
+# cross-chat reply restriction ("Reply in Another Chat")
+@router.message(InMainGroups(), F.external_reply, ~F.is_automatic_forward)
+async def on_external_reply(message: Message) -> None:
+    """
+    Delete cross-chat replies from low-rep users.
+
+    Messages sent via "Reply in Another Chat" have external_reply set.
+    This covers both plain text replies and forwards containing an external reply.
+    """
+    if message.from_user is None:
+        return
+
+    tg_member = await retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
+
+    if tg_member.status in MemberStatus.admin_statuses():
+        return
+
+    member = await retrieve_or_create_member(message.from_user.id)
+
+    if member.reputation_points < config.spam.external_reply_rep_threshold:
+        await message.delete()
+
+        await queue_member_update(
+            message.from_user.id,
+            violations_count_spam=1,
+            reputation_points=-10
+        )
+
+        msg_text = get_message_text(message) or "[медиа без текста]"
+        await write_log(
+            message.bot,
+            f"{msg_text}\n\n<i>Автор:</i> {user_mention(message.from_user)}",
+            "↩️ Антиспам (кросс-чат)",
+            message.chat.title
+        )
+
+
 # forwards restriction
 @router.message(InMainGroups(), F.forward_origin)
 async def on_user_forward(message: Message) -> None:

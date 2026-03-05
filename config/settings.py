@@ -71,6 +71,9 @@ class SpamConfig(BaseModel):
     # link spam (t.me invites, external URLs)
     links_rep_threshold: int = 50  # delete messages with links below this rep
 
+    # cross-chat replies ("Reply in Another Chat")
+    external_reply_rep_threshold: int = 50  # delete cross-chat replies below this rep
+
     # forward restriction for low-rep users
     allow_forwards_threshold: int = 30  # rep required to forward messages
     forward_violation_penalty: int = 10  # rep penalty for forwarding
