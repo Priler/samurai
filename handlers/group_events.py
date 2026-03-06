@@ -872,12 +872,14 @@ def is_nsfw_detected(prediction: dict) -> bool:
     hentai = float(prediction["Hentai"])
 
     # safe: high Normal or Anime with low explicit signals
+    # even if both sensual+porn are individually below limits, together they override
     is_safe = (
         (normal > config.nsfw.normal_prediction_threshold or
          anime > config.nsfw.anime_prediction_threshold)
         and
         (sensual < config.nsfw.normal_comb_sensual_prediction_threshold
          and porn < config.nsfw.normal_comb_pornography_prediction_threshold)
+        and not (sensual > 0.25 and porn > 0.03)
     )
 
     # combined sensual + pornography - most reliable signal

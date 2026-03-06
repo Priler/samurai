@@ -42,7 +42,7 @@ def _get_processor():
     global _processor
     if _processor is None:
         from transformers import AutoImageProcessor
-        _processor = AutoImageProcessor.from_pretrained(MODEL_NAME, use_fast=True)
+        _processor = AutoImageProcessor.from_pretrained(MODEL_NAME, use_fast=False)
     return _processor
 
 
