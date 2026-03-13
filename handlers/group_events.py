@@ -9,10 +9,11 @@ import asyncio
 import io
 import logging
 import random
+from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from aiogram import Router, F, Bot
+from aiogram import Router, F
 from aiogram.types import (
     Message, ContentType, InlineKeyboardMarkup, InlineKeyboardButton,
     ChatMemberAdministrator, ChatMemberOwner, ChatPermissions, ChatMemberUpdated
@@ -30,7 +31,7 @@ from services import (
     retrieve_or_create_member, retrieve_tgmember, detect_gender,
     check_for_profanity_all, check_name_for_violations, Gender
 )
-from services.chat_registry import is_linked_channel, register_chat, disable_chat
+from services.chat_registry import is_linked_channel, register_chat
 from services.runtime_settings import get_setting, get_logs_chat_id
 from services.message_rate_limit import check_message_interval
 from services.spam import predict as ruspam_predict
@@ -68,7 +69,6 @@ MEDIA_ONLY_CONTENT_TYPES = {
     ContentType.AUDIO, ContentType.VIDEO_NOTE, ContentType.ANIMATION
 }
 
-
 def _build_log_action_keyboard(chat_id: int, user_id: int) -> InlineKeyboardMarkup:
     """Action keyboard for logs: quick mute/ban against offender."""
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -92,10 +92,16 @@ async def on_bot_chat_membership_update(event: ChatMemberUpdated) -> None:
             chat_type=chat.type,
             title=chat.title or chat.full_name,
             bot_status=status,
-            is_enabled=True
+            is_enabled=None
         )
     elif status in ("left", "kicked"):
-        await disable_chat(chat.id)
+        await register_chat(
+            chat_id=chat.id,
+            chat_type=chat.type,
+            title=chat.title or chat.full_name,
+            bot_status=status,
+            is_enabled=False
+        )
 
 # fun command
 @router.message(InMainGroups(), Command("бу", prefix="!/"))
@@ -580,19 +586,19 @@ async def on_user_message(message: Message) -> None:
 
     min_interval_sec = int(await get_setting("moderation.message_min_interval_sec", chat_id=message.chat.id))
     if min_interval_sec > 0:
-        allowed, remaining = check_message_interval(message.chat.id, message.from_user.id, min_interval_sec)
+        allowed, _ = check_message_interval(message.chat.id, message.from_user.id, min_interval_sec)
         if not allowed:
-            action = str(await get_setting("moderation.interval_violation_action", chat_id=message.chat.id))
-            if action in ("delete", "penalty"):
-                with suppress(TelegramBadRequest):
-                    await message.delete()
-            if action == "warn":
-                with suppress(TelegramBadRequest):
-                    await message.reply(f"⏱ Писать можно не чаще 1 сообщения в {min_interval_sec} сек. Осталось: {remaining} сек.")
-            if action == "penalty":
-                penalty = int(await get_setting("moderation.interval_penalty_points", chat_id=message.chat.id))
-                if penalty > 0:
-                    await queue_member_update(message.from_user.id, reputation_points=-penalty, violations_count_spam=1)
+            # Previous warning+auto-delete flow is intentionally disabled.
+            # Interval setting now applies hard mute for N seconds.
+            # Telegram treats restrictions shorter than 30 seconds as permanent.
+            mute_seconds = max(min_interval_sec, 31)
+            with suppress(Exception):
+                await message.bot.restrict_chat_member(
+                    chat_id=message.chat.id,
+                    user_id=message.from_user.id,
+                    permissions=ChatPermissions(can_send_messages=False),
+                    until_date=datetime.now(timezone.utc) + timedelta(seconds=mute_seconds),
+                )
             return
 
     allow_media_threshold = int(await get_setting("spam.allow_media_threshold", chat_id=message.chat.id))

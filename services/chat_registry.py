@@ -63,7 +63,7 @@ async def register_chat(
     chat_type: str = "supergroup",
     title: str | None = None,
     bot_status: str = "administrator",
-    is_enabled: bool = True
+    is_enabled: bool | None = None
 ) -> None:
     row = await _first_or_none(ManagedChat.objects.filter(chat_id=chat_id))
     now = datetime.now()
@@ -71,7 +71,8 @@ async def register_chat(
         row.chat_type = chat_type
         row.title = title
         row.bot_status = bot_status
-        row.is_enabled = is_enabled
+        if is_enabled is not None:
+            row.is_enabled = is_enabled
         row.updated_at = now
         await row.update()
     else:
@@ -80,7 +81,7 @@ async def register_chat(
             chat_type=chat_type,
             title=title,
             bot_status=bot_status,
-            is_enabled=is_enabled,
+            is_enabled=bool(is_enabled) if is_enabled is not None else False,
             updated_at=now
         )
     _clear_cache()
@@ -101,6 +102,24 @@ async def list_managed_chats(enabled_only: bool = True) -> list[ManagedChat]:
     if enabled_only:
         return await ManagedChat.objects.filter(is_enabled=True).order_by("chat_id").all()
     return await ManagedChat.objects.order_by("chat_id").all()
+
+
+async def list_admin_chats(chat_type: str | None = None) -> list[ManagedChat]:
+    rows = await ManagedChat.objects.filter(bot_status__in=["administrator", "creator"]).order_by("chat_id").all()
+    if chat_type is None:
+        return rows
+    return [row for row in rows if row.chat_type == chat_type]
+
+
+async def set_chat_monitoring(chat_id: int, enabled: bool) -> bool:
+    row = await _first_or_none(ManagedChat.objects.filter(chat_id=chat_id))
+    if not row:
+        return False
+    row.is_enabled = enabled
+    row.updated_at = datetime.now()
+    await row.update()
+    _clear_cache()
+    return True
 
 
 async def get_main_chat_ids() -> list[int]:
