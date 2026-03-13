@@ -3,7 +3,7 @@ from typing import Union
 from aiogram.filters import BaseFilter
 from aiogram.types import Message, CallbackQuery
 
-from config import config
+from services.owners import is_owner
 
 
 class IsOwnerFilter(BaseFilter):
@@ -18,7 +18,7 @@ class IsOwnerFilter(BaseFilter):
         if event.from_user is None:
             return False
 
-        user_is_owner = event.from_user.id == config.bot.owner
+        user_is_owner = await is_owner(event.from_user.id)
 
         if self.is_owner:
             return user_is_owner

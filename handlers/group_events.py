@@ -9,12 +9,13 @@ import asyncio
 import io
 import logging
 import random
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from aiogram import Router, F, Bot
 from aiogram.types import (
     Message, ContentType, InlineKeyboardMarkup, InlineKeyboardButton,
-    ChatMemberAdministrator, ChatMemberOwner
+    ChatMemberAdministrator, ChatMemberOwner, ChatPermissions, ChatMemberUpdated
 )
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
@@ -29,6 +30,9 @@ from services import (
     retrieve_or_create_member, retrieve_tgmember, detect_gender,
     check_for_profanity_all, check_name_for_violations, Gender
 )
+from services.chat_registry import is_linked_channel, register_chat, disable_chat
+from services.runtime_settings import get_setting, get_logs_chat_id
+from services.message_rate_limit import check_message_interval
 from services.spam import predict as ruspam_predict
 from services.nsfw import classify_explicit_content as nsfw_predict
 from services.cache import (
@@ -65,7 +69,33 @@ MEDIA_ONLY_CONTENT_TYPES = {
 }
 
 
+def _build_log_action_keyboard(chat_id: int, user_id: int) -> InlineKeyboardMarkup:
+    """Action keyboard for logs: quick mute/ban against offender."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🙊 Мут 5м", callback_data=f"lgm5_{chat_id}_{user_id}")],
+        [InlineKeyboardButton(text="❌ Бан 5м", callback_data=f"lgb5_{chat_id}_{user_id}")],
+        [InlineKeyboardButton(text="🚫 Бан навсегда", callback_data=f"lgban_{chat_id}_{user_id}")],
+    ])
+
+
 ### COMMAND HANDLERS (must be before catch-all) ###
+
+
+@router.my_chat_member()
+async def on_bot_chat_membership_update(event: ChatMemberUpdated) -> None:
+    """Track where the bot is added/removed/promoted to admin."""
+    chat = event.chat
+    status = event.new_chat_member.status
+    if status in ("member", "administrator", "creator"):
+        await register_chat(
+            chat_id=chat.id,
+            chat_type=chat.type,
+            title=chat.title or chat.full_name,
+            bot_status=status,
+            is_enabled=True
+        )
+    elif status in ("left", "kicked"):
+        await disable_chat(chat.id)
 
 # fun command
 @router.message(InMainGroups(), Command("бу", prefix="!/"))
@@ -230,7 +260,7 @@ async def on_spam(message: Message) -> None:
         ])
 
         await message.bot.send_message(
-            config.groups.logs,
+            await get_logs_chat_id(),
             generate_log_message(log_msg, "❌ АнтиСПАМ", message.chat.title),
             reply_markup=spam_keyboard
         )
@@ -328,14 +358,36 @@ async def on_punish(message: Message) -> None:
 # user join
 @router.message(InMainGroups(), F.content_type == ContentType.NEW_CHAT_MEMBERS)
 async def on_user_join(message: Message) -> None:
-    """Remove 'user joined' service message."""
-    await message.delete()
-    await write_log(
-        message.bot,
-        f"Присоединился пользователь {user_mention(message.from_user)}",
-        "➕ Новый участник",
-        message.chat.title
-    )
+    """Handle new members and optional auto-mute."""
+    with suppress(TelegramBadRequest):
+        await message.delete()
+
+    mute_enabled = await get_setting("moderation.new_user_automute_enabled", chat_id=message.chat.id)
+    mute_seconds = int(await get_setting("moderation.new_user_automute_seconds", chat_id=message.chat.id))
+    # backward-compat fallback to legacy field
+    if mute_seconds <= 0:
+        mute_seconds = int(await get_setting("groups.new_users_nomedia", chat_id=message.chat.id))
+
+    for member in (message.new_chat_members or []):
+        log_msg = f"Присоединился пользователь {user_mention(member)}"
+        if mute_enabled and mute_seconds > 0 and not member.is_bot:
+            try:
+                await message.bot.restrict_chat_member(
+                    chat_id=message.chat.id,
+                    user_id=member.id,
+                    permissions=ChatPermissions(can_send_messages=False),
+                    until_date=datetime.now(timezone.utc) + timedelta(seconds=mute_seconds)
+                )
+                log_msg += f"\nАвтомьют: {mute_seconds} сек."
+            except Exception:
+                pass
+
+        await write_log(
+            message.bot,
+            log_msg,
+            "➕ Новый участник",
+            message.chat.title
+        )
 
 
 # voice messages (discourage)
@@ -376,7 +428,10 @@ async def on_external_reply(message: Message) -> None:
 
     member = await retrieve_or_create_member(message.from_user.id)
 
-    if member.reputation_points < config.spam.external_reply_rep_threshold:
+    external_reply_rep_threshold = int(
+        await get_setting("spam.external_reply_rep_threshold", chat_id=message.chat.id)
+    )
+    if member.reputation_points < external_reply_rep_threshold:
         await message.delete()
 
         await queue_member_update(
@@ -410,7 +465,7 @@ async def on_user_forward(message: Message) -> None:
     
     # allow forwards from linked channels
     if message.forward_from_chat:
-        if config.groups.is_linked_channel(message.forward_from_chat.id):
+        if await is_linked_channel(message.forward_from_chat.id):
             return
     
     # allow forwards from group members
@@ -433,12 +488,14 @@ async def on_user_forward(message: Message) -> None:
     if tg_member.status in MemberStatus.admin_statuses():
         return
 
-    if member.reputation_points < config.spam.allow_forwards_threshold:
+    allow_forwards_threshold = int(await get_setting("spam.allow_forwards_threshold", chat_id=message.chat.id))
+    forward_violation_penalty = int(await get_setting("spam.forward_violation_penalty", chat_id=message.chat.id))
+    if member.reputation_points < allow_forwards_threshold:
         await message.delete()
         
         await queue_member_update(
             message.from_user.id,
-            reputation_points=-config.spam.forward_violation_penalty,
+            reputation_points=-forward_violation_penalty,
             violations_count_spam=1
         )
         
@@ -472,8 +529,9 @@ async def on_user_media(message: Message) -> None:
     member = await retrieve_or_create_member(message.from_user.id)
     tg_member = await retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
 
+    allow_media_threshold = int(await get_setting("spam.allow_media_threshold", chat_id=message.chat.id))
     if (tg_member.status not in MemberStatus.admin_statuses() and
-        member.reputation_points < config.spam.allow_media_threshold):
+        member.reputation_points < allow_media_threshold):
         await message.delete()
 
 
@@ -520,9 +578,34 @@ async def on_user_message(message: Message) -> None:
     if tg_member.status in MemberStatus.admin_statuses():
         return
 
+    min_interval_sec = int(await get_setting("moderation.message_min_interval_sec", chat_id=message.chat.id))
+    if min_interval_sec > 0:
+        allowed, remaining = check_message_interval(message.chat.id, message.from_user.id, min_interval_sec)
+        if not allowed:
+            action = str(await get_setting("moderation.interval_violation_action", chat_id=message.chat.id))
+            if action in ("delete", "penalty"):
+                with suppress(TelegramBadRequest):
+                    await message.delete()
+            if action == "warn":
+                with suppress(TelegramBadRequest):
+                    await message.reply(f"⏱ Писать можно не чаще 1 сообщения в {min_interval_sec} сек. Осталось: {remaining} сек.")
+            if action == "penalty":
+                penalty = int(await get_setting("moderation.interval_penalty_points", chat_id=message.chat.id))
+                if penalty > 0:
+                    await queue_member_update(message.from_user.id, reputation_points=-penalty, violations_count_spam=1)
+            return
+
+    allow_media_threshold = int(await get_setting("spam.allow_media_threshold", chat_id=message.chat.id))
+    single_emoji_rep_threshold = int(await get_setting("spam.single_emoji_rep_threshold", chat_id=message.chat.id))
+    links_rep_threshold = int(await get_setting("spam.links_rep_threshold", chat_id=message.chat.id))
+    member_messages_threshold = int(await get_setting("spam.member_messages_threshold", chat_id=message.chat.id))
+    member_reputation_threshold = int(await get_setting("spam.member_reputation_threshold", chat_id=message.chat.id))
+    profanity_temp_ban_enabled = bool(await get_setting("moderation.profanity_temp_ban_enabled", chat_id=message.chat.id))
+    profanity_temp_ban_seconds = int(await get_setting("moderation.profanity_temp_ban_seconds", chat_id=message.chat.id))
+
     # media restriction for low-rep users (photos, videos, documents)
     if message.content_type != ContentType.TEXT:
-        if member.reputation_points < config.spam.allow_media_threshold:
+        if member.reputation_points < allow_media_threshold:
             await message.delete()
             return
 
@@ -542,7 +625,13 @@ async def on_user_message(message: Message) -> None:
 
             log_msg = msg_text
             log_msg += f"\n\n<i>Автор:</i> {user_mention(message.from_user)}"
-            await write_log(message.bot, log_msg, "🈲 Антиспам (CN)", message.chat.title)
+            await write_log(
+                message.bot,
+                log_msg,
+                "🈲 Антиспам (CN)",
+                message.chat.title,
+                reply_markup=_build_log_action_keyboard(message.chat.id, user_id)
+            )
             await _maybe_autoban(message, member, 5, "CN-спам")
             return
 
@@ -562,11 +651,24 @@ async def on_user_message(message: Message) -> None:
             if bad_word:
                 log_msg = log_msg.replace(bad_word, f'<u><b>{bad_word}</b></u>')
             log_msg += f"\n\n<i>Автор:</i> {user_mention(message.from_user)}"
-            await write_log(message.bot, log_msg, "🤬 Антимат", message.chat.title)
+            await write_log(
+                message.bot,
+                log_msg,
+                "🤬 Антимат",
+                message.chat.title,
+                reply_markup=_build_log_action_keyboard(message.chat.id, user_id)
+            )
+            if profanity_temp_ban_enabled and profanity_temp_ban_seconds > 0:
+                with suppress(Exception):
+                    await message.bot.ban_chat_member(
+                        chat_id=message.chat.id,
+                        user_id=user_id,
+                        until_date=datetime.now(timezone.utc) + timedelta(seconds=profanity_temp_ban_seconds)
+                    )
             return
 
         # single-emoji spam (bots flooding with lone emojis)
-        if (member.reputation_points < config.spam.single_emoji_rep_threshold and
+        if (member.reputation_points < single_emoji_rep_threshold and
                 _is_single_emoji(msg_text)):
             await message.delete()
 
@@ -580,12 +682,13 @@ async def on_user_message(message: Message) -> None:
                 message.bot,
                 f"{msg_text}\n\n<i>Автор:</i> {user_mention(message.from_user)}",
                 "🤖 Антиспам (эмодзи)",
-                message.chat.title
+                message.chat.title,
+                reply_markup=_build_log_action_keyboard(message.chat.id, user_id)
             )
             return
 
         # link spam (t.me invites, external URLs) from low-rep users
-        if (member.reputation_points < config.spam.links_rep_threshold and
+        if (member.reputation_points < links_rep_threshold and
                 _contains_link(message)):
             await message.delete()
 
@@ -599,7 +702,8 @@ async def on_user_message(message: Message) -> None:
                 message.bot,
                 f"{msg_text}\n\n<i>Автор:</i> {user_mention(message.from_user)}",
                 "🔗 Антиспам (ссылка)",
-                message.chat.title
+                message.chat.title,
+                reply_markup=_build_log_action_keyboard(message.chat.id, user_id)
             )
             await _maybe_autoban(message, member, 10, "ссылка")
             return
@@ -607,8 +711,8 @@ async def on_user_message(message: Message) -> None:
         # no profanity - check spam
         # skip expensive ML for trusted users
         should_check_spam = not is_trusted_user(member) and (
-            member.messages_count < config.spam.member_messages_threshold or 
-            member.reputation_points < config.spam.member_reputation_threshold
+            member.messages_count < member_messages_threshold or
+            member.reputation_points < member_reputation_threshold
         )
         
         if should_check_spam and await asyncio.to_thread(ruspam_predict, msg_text):
@@ -643,11 +747,11 @@ async def check_for_unwanted(message: Message, msg_text: str, member: MemberData
     # check if reply to channel post (comment)
     if (message.reply_to_message and 
         message.reply_to_message.forward_from_chat and 
-        config.groups.is_linked_channel(message.reply_to_message.forward_from_chat.id)):
+        await is_linked_channel(message.reply_to_message.forward_from_chat.id)):
         
         # remove early comments from low-rep users
-        threshold = config.spam.allow_comments_rep_threshold
-        interval = config.spam.remove_first_comments_interval
+        threshold = int(await get_setting("spam.allow_comments_rep_threshold", chat_id=message.chat.id))
+        interval = int(await get_setting("spam.remove_first_comments_interval", chat_id=message.chat.id))
         
         if (member.reputation_points < threshold and
             (message.date - message.reply_to_message.forward_date).seconds <= interval):
@@ -663,11 +767,12 @@ async def check_for_unwanted(message: Message, msg_text: str, member: MemberData
             except TelegramBadRequest:
                 pass
 
-    if not config.nsfw.enabled:
+    if not bool(await get_setting("nsfw.enabled", chat_id=message.chat.id)):
         return False
 
     user_id = message.from_user.id
-    is_low_rep = member.reputation_points < config.nsfw.check_rep_threshold
+    check_rep_threshold = int(await get_setting("nsfw.check_rep_threshold", chat_id=message.chat.id))
+    is_low_rep = member.reputation_points < check_rep_threshold
 
     # in-chat image nsfw check
     if message.content_type == ContentType.PHOTO and is_low_rep:
@@ -679,7 +784,7 @@ async def check_for_unwanted(message: Message, msg_text: str, member: MemberData
             file_bytes = await message.bot.download_file(img_file.file_path)
             image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
             prediction = await asyncio.to_thread(nsfw_predict, np.asarray(image))
-            is_nsfw = is_nsfw_detected(prediction)
+            is_nsfw = await is_nsfw_detected(prediction, chat_id=message.chat.id)
             cache_nsfw_result(user_id, photo.file_unique_id, is_nsfw)
         else:
             is_nsfw = cached
@@ -714,7 +819,7 @@ async def check_for_unwanted(message: Message, msg_text: str, member: MemberData
                 file_bytes = await message.bot.download_file(img_file.file_path)
                 image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
                 prediction = await asyncio.to_thread(nsfw_predict, np.asarray(image))
-                is_nsfw = is_nsfw_detected(prediction)
+                is_nsfw = await is_nsfw_detected(prediction, chat_id=message.chat.id)
                 cache_nsfw_result(user_id, photo.file_unique_id, is_nsfw)
             else:
                 is_nsfw = cached
@@ -732,12 +837,15 @@ async def _maybe_autoban(
     message: Message, member: MemberData, penalty: int, reason: str
 ) -> None:
     """Ban user if violations + rep thresholds are exceeded."""
-    if not config.spam.autoban_enabled:
+    autoban_enabled = bool(await get_setting("spam.autoban_enabled", chat_id=message.chat.id))
+    if not autoban_enabled:
         return
+    autoban_threshold = int(await get_setting("spam.autoban_threshold", chat_id=message.chat.id))
+    autoban_rep_threshold = int(await get_setting("spam.autoban_rep_threshold", chat_id=message.chat.id))
     new_violations = member.violations_count_spam + 1
     new_rep = member.reputation_points - penalty
-    if (new_violations >= config.spam.autoban_threshold and
-            new_rep < config.spam.autoban_rep_threshold):
+    if (new_violations >= autoban_threshold and
+            new_rep < autoban_rep_threshold):
         try:
             await message.bot.ban_chat_member(
                 chat_id=message.chat.id,
@@ -777,7 +885,7 @@ async def _report_nsfw(
     ])
 
     await message.bot.send_message(
-        config.groups.logs,
+        await get_logs_chat_id(),
         generate_log_message(log_msg, log_label, message.chat.title),
         reply_markup=keyboard
     )
@@ -868,7 +976,7 @@ def _contains_chinese(text: str) -> bool:
     return False
 
 
-def is_nsfw_detected(prediction: dict) -> bool:
+async def is_nsfw_detected(prediction: dict, chat_id: int | None = None) -> bool:
     """Check if NSFW is detected based on thresholds.
 
     Detection requires *companion signals* - a single elevated category
@@ -883,34 +991,54 @@ def is_nsfw_detected(prediction: dict) -> bool:
 
     # safe: high Normal or Anime with low explicit signals
     # even if both sensual+porn are individually below limits, together they override
+    normal_prediction_threshold = float(await get_setting("nsfw.normal_prediction_threshold", chat_id=chat_id))
+    anime_prediction_threshold = float(await get_setting("nsfw.anime_prediction_threshold", chat_id=chat_id))
+    normal_comb_sensual_prediction_threshold = float(
+        await get_setting("nsfw.normal_comb_sensual_prediction_threshold", chat_id=chat_id)
+    )
+    normal_comb_pornography_prediction_threshold = float(
+        await get_setting("nsfw.normal_comb_pornography_prediction_threshold", chat_id=chat_id)
+    )
+    comb_sensual_prediction_threshold = float(
+        await get_setting("nsfw.comb_sensual_prediction_threshold", chat_id=chat_id)
+    )
+    comb_pornography_prediction_threshold = float(
+        await get_setting("nsfw.comb_pornography_prediction_threshold", chat_id=chat_id)
+    )
+    pornography_prediction_threshold = float(
+        await get_setting("nsfw.pornography_prediction_threshold", chat_id=chat_id)
+    )
+    sensual_prediction_threshold = float(await get_setting("nsfw.sensual_prediction_threshold", chat_id=chat_id))
+    hentai_prediction_threshold = float(await get_setting("nsfw.hentai_prediction_threshold", chat_id=chat_id))
+
     is_safe = (
-        (normal > config.nsfw.normal_prediction_threshold or
-         anime > config.nsfw.anime_prediction_threshold)
+        (normal > normal_prediction_threshold or
+         anime > anime_prediction_threshold)
         and
-        (sensual < config.nsfw.normal_comb_sensual_prediction_threshold
-         and porn < config.nsfw.normal_comb_pornography_prediction_threshold)
+        (sensual < normal_comb_sensual_prediction_threshold
+         and porn < normal_comb_pornography_prediction_threshold)
         and not (sensual > 0.25 and porn > 0.03)
     )
 
     # combined sensual + pornography - most reliable signal
     is_combined = (
-        sensual > config.nsfw.comb_sensual_prediction_threshold
-        and porn > config.nsfw.comb_pornography_prediction_threshold
+        sensual > comb_sensual_prediction_threshold
+        and porn > comb_pornography_prediction_threshold
     )
 
     # strong pornography alone
-    is_porn = porn > config.nsfw.pornography_prediction_threshold
+    is_porn = porn > pornography_prediction_threshold
 
     # high sensual - needs some porn signal at moderate confidence,
     # but very high sensual (>0.95) is conclusive on its own
     is_sensual = (
-        sensual > config.nsfw.sensual_prediction_threshold
+        sensual > sensual_prediction_threshold
         and (sensual > 0.95 or porn > 0.01)
     )
 
     # high hentai - only with explicit companion (avoids FP on clean anime art)
     is_hentai = (
-        hentai > config.nsfw.hentai_prediction_threshold
+        hentai > hentai_prediction_threshold
         and (porn > 0.05 or sensual > 0.1)
     )
 

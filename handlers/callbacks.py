@@ -15,10 +15,11 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery, ChatPermissions
 from aiogram.exceptions import TelegramBadRequest
 
-from config import config
 from db.models import Member, Spam
 from services.reports import remove_report
 from services.cache import queue_member_update
+from services.owners import is_owner
+from services.chat_registry import get_main_chat_ids
 from utils import get_string, _random
 from handlers.personal_actions import pending_messages
 
@@ -45,7 +46,7 @@ def safe_callback(func):
 async def callback_msg_send(call: CallbackQuery) -> None:
     """Handle message send callbacks."""
     # verify owner
-    if call.from_user.id != config.bot.owner:
+    if not await is_owner(call.from_user.id):
         await call.answer("⛔ Только для владельца", show_alert=True)
         return
     
@@ -75,7 +76,7 @@ async def callback_msg_send(call: CallbackQuery) -> None:
         # send to all chats
         sent = 0
         failed = 0
-        for chat_id in config.groups.main:
+        for chat_id in await get_main_chat_ids():
             try:
                 await call.bot.send_message(chat_id, text)
                 sent += 1
@@ -227,6 +228,38 @@ async def callback_report_delete_and_mute_24h(call: CallbackQuery) -> None:
     await call.answer(text="Done")
 
 
+@router.callback_query(F.data.startswith("rmute5_"))
+@safe_callback
+async def callback_report_delete_and_mute_5m(call: CallbackQuery) -> None:
+    """Delete message and mute user for 5 minutes. Reward rep."""
+    # format: rmute5_chatId_msgId_userId_reporterId_botReplyId
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    message_id = int(parts[2])
+    user_id = int(parts[3])
+    reporter_id = int(parts[4])
+    bot_reply_id = int(parts[5])
+
+    with suppress(TelegramBadRequest):
+        await call.bot.delete_message(chat_id, message_id)
+
+    await call.bot.restrict_chat_member(
+        chat_id=chat_id,
+        user_id=user_id,
+        permissions=ChatPermissions(can_send_messages=False),
+        until_date=datetime.now(timezone.utc) + timedelta(minutes=5)
+    )
+
+    remove_report(chat_id, message_id)
+    await _reward_reporter(reporter_id, 5)
+    await _update_bot_reply(call.bot, chat_id, bot_reply_id)
+
+    await call.message.edit_text(
+        call.message.text + "\n\n🗑🙊 <b>Удалено, + выдан мут на 5 минут.</b>"
+    )
+    await call.answer(text="Done")
+
+
 @router.callback_query(F.data.startswith("rmute2_"))
 @safe_callback
 async def callback_report_delete_and_mute_7d(call: CallbackQuery) -> None:
@@ -260,6 +293,37 @@ async def callback_report_delete_and_mute_7d(call: CallbackQuery) -> None:
 
     await call.message.edit_text(
         call.message.text + "\n\n" + get_string("action_deleted_readonly2")
+    )
+    await call.answer(text="Done")
+
+
+@router.callback_query(F.data.startswith("rban5_"))
+@safe_callback
+async def callback_report_delete_and_ban_5m(call: CallbackQuery) -> None:
+    """Delete message and ban user for 5 minutes. Reward rep."""
+    # format: rban5_chatId_msgId_userId_reporterId_botReplyId
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    message_id = int(parts[2])
+    user_id = int(parts[3])
+    reporter_id = int(parts[4])
+    bot_reply_id = int(parts[5])
+
+    with suppress(TelegramBadRequest):
+        await call.bot.delete_message(chat_id, message_id)
+
+    await call.bot.ban_chat_member(
+        chat_id=chat_id,
+        user_id=user_id,
+        until_date=datetime.now(timezone.utc) + timedelta(minutes=5)
+    )
+
+    remove_report(chat_id, message_id)
+    await _reward_reporter(reporter_id, 12)
+    await _update_bot_reply(call.bot, chat_id, bot_reply_id)
+
+    await call.message.edit_text(
+        call.message.text + "\n\n🗑❌ <b>Удалено, + бан на 5 минут.</b>"
     )
     await call.answer(text="Done")
 
@@ -687,3 +751,50 @@ async def callback_nsfw_safe(call: CallbackQuery) -> None:
         call.message.text + "\n\n❎ <b>Сообщение помечено как не содержащее NSFW.</b>"
     )
     await call.answer(text="Done")
+
+
+### LOG ACTION CALLBACKS ###
+
+@router.callback_query(F.data.startswith("lgm5_"))
+@safe_callback
+async def callback_log_mute_5m(call: CallbackQuery) -> None:
+    """Mute user for 5 minutes from log action buttons."""
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    user_id = int(parts[2])
+
+    await call.bot.restrict_chat_member(
+        chat_id=chat_id,
+        user_id=user_id,
+        permissions=ChatPermissions(can_send_messages=False),
+        until_date=datetime.now(timezone.utc) + timedelta(minutes=5)
+    )
+    await call.answer("🙊 Мут 5м выдан")
+
+
+@router.callback_query(F.data.startswith("lgb5_"))
+@safe_callback
+async def callback_log_ban_5m(call: CallbackQuery) -> None:
+    """Ban user for 5 minutes from log action buttons."""
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    user_id = int(parts[2])
+
+    await call.bot.ban_chat_member(
+        chat_id=chat_id,
+        user_id=user_id,
+        until_date=datetime.now(timezone.utc) + timedelta(minutes=5)
+    )
+    await call.answer("❌ Бан 5м выдан")
+
+
+@router.callback_query(F.data.startswith("lgban_"))
+@safe_callback
+async def callback_log_ban_perm(call: CallbackQuery) -> None:
+    """Permanent ban from log action buttons."""
+    parts = call.data.split("_")
+    chat_id = int(parts[1])
+    user_id = int(parts[2])
+
+    await call.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+    await call.answer("🚫 Бан выдан")

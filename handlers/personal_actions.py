@@ -16,6 +16,23 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 from config import config
 from filters import IsOwnerFilter, IsAdminFilter, InMainGroups
+from services.chat_registry import (
+    get_main_chat_ids,
+    list_managed_chats,
+    register_chat,
+    disable_chat,
+    add_linked_channel,
+    remove_linked_channel,
+    list_linked_channels,
+)
+from services.owners import list_owner_ids, add_owner, remove_owner
+from services.runtime_settings import (
+    get_setting,
+    set_setting,
+    reset_setting,
+    list_setting_keys,
+    parse_setting_input,
+)
 from services.nsfw import classify_explicit_content as nsfw_predict
 from services.profanity import check_for_profanity
 from utils import remove_prefix
@@ -44,8 +61,9 @@ def _cleanup_old_messages() -> None:
 async def _build_chat_keyboard(bot, msg_id: str) -> InlineKeyboardMarkup:
     """Build inline keyboard with chat names."""
     buttons = []
+    main_chat_ids = await get_main_chat_ids()
     
-    for chat_id in config.groups.main:
+    for chat_id in main_chat_ids:
         try:
             chat = await bot.get_chat(chat_id)
             chat_name = chat.title or f"Chat {chat_id}"
@@ -70,6 +88,280 @@ async def _build_chat_keyboard(bot, msg_id: str) -> InlineKeyboardMarkup:
     )])
     
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+@router.message(
+    F.chat.type == "private",
+    IsOwnerFilter(),
+    Command("owners", prefix="!/")
+)
+async def cmd_owners(message: Message) -> None:
+    """Manage owners: !owners list|add <id>|del <id>."""
+    parts = message.text.split()
+    if len(parts) == 1 or parts[1] == "list":
+        owner_ids = await list_owner_ids()
+        await message.reply(
+            "👑 <b>Owners:</b>\n" + "\n".join(f"- <code>{oid}</code>" for oid in owner_ids)
+        )
+        return
+
+    if len(parts) < 3:
+        await message.reply("Использование: !owners list | !owners add <user_id> | !owners del <user_id>")
+        return
+
+    action = parts[1].lower()
+    try:
+        user_id = int(parts[2])
+    except ValueError:
+        await message.reply("user_id должен быть числом.")
+        return
+
+    if action == "add":
+        changed = await add_owner(user_id, actor_id=message.from_user.id)
+        await message.reply("✅ Добавлен owner." if changed else "ℹ️ Уже owner.")
+    elif action in ("del", "rm", "remove"):
+        try:
+            changed = await remove_owner(user_id)
+            await message.reply("✅ Owner удалён." if changed else "ℹ️ Owner не найден.")
+        except ValueError as e:
+            await message.reply(f"❌ {e}")
+    else:
+        await message.reply("Неизвестное действие. Использование: list|add|del")
+
+
+@router.message(
+    F.chat.type == "private",
+    IsOwnerFilter(),
+    Command("chats", prefix="!/")
+)
+async def cmd_chats(message: Message) -> None:
+    """List managed chats."""
+    chats = await list_managed_chats(enabled_only=False)
+    if not chats:
+        await message.reply("Список чатов пуст.")
+        return
+
+    lines = ["🧩 <b>Managed chats:</b>"]
+    for row in chats:
+        state = "ON" if row.is_enabled else "OFF"
+        lines.append(f"- <code>{row.chat_id}</code> [{state}] {row.title or ''}".strip())
+    await message.reply("\n".join(lines))
+
+
+@router.message(
+    F.chat.type == "private",
+    IsOwnerFilter(),
+    Command("chat_add", prefix="!/")
+)
+async def cmd_chat_add(message: Message) -> None:
+    """Add/enable managed chat: !chat_add <chat_id>."""
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.reply("Использование: !chat_add <chat_id>")
+        return
+    try:
+        chat_id = int(parts[1])
+    except ValueError:
+        await message.reply("chat_id должен быть числом.")
+        return
+
+    title = None
+    chat_type = "supergroup"
+    try:
+        chat = await message.bot.get_chat(chat_id)
+        title = chat.title or chat.full_name
+        chat_type = chat.type
+    except Exception:
+        pass
+
+    await register_chat(chat_id, chat_type=chat_type, title=title, bot_status="administrator", is_enabled=True)
+    await message.reply(f"✅ Чат <code>{chat_id}</code> добавлен/включён.")
+
+
+@router.message(
+    F.chat.type == "private",
+    IsOwnerFilter(),
+    Command("chat_rm", prefix="!/")
+)
+async def cmd_chat_rm(message: Message) -> None:
+    """Disable managed chat: !chat_rm <chat_id>."""
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.reply("Использование: !chat_rm <chat_id>")
+        return
+    try:
+        chat_id = int(parts[1])
+    except ValueError:
+        await message.reply("chat_id должен быть числом.")
+        return
+
+    changed = await disable_chat(chat_id)
+    await message.reply("✅ Чат отключён." if changed else "ℹ️ Чат не найден.")
+
+
+@router.message(
+    F.chat.type == "private",
+    IsOwnerFilter(),
+    Command("links", prefix="!/")
+)
+async def cmd_links(message: Message) -> None:
+    """List linked channels."""
+    rows = await list_linked_channels()
+    if not rows:
+        await message.reply("Связанных каналов пока нет.")
+        return
+    lines = ["🔗 <b>Linked channels:</b>"]
+    for row in rows:
+        lines.append(f"- group <code>{row.group_chat_id}</code> -> channel <code>{row.channel_chat_id}</code>")
+    await message.reply("\n".join(lines))
+
+
+@router.message(
+    F.chat.type == "private",
+    IsOwnerFilter(),
+    Command("link_add", prefix="!/")
+)
+async def cmd_link_add(message: Message) -> None:
+    """Add linked channel: !link_add <group_id> <channel_id>."""
+    parts = message.text.split()
+    if len(parts) < 3:
+        await message.reply("Использование: !link_add <group_id> <channel_id>")
+        return
+    try:
+        group_id = int(parts[1])
+        channel_id = int(parts[2])
+    except ValueError:
+        await message.reply("group_id и channel_id должны быть числами.")
+        return
+
+    await add_linked_channel(group_id, channel_id)
+    await message.reply("✅ Связка добавлена.")
+
+
+@router.message(
+    F.chat.type == "private",
+    IsOwnerFilter(),
+    Command("link_rm", prefix="!/")
+)
+async def cmd_link_rm(message: Message) -> None:
+    """Remove linked channel: !link_rm <group_id> <channel_id>."""
+    parts = message.text.split()
+    if len(parts) < 3:
+        await message.reply("Использование: !link_rm <group_id> <channel_id>")
+        return
+    try:
+        group_id = int(parts[1])
+        channel_id = int(parts[2])
+    except ValueError:
+        await message.reply("group_id и channel_id должны быть числами.")
+        return
+
+    changed = await remove_linked_channel(group_id, channel_id)
+    await message.reply("✅ Связка удалена." if changed else "ℹ️ Связка не найдена.")
+
+
+@router.message(
+    F.chat.type == "private",
+    IsOwnerFilter(),
+    Command("cfgkeys", prefix="!/")
+)
+async def cmd_cfg_keys(message: Message) -> None:
+    """List available runtime setting keys."""
+    keys = list_setting_keys()
+    await message.reply("🛠 <b>Runtime keys:</b>\n" + "\n".join(f"- <code>{k}</code>" for k in keys))
+
+
+@router.message(
+    F.chat.type == "private",
+    IsOwnerFilter(),
+    Command("getcfg", prefix="!/")
+)
+async def cmd_get_cfg(message: Message) -> None:
+    """Get setting value: !getcfg <key> [chat_id]."""
+    parts = message.text.split(maxsplit=2)
+    if len(parts) < 2:
+        await message.reply("Использование: !getcfg <key> [chat_id]")
+        return
+
+    key = parts[1].strip()
+    chat_id = None
+    if len(parts) == 3:
+        try:
+            chat_id = int(parts[2].strip())
+        except ValueError:
+            await message.reply("chat_id должен быть числом.")
+            return
+
+    try:
+        value = await get_setting(key, chat_id=chat_id)
+    except Exception as e:
+        await message.reply(f"❌ {e}")
+        return
+
+    scope = f"chat={chat_id}" if chat_id is not None else "global"
+    await message.reply(f"✅ <code>{key}</code> ({scope}) = <code>{value}</code>")
+
+
+@router.message(
+    F.chat.type == "private",
+    IsOwnerFilter(),
+    Command("setcfg", prefix="!/")
+)
+async def cmd_set_cfg(message: Message) -> None:
+    """Set setting value: !setcfg <key> <value> [chat_id]."""
+    parts = message.text.split()
+    if len(parts) < 3:
+        await message.reply("Использование: !setcfg <key> <value> [chat_id]")
+        return
+
+    key = parts[1]
+    raw_value = parts[2]
+    chat_id = None
+    if len(parts) > 3:
+        try:
+            chat_id = int(parts[3])
+        except ValueError:
+            await message.reply("chat_id должен быть числом.")
+            return
+
+    try:
+        value = parse_setting_input(key, raw_value)
+        applied = await set_setting(key, value, actor_id=message.from_user.id, chat_id=chat_id)
+    except Exception as e:
+        await message.reply(f"❌ {e}")
+        return
+
+    scope = f"chat={chat_id}" if chat_id is not None else "global"
+    await message.reply(f"✅ Установлено: <code>{key}</code> ({scope}) = <code>{applied}</code>")
+
+
+@router.message(
+    F.chat.type == "private",
+    IsOwnerFilter(),
+    Command("delcfg", prefix="!/")
+)
+async def cmd_del_cfg(message: Message) -> None:
+    """Reset setting to fallback/default: !delcfg <key> [chat_id]."""
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.reply("Использование: !delcfg <key> [chat_id]")
+        return
+    key = parts[1]
+    chat_id = None
+    if len(parts) > 2:
+        try:
+            chat_id = int(parts[2])
+        except ValueError:
+            await message.reply("chat_id должен быть числом.")
+            return
+    try:
+        await reset_setting(key, actor_id=message.from_user.id, chat_id=chat_id)
+    except Exception as e:
+        await message.reply(f"❌ {e}")
+        return
+
+    scope = f"chat={chat_id}" if chat_id is not None else "global"
+    await message.reply(f"✅ Сброшено: <code>{key}</code> ({scope})")
 
 
 @router.message(
@@ -300,7 +592,7 @@ async def cmd_nsfw_test(message: Message) -> None:
 
     # lazy import to avoid circular dep (personal_actions loads before group_events)
     from handlers.group_events import is_nsfw_detected
-    verdict = is_nsfw_detected(prediction)
+    verdict = await is_nsfw_detected(prediction)
 
     lines = ["🔞 <b>NSFW Test Results:</b>\n"]
     for label, score in prediction.items():

@@ -8,7 +8,6 @@ import psutil
 from aiogram.types import Message
 from aiogram.enums import ContentType
 
-from config import config
 from utils.localization import get_string
 
 
@@ -87,7 +86,8 @@ async def write_log(
     bot,
     message: str,
     log_type: str = "default",
-    chat_title: Optional[str] = None
+    chat_title: Optional[str] = None,
+    reply_markup=None
 ):
     """
     Write log message to logs channel.
@@ -98,9 +98,12 @@ async def write_log(
         log_type: Type of log
         chat_title: Name of the chat (for multi-group support)
     """
+    from services.runtime_settings import get_logs_chat_id
+    log_chat_id = await get_logs_chat_id()
     return await bot.send_message(
-        config.groups.logs,
-        generate_log_message(message, log_type, chat_title)
+        log_chat_id,
+        generate_log_message(message, log_type, chat_title),
+        reply_markup=reply_markup
     )
 
 

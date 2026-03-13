@@ -1,13 +1,3 @@
-[bot]
-# <env-var>
-owner = 0
-# <env-var>
-token = ""
-version = "1.1"
-version_codename = "Gojo Satoru"
-
-
-
 [locale]
 # default locale for bot messages
 default = "ru"
@@ -19,19 +9,19 @@ available = ["ru", "en"]
 
 [groups]
 # list of main chat IDs where bot operates (can be multiple)
-main = []
+main = [-1003841835219]
 
 # single channel for admin reports
-reports = 0
+reports = 5218465355
 
 # single channel for logs
-logs = 0
+logs = 5227269880
 
 # list of linked channels (for auto-forward/comment detection)
-linked_channels = []
+linked_channels = [-1003781882267]
 
 # time in seconds for new users media restriction
-new_users_nomedia = 7776000
+new_users_nomedia = 86400
 
 
 
@@ -43,29 +33,29 @@ member_messages_threshold = 15
 member_reputation_threshold = 15
 
 # reputation points user must have, to be allowed to send media type messages
-allow_media_threshold = 15
+allow_media_threshold = 5
 
 # remove messages during this interval after a post to channel has been made (any other gender/unknown)
 # set to 0 to allow all
-remove_first_comments_interval = 30
+remove_first_comments_interval = 15
 
 # reputation points account must have, to be allowed to post messages (automatic_forward)
-allow_comments_rep_threshold = 50
+allow_comments_rep_threshold = 5
 
 # remove messages during this interval after a post to channel has been made (only applied to woman gender)
 # set to 0 to allow all
-women_remove_first_comments_interval = 600
+women_remove_first_comments_interval = 15
 
 # reputation points women account must have, to be allowed to post messages
 # could be lower for those groups where women comments not so often
 # affects if profile photo will be checked for NSFW
-allow_comments_rep_threshold__woman = 10
+allow_comments_rep_threshold__woman = 5
 
 # reputation points below which single-emoji messages are deleted (bot spam pattern)
-single_emoji_rep_threshold = 15
+single_emoji_rep_threshold = 5
 
 # reputation points required to post any links (URLs, t.me invites, etc.)
-links_rep_threshold = 20
+links_rep_threshold = 10
 
 # reputation points required to use "Reply in Another Chat" (cross-chat replies)
 # bots and spammers abuse this to inject messages with external context
@@ -92,7 +82,7 @@ autoban_rep_threshold = 50
 # accounts with rep > allow_comments_rep_threshold__woman will be skipped from nsfw checks
 # note that NSFW checks are performed only with FEMALE accounts with low rep
 [nsfw]
-enabled = true
+enabled = false
 
 # > will be detected as nsfw
 # these values works through AND condition between sensual and pornography
@@ -169,7 +159,7 @@ time_window = 60
 
 [healthcheck]
 # HTTP health check endpoint for container orchestration
-enabled = false
+enabled = true
 host = "0.0.0.0"
 port = 8080
 
@@ -211,7 +201,7 @@ utc_offset = 5
 
 [ml]
 # Auto-unload ML models when not used to save RAM
-auto_unload_enabled = false
+auto_unload_enabled = true
 
 # Unload spam model after this many minutes of inactivity
 spam_ttl_minutes = 60

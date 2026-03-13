@@ -4,7 +4,7 @@ Filter to check if message is from one of the main groups.
 from aiogram.filters import Filter
 from aiogram.types import Message, CallbackQuery
 
-from config import config
+from services.chat_registry import is_main_chat
 
 
 class InMainGroups(Filter):
@@ -27,6 +27,4 @@ class InMainGroups(Filter):
         else:
             chat_id = event.chat.id
         
-        # Use O(1) set lookup instead of O(n) list lookup
-        # print(chat_id)
-        return config.groups.is_main_group(chat_id)
+        return await is_main_chat(chat_id)

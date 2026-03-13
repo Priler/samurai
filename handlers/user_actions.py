@@ -7,9 +7,9 @@ from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-from config import config
 from filters import InMainGroups
 from services.reports import is_already_reported, track_report
+from services.runtime_settings import get_reports_chat_id
 from utils import get_string, _random, get_report_comment, get_url_chat_id, MemberStatus
 
 router = Router(name="user_actions")
@@ -113,12 +113,20 @@ async def cmd_report(message: Message) -> None:
             callback_data=cb("rdelban")
         )],
         [InlineKeyboardButton(
+            text="🗑 Удалить + 🙊 мут 5 минут",
+            callback_data=cb("rmute5")
+        )],
+        [InlineKeyboardButton(
             text=get_string("action-del-and-readonly"),
             callback_data=cb("rmute")
         )],
         [InlineKeyboardButton(
             text=get_string("action-del-and-readonly2"),
             callback_data=cb("rmute2")
+        )],
+        [InlineKeyboardButton(
+            text="🗑 Удалить + ❌ бан 5 минут",
+            callback_data=cb("rban5")
         )],
         [InlineKeyboardButton(
             text=get_string("action-false-alarm"),
@@ -140,9 +148,10 @@ async def cmd_report(message: Message) -> None:
 
     # forward and send to admins
     try:
-        await reported_msg.forward(config.groups.reports)
+        reports_chat_id = await get_reports_chat_id()
+        await reported_msg.forward(reports_chat_id)
         await message.bot.send_message(
-            config.groups.reports,
+            reports_chat_id,
             get_report_comment(
                 reported_msg.date,
                 reported_msg.message_id,
@@ -174,8 +183,9 @@ async def calling_all_units(message: Message) -> None:
     header = f"[ {message.chat.title} ]\n\n" if message.chat.title else ""
 
     try:
+        reports_chat_id = await get_reports_chat_id()
         await message.bot.send_message(
-            config.groups.reports,
+            reports_chat_id,
             header + get_string(
                 "need-admins-attention",
                 chat_id=get_url_chat_id(message.chat.id),

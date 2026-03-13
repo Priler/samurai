@@ -24,6 +24,9 @@ from services.announcements import set_bot as set_announcements_bot, run_schedul
 from services.healthcheck import start_health_server, stop_health_server, get_health_server
 from services.cache import start_batch_flush_task, stop_batch_flush_task, flush_member_updates
 from services import ml_manager
+from services.owners import bootstrap_owners
+from services.chat_registry import bootstrap_chat_registry
+from services.runtime_settings import bootstrap_runtime_defaults
 
 # Configure logging
 logging.basicConfig(
@@ -46,6 +49,12 @@ async def on_startup(bot: Bot) -> None:
     # Initialize database
     await init_db()
     logger.info("Database connected")
+
+    # Bootstrap runtime entities
+    await bootstrap_owners()
+    await bootstrap_chat_registry()
+    await bootstrap_runtime_defaults()
+    logger.info("Runtime settings/owners/chats bootstrapped")
 
     # Start batch member update flush task (interval from config)
     start_batch_flush_task()
