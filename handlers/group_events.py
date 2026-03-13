@@ -392,6 +392,7 @@ async def on_external_reply(message: Message) -> None:
             "↩️ Антиспам (кросс-чат)",
             message.chat.title
         )
+        await _maybe_autoban(message, member, 10, "кросс-чат")
 
 
 # forwards restriction
@@ -542,6 +543,7 @@ async def on_user_message(message: Message) -> None:
             log_msg = msg_text
             log_msg += f"\n\n<i>Автор:</i> {user_mention(message.from_user)}"
             await write_log(message.bot, log_msg, "🈲 Антиспам (CN)", message.chat.title)
+            await _maybe_autoban(message, member, 5, "CN-спам")
             return
 
         # check profanity
@@ -599,6 +601,7 @@ async def on_user_message(message: Message) -> None:
                 "🔗 Антиспам (ссылка)",
                 message.chat.title
             )
+            await _maybe_autoban(message, member, 10, "ссылка")
             return
 
         # no profanity - check spam
@@ -618,27 +621,7 @@ async def on_user_message(message: Message) -> None:
                 reputation_points=-5
             )
             
-            # auto-ban check
-            if config.spam.autoban_enabled:
-                new_violations = member.violations_count_spam + 1
-                new_rep = member.reputation_points - 5
-                if (new_violations >= config.spam.autoban_threshold and 
-                    new_rep < config.spam.autoban_rep_threshold):
-                    try:
-                        await message.bot.ban_chat_member(
-                            chat_id=message.chat.id,
-                            user_id=user_id
-                        )
-                        await write_log(
-                            message.bot,
-                            f"Автобан за спам: {new_violations} нарушений\n"
-                            f"<i>Репутация:</i> {new_rep}\n\n"
-                            f"<i>Пользователь:</i> {user_mention(message.from_user)}",
-                            "🚫 Автобан",
-                            message.chat.title
-                        )
-                    except Exception:
-                        pass  # user left or already banned
+            await _maybe_autoban(message, member, 5, "спам")
             return
 
     # check for unwanted content (nsfw, suspicious profiles)
@@ -745,6 +728,33 @@ async def check_for_unwanted(message: Message, msg_text: str, member: MemberData
     return False
 
 
+async def _maybe_autoban(
+    message: Message, member: MemberData, penalty: int, reason: str
+) -> None:
+    """Ban user if violations + rep thresholds are exceeded."""
+    if not config.spam.autoban_enabled:
+        return
+    new_violations = member.violations_count_spam + 1
+    new_rep = member.reputation_points - penalty
+    if (new_violations >= config.spam.autoban_threshold and
+            new_rep < config.spam.autoban_rep_threshold):
+        try:
+            await message.bot.ban_chat_member(
+                chat_id=message.chat.id,
+                user_id=message.from_user.id
+            )
+            await write_log(
+                message.bot,
+                f"Автобан ({reason}): {new_violations} нарушений\n"
+                f"<i>Репутация:</i> {new_rep}\n\n"
+                f"<i>Пользователь:</i> {user_mention(message.from_user)}",
+                "🚫 Автобан",
+                message.chat.title
+            )
+        except Exception:
+            pass  # user left or already banned
+
+
 async def _report_nsfw(
     message: Message, msg_text: Optional[str], member: MemberData,
     log_label: str, extra_info: str = None
@@ -799,7 +809,7 @@ def _is_single_emoji(text: str) -> bool:
     Handles simple emoji, emoji + variation selector / skin-tone modifier,
     and two-regional-indicator flag sequences (e.g. 🇺🇸).
     ZWJ sequences (👨‍👩‍👧) are intentionally treated as multi-emoji so they
-    are NOT flagged — only trivial single-character bot spam is caught.
+    are NOT flagged - only trivial single-character bot spam is caught.
     """
     stripped = text.strip()
     if not stripped:
@@ -861,7 +871,7 @@ def _contains_chinese(text: str) -> bool:
 def is_nsfw_detected(prediction: dict) -> bool:
     """Check if NSFW is detected based on thresholds.
 
-    Detection requires *companion signals* — a single elevated category
+    Detection requires *companion signals* - a single elevated category
     alone is not enough (the model produces too many false positives on
     clean anime art / attractive-but-safe photos).
     """
