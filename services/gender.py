@@ -50,8 +50,10 @@ def detect_name_language(name: str | None) -> str:
     return 'unknown'
 
 
-def name_norm(s: str) -> str:
+def name_norm(s: str | None) -> str:
     """Normalize name for comparison."""
+    if not s:
+        return ''
     s = unicodedata.normalize("NFKC", s.lower())
     s = s.replace("ё", "е")
     s = re.sub(r"[^а-яa-z]+", "", s)
@@ -59,16 +61,20 @@ def name_norm(s: str) -> str:
     return s
 
 
-def name_strip_suffixes(name: str, suffixes: list) -> str:
+def name_strip_suffixes(name: str | None, suffixes: list) -> str:
     """Strip diminutive suffixes from name."""
+    if not name:
+        return ''
     for suf in sorted(suffixes, key=len, reverse=True):
         if name.endswith(suf) and len(name) - len(suf) >= 3:
             return name[: -len(suf)]
     return name
 
 
-def transliterate_name(name: str, force_lang: str = None) -> str | None:
+def transliterate_name(name: str | None, force_lang: str = None) -> str | None:
     """Transliterate name between Russian and English."""
+    if not name:
+        return None
     ru_to_en = {
         'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd',
         'е': 'e', 'ё': 'e', 'ж': 'zh', 'з': 'z', 'и': 'i',
@@ -126,8 +132,10 @@ def transliterate_name(name: str, force_lang: str = None) -> str | None:
         return result
 
 
-def detect_gender_compare(name: str, country: str = None) -> Gender:
+def detect_gender_compare(name: str | None, country: str = None) -> Gender:
     """Compare gender using gender_extractor library."""
+    if not name:
+        return Gender.UNKNOWN
     try:
         if country is not None:
             r = g_ext.extract_gender(name, country)
@@ -146,8 +154,10 @@ def detect_gender_compare(name: str, country: str = None) -> Gender:
         return Gender.UNKNOWN
 
 
-def prepare_word(word: str) -> str:
+def prepare_word(word: str | None) -> str:
     """Prepare word for analysis (fix masked letters)."""
+    if not word:
+        return ''
     word = word.lower().strip()
     return _censor_ru.prepare_word(word)
 
@@ -189,10 +199,16 @@ def detect_gender(name: str | None) -> Gender:
     else:
         name = _name
 
+    if not name:
+        return Gender.UNKNOWN
+
     # Preprocess name
     _name_lang = detect_name_language(name)
     name = prepare_word(name)
     name = transliterate_name(name, 'english')
+
+    if not name:
+        return Gender.UNKNOWN
 
     if _name_lang == 'russian':
         det_gen = detect_gender_compare(name, "Russia")
