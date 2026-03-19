@@ -31,8 +31,10 @@ def remove_non_letters(text: str) -> str:
     return ''.join(char for char in text if char.isalpha() or char == ' ' or char.isdigit())
 
 
-def detect_name_language(name: str) -> str:
+def detect_name_language(name: str | None) -> str:
     """Detect if name is Russian or English."""
+    if not name:
+        return 'unknown'
     russian_chars = set('абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ')
     english_chars = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')
 
