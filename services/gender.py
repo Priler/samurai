@@ -150,7 +150,7 @@ def prepare_word(word: str) -> str:
     return _censor_ru.prepare_word(word)
 
 
-def detect_gender(name: str) -> Gender:
+def detect_gender(name: str | None) -> Gender:
     """
     Detect gender from first name.
 
@@ -160,6 +160,8 @@ def detect_gender(name: str) -> Gender:
     Returns:
         Gender enum value
     """
+    if not name:
+        return Gender.UNKNOWN
     _name = name
     name = remove_non_letters(name)
 
