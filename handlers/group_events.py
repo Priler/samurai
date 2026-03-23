@@ -546,6 +546,23 @@ async def on_user_message(message: Message) -> None:
             await _maybe_autoban(message, member, 5, "CN-спам")
             return
 
+        # invisible unicode spacing spam (Hangul filler chars between words)
+        if (member.reputation_points < config.spam.links_rep_threshold and
+                _contains_invisible_spacing(msg_text)):
+            await message.delete()
+
+            await queue_member_update(
+                user_id,
+                violations_count_spam=1,
+                reputation_points=-10
+            )
+
+            log_msg = msg_text
+            log_msg += f"\n\n<i>Автор:</i> {user_mention(message.from_user)}"
+            await write_log(message.bot, log_msg, "👻 Антиспам (невидимые символы)", message.chat.title)
+            await _maybe_autoban(message, member, 10, "невидимые символы")
+            return
+
         # check profanity
         is_profanity, bad_word = check_for_profanity_all(msg_text)
 
@@ -854,6 +871,17 @@ def _is_single_emoji(text: str) -> bool:
     if base_count == 2 and all_regional:
         return True  # flag (two regional indicator chars)
     return False
+
+
+def _contains_invisible_spacing(text: str) -> bool:
+    """Check if text contains invisible Unicode spacing chars used in spam.
+
+    Spammers insert Hangul filler characters (U+115F, U+1160, U+3164, U+FFA0)
+    between words to evade keyword filters while appearing as normal spaces.
+    These have no legitimate use in Russian or English text.
+    """
+    _INVISIBLE_SPACING = {0x115F, 0x1160, 0x3164, 0xFFA0}
+    return any(ord(ch) in _INVISIBLE_SPACING for ch in text)
 
 
 def _contains_chinese(text: str) -> bool:
