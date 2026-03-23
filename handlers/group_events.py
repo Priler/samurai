@@ -357,6 +357,39 @@ async def on_user_contact(message: Message) -> None:
         await message.delete()
 
 
+# shared locations
+@router.message(InMainGroups(), F.content_type == ContentType.LOCATION)
+async def on_user_location(message: Message) -> None:
+    """Delete shared locations from low-rep users."""
+    if message.from_user is None:
+        return
+
+    tg_member = await retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
+
+    if tg_member.status in MemberStatus.admin_statuses():
+        return
+
+    member = await retrieve_or_create_member(message.from_user.id)
+
+    if member.reputation_points < config.spam.links_rep_threshold:
+        await message.delete()
+
+        await queue_member_update(
+            message.from_user.id,
+            violations_count_spam=1,
+            reputation_points=-10
+        )
+
+        await write_log(
+            message.bot,
+            f"Геолокация удалена\n\n<i>Автор:</i> {user_mention(message.from_user)}\n"
+            f"<i>Репутация:</i> {member.reputation_points}",
+            "📍 Антиспам (геолокация)",
+            message.chat.title
+        )
+        await _maybe_autoban(message, member, 10, "геолокация")
+
+
 # cross-chat reply restriction ("Reply in Another Chat")
 @router.message(InMainGroups(), F.external_reply, ~F.is_automatic_forward)
 async def on_external_reply(message: Message) -> None:
