@@ -33,7 +33,7 @@ speed = [
 ]
 ml = [
     "torch>=2.0.0",
-    "transformers>=4.30.0",
+    "transformers>=5.5.0",
     "numpy>=1.24.0",
     "pillow>=10.0.0",
 ]
