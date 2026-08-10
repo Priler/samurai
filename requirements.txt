@@ -33,7 +33,7 @@ sqlalchemy>=1.4.42,<2.0.0
 # pymysql
 
 # ML models (spam/nsfw detection) - CPU only
-torch>=2.0.0
+torch>=2.13.0
 transformers>=4.30.0
 # onnxruntime
 numpy>=1.24.0
