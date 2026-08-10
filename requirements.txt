@@ -37,7 +37,7 @@ torch>=2.0.0
 transformers>=4.30.0
 # onnxruntime
 numpy>=1.24.0
-pillow>=10.0.0
+pillow>=12.3.0
 
 # HuggingFace (for model downloads)
 # hf_xet
