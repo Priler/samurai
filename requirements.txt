@@ -20,7 +20,7 @@ fluent-compiler>=1.0
 
 # Speed optimizations (optional)
 uvloop>=0.20.0; sys_platform != 'win32'
-ujson>=5.10.0
+ujson>=5.13.0
 
 # Database (Ormar ORM)
 ormar>=0.20.0

@@ -29,7 +29,7 @@ dependencies = [
 [project.optional-dependencies]
 speed = [
     "uvloop>=0.20.0; sys_platform != 'win32'",
-    "ujson>=5.10.0",
+    "ujson>=5.13.0",
 ]
 ml = [
     "torch>=2.0.0",
