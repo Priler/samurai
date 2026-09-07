@@ -78,6 +78,20 @@ class SpamConfig(BaseModel):
     allow_forwards_threshold: int = 30  # rep required to forward messages
     forward_violation_penalty: int = 10  # rep penalty for forwarding
     
+    # coordinated newcomer burst detection
+    burst_enabled: bool = True
+    burst_window_seconds: int = 120   # window to count distinct newcomers in
+    burst_min_accounts: int = 4       # distinct low-rep accounts to call it a burst
+    burst_rep_threshold: int = 15     # rep below which an account counts as a newcomer
+    burst_max_tracked: int = 200      # per-chat ring buffer size
+    burst_alert_cooldown: int = 300   # seconds between burst alerts per chat
+    # "log" reports to the logs channel only; "delete" also removes the message
+    burst_action: str = "log"
+
+    # extra display-name bait tokens, appended to the built-in lists
+    name_blacklist_ru: List[str] = Field(default_factory=list)
+    name_blacklist_en: List[str] = Field(default_factory=list)
+
     # auto-ban for repeat spam offenders
     autoban_enabled: bool = True  # enable auto-ban for spam violations
     autoban_threshold: int = 100  # ban user when violations exceed this
@@ -102,6 +116,15 @@ class NSFWConfig(BaseModel):
     normal_comb_sensual_prediction_threshold: float = 0.5
     normal_comb_pornography_prediction_threshold: float = 0.2
     anime_prediction_threshold: float = 0.7
+
+    # Softcore tier: suggestive-but-clothed avatars that the strict rules above miss.
+    # Deletes + logs for review, never auto-bans and never triggers recent-message cleanup.
+    soft_enabled: bool = True
+    soft_sensual_threshold: float = 0.35
+    soft_pornography_threshold: float = 0.05
+    soft_hentai_threshold: float = 0.5
+    soft_normal_ceiling: float = 0.6
+
     check_rep_threshold: int = 50
     profile_check_cooldown: int = 3600
     recent_cleanup_seconds: int = Field(default=300, gt=0)

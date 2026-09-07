@@ -78,6 +78,38 @@ allow_forwards_threshold = 50
 # reputation penalty for attempting to forward with low rep
 forward_violation_penalty = 10
 
+# Newcomer burst detection
+burst_enabled = true
+
+# window (seconds) to count distinct low-rep accounts in
+burst_window_seconds = 120
+
+# how many distinct low-rep accounts inside the window counts as a burst
+burst_min_accounts = 4
+
+# accounts below this reputation count toward a burst
+burst_rep_threshold = 15
+
+# per-chat ring buffer size
+burst_max_tracked = 200
+
+# seconds between burst alerts per chat (log spam guard)
+burst_alert_cooldown = 300
+
+# "log"    = report to logs channel only (safe default)
+# "delete" = also remove the message
+# NOTE: in a linked discussion group a new channel post legitimately draws a
+# wave of first-time commenters, so calibrate against real traffic before
+# switching this to "delete"
+burst_action = "log"
+
+
+# Display-name blacklists
+# appended to the built-in lists (porn/18+/onlyfans/etc)
+name_blacklist_ru = []
+name_blacklist_en = []
+
+
 # auto-ban users who exceed spam violations threshold
 autoban_enabled = true
 
@@ -94,8 +126,8 @@ allowlist_en = []
 
 
 
-# accounts with rep > allow_comments_rep_threshold__woman will be skipped from nsfw checks
-# note that NSFW checks are performed only with FEMALE accounts with low rep
+# NSFW checks run for any account whose reputation is below check_rep_threshold.
+# (They are NOT limited to female-detected accounts - that gating was removed.)
 [nsfw]
 enabled = true
 
@@ -121,6 +153,15 @@ normal_comb_pornography_prediction_threshold = 0.2
 
 # > will NOT be detected as nsfw
 anime_prediction_threshold = 0.7
+
+# Softcore tier: suggestive-but-clothed avatars that the strict thresholds above miss.
+# Deletes the message and logs it for review, but never auto-bans and never triggers recent-message cleanup.
+soft_enabled = true
+soft_sensual_threshold = 0.35
+soft_pornography_threshold = 0.05
+soft_hentai_threshold = 0.5
+# images scoring Normal at or above this are never flagged as softcore
+soft_normal_ceiling = 0.6
 
 # check all the profiles with rep lower that this
 check_rep_threshold = 50

@@ -380,21 +380,21 @@ def _periodically_prune_reverse_indexes() -> None:
             del _nsfw_user_keys[user_id]
 
 
-def get_cached_nsfw_result(user_id: int, photo_file_unique_id: str) -> Optional[bool]:
+def get_cached_nsfw_result(user_id: int, photo_file_unique_id: str) -> Optional[str]:
     """
     Get cached NSFW detection result.
-    
+
     Returns:
-        True/False if cached, None if not in cache
+        The cached severity level ("none"/"soft"/"hard"), or None if not cached
     """
     cache_key = (user_id, photo_file_unique_id)
     return nsfw_results_cache.get(cache_key)
 
 
-def cache_nsfw_result(user_id: int, photo_file_unique_id: str, is_nsfw: bool) -> None:
-    """Cache NSFW detection result."""
+def cache_nsfw_result(user_id: int, photo_file_unique_id: str, level: str) -> None:
+    """Cache NSFW detection result (severity level)."""
     cache_key = (user_id, photo_file_unique_id)
-    nsfw_results_cache[cache_key] = is_nsfw
+    nsfw_results_cache[cache_key] = level
     
     # track in reverse index
     if user_id not in _nsfw_user_keys:

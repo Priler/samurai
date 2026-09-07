@@ -59,6 +59,17 @@ _EN_CONFUSABLES = str.maketrans({
     "@": "a", "$": "s",
 })
 
+# reverse direction: Latin lookalikes folded to Cyrillic, so bait words typed
+# as "пoрнo" (Latin o) still match the Cyrillic blacklist
+_RU_CONFUSABLES = str.maketrans({
+    "a": "а", "e": "е", "o": "о", "p": "р", "c": "с", "x": "х",
+    "y": "у", "k": "к", "m": "м", "t": "т", "b": "в", "h": "н",
+    "0": "о", "3": "е", "4": "а",
+})
+
+# separators spammers wedge between letters ("п.о.р.н.о", "s e x")
+_NAME_SEPARATORS_RE = re.compile(r"[\s._\-*|/\\+~^'\"`,:;!?()\[\]{}]+")
+
 
 def normalize_text(text: str) -> str:
     if not isinstance(text, str):
@@ -250,6 +261,46 @@ def check_for_profanity_all(text: str) -> tuple[bool, str | None]:
     return False, None
 
 
+# Blacklist words spam accounts put in display names.
+# Matched as substrings against a confusable-normalized name, so "p0rn" / "пoрно" (mixed script) are covered.
+_NAME_BLACKLIST_RU = (
+    "профил",
+    "посмотри",
+    "кликай",
+    "загляни",
+    "порн",
+    "секс",
+    "интим",
+    "эротик",
+    "вебкам",
+    "шлюх",
+    "проститу",
+    "разврат",
+    "голая",
+    "голые",
+    "инцест",
+    "сучка",
+    "мамка",
+)
+
+_NAME_BLACKLIST_EN = (
+    "porn",
+    "xxx",
+    "18+",
+    "sex",
+    "nude",
+    "naked",
+    "onlyfans",
+    "webcam",
+    "escort",
+    "hookup",
+    "milf",
+    "fuckme",
+    "cam4",
+    "hentai",
+)
+
+
 def check_name_for_violations(name: str) -> bool:
     """
     Check if a name contains violations (blacklisted words or profanity).
@@ -257,17 +308,27 @@ def check_name_for_violations(name: str) -> bool:
     Returns:
         True if name is clean, False if it contains violations.
     """
-    blacklist_words = [
-        "профиль",
-        "посмотри",
-        "кликай",
-        "загляни",
-        "проф"
-    ]
+    if not name:
+        return True
 
-    prepared_name = prepare_word(name)
-    is_clean = not any(sub.lower() in prepared_name.lower() for sub in blacklist_words)
+    # Two passes: the EN pass folds Cyrillic lookalikes to Latin, so Latin bait
+    # tokens survive script mixing; the RU pass folds the other direction.
+    checks = (
+        (normalize_for_detection(name, "en"),
+         _NAME_BLACKLIST_EN + tuple(config.spam.name_blacklist_en)),
+        (normalize_for_detection(name, "ru").translate(_RU_CONFUSABLES),
+         _NAME_BLACKLIST_RU + tuple(config.spam.name_blacklist_ru)),
+    )
+
+    for normalized, blacklist in checks:
+        collapsed = _NAME_SEPARATORS_RE.sub("", normalized)
+        for token in blacklist:
+            # Anchor at a word start so bait words still match with any suffix
+            # ("порнуха", "sexchat") without firing on Middlesex or Профессор.
+            pattern = re.compile(r"\b" + re.escape(token.casefold()))
+            if pattern.search(normalized) or pattern.search(collapsed):
+                return False
 
     profanity_detected, _ = check_for_profanity_all(name)
 
-    return not profanity_detected and is_clean
+    return not profanity_detected

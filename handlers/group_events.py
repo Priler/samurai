@@ -10,12 +10,14 @@ import io
 import logging
 import random
 from contextlib import suppress
+from datetime import datetime
 from typing import Optional
 
 from aiogram import Router, F, Bot
 from aiogram.types import (
     Message, ContentType, InlineKeyboardMarkup, InlineKeyboardButton,
-    ChatMemberAdministrator, ChatMemberOwner
+    ChatMemberAdministrator, ChatMemberOwner,
+    MessageOriginChannel, MessageOriginUser, MessageOriginChat, MessageOriginHiddenUser
 )
 from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.filters import Command
@@ -44,6 +46,7 @@ from services.cache import (
     MemberData
 )
 from services.announcements import track_message
+from services import burst
 from services.recent_messages import delete_recent_messages
 from utils import (
     get_string, _random, user_mention, write_log, 
@@ -446,18 +449,20 @@ async def _handle_user_forward(message: Message) -> bool:
     # skip auto-forwards
     if message.is_automatic_forward:
         return False
-    
+
+    origin = message.forward_origin
+
     # allow forwards from linked channels
-    if message.forward_from_chat:
-        if config.groups.is_linked_channel(message.forward_from_chat.id):
+    if isinstance(origin, MessageOriginChannel):
+        if config.groups.is_linked_channel(origin.chat.id):
             return False
-    
+
     # allow forwards from group members
-    if message.forward_from:
+    if isinstance(origin, MessageOriginUser):
         try:
             forwarded_member = await message.bot.get_chat_member(
-                message.chat.id, 
-                message.forward_from.id
+                message.chat.id,
+                origin.sender_user.id
             )
             if forwarded_member.status not in ("left", "kicked"):
                 return False
@@ -465,7 +470,7 @@ async def _handle_user_forward(message: Message) -> bool:
             logging.getLogger(__name__).debug(
                 "Could not verify forwarded user membership", exc_info=True
             )
-    
+
     # external forward - check rep
     member = await retrieve_or_create_member(message.from_user.id)
     tg_member = await retrieve_tgmember(message.bot, message.chat.id, message.from_user.id)
@@ -485,13 +490,15 @@ async def _handle_user_forward(message: Message) -> bool:
         
         # log
         forward_from = "Unknown"
-        if message.forward_from:
-            forward_from = f"👤 {escape_html(message.forward_from.full_name)}"
-        elif message.forward_from_chat:
-            forward_from = f"📢 {escape_html(message.forward_from_chat.title or message.forward_from_chat.id)}"
-        elif message.forward_sender_name:
-            forward_from = f"👤 {escape_html(message.forward_sender_name)}"
-        
+        if isinstance(origin, MessageOriginUser):
+            forward_from = f"👤 {escape_html(origin.sender_user.full_name)}"
+        elif isinstance(origin, MessageOriginChannel):
+            forward_from = f"📢 {escape_html(origin.chat.title or origin.chat.id)}"
+        elif isinstance(origin, MessageOriginChat):
+            forward_from = f"📢 {escape_html(origin.sender_chat.title or origin.sender_chat.id)}"
+        elif isinstance(origin, MessageOriginHiddenUser):
+            forward_from = f"👤 {escape_html(origin.sender_user_name)}"
+
         await write_log(
             message.bot,
             f"Удалён форвард от: {forward_from}\n\n"
@@ -561,6 +568,13 @@ async def _process_user_message(message: Message, count_clean_message: bool) -> 
     # skip admins
     if tg_member.status in MemberStatus.admin_statuses():
         return
+
+    # record newcomer cohort before any filter can return, so a wave stays
+    # visible even when individual messages are caught by other rules
+    burst_cohort = 0
+    if (count_clean_message and config.spam.burst_enabled
+            and member.reputation_points < config.spam.burst_rep_threshold):
+        burst_cohort = burst.record_newcomer(message.chat.id, message.from_user.id)
 
     # media restriction for low-rep users (photos, videos, documents)
     if message.content_type != ContentType.TEXT:
@@ -682,6 +696,10 @@ async def _process_user_message(message: Message, count_clean_message: bool) -> 
     # check for unwanted content (nsfw, suspicious profiles)
     handled = await check_for_unwanted(message, msg_text, member)
 
+    # coordinated newcomer burst (many fresh accounts talking at once)
+    if not handled and count_clean_message:
+        handled = await _check_newcomer_burst(message, msg_text, member, burst_cohort)
+
     if not handled and count_clean_message:
         # clean msg - increase rep
         await queue_member_update(
@@ -693,24 +711,39 @@ async def _process_user_message(message: Message, count_clean_message: bool) -> 
 
 ### HELPER FUNCTIONS ###
 
-async def check_for_unwanted(message: Message, msg_text: str, member: MemberData) -> bool:
+def _linked_channel_post_date(message: Message) -> Optional[datetime]:
+    """Return the original post date if this message is a linked-channel post.
+
+    In a discussion group the channel post arrives as an auto-forward, and user
+    comments are replies to it.
+    """
+    origin = message.forward_origin
+    if not isinstance(origin, MessageOriginChannel):
+        return None
+    if not config.groups.is_linked_channel(origin.chat.id):
+        return None
+    return origin.date
+
+
+async def check_for_unwanted(message: Message, msg_text: Optional[str], member: MemberData) -> bool:
     """Check for unwanted content (first comments, NSFW images, suspicious profiles)."""
     # check if reply to channel post (comment)
-    if (message.reply_to_message and 
-        message.reply_to_message.forward_from_chat and 
-        config.groups.is_linked_channel(message.reply_to_message.forward_from_chat.id)):
-        
+    post_date = (
+        _linked_channel_post_date(message.reply_to_message)
+        if message.reply_to_message else None
+    )
+    if post_date is not None:
         # remove early comments from low-rep users
         threshold = config.spam.allow_comments_rep_threshold
         interval = config.spam.remove_first_comments_interval
-        
+
         if (member.reputation_points < threshold and
-            0 <= (message.date - message.reply_to_message.forward_date).total_seconds() <= interval):
+            0 <= (message.date - post_date).total_seconds() <= interval):
             try:
                 await message.delete()
                 await write_log(
                     message.bot,
-                    f"Удалено сообщение: {escape_html(message.text)}\n\n<i>Автор:</i> {user_mention(message.from_user)}",
+                    f"Удалено сообщение: {escape_html(msg_text or '[медиа без текста]')}\n\n<i>Автор:</i> {user_mention(message.from_user)}",
                     "🤖 Антибот",
                     message.chat.title
                 )
@@ -734,17 +767,20 @@ async def check_for_unwanted(message: Message, msg_text: str, member: MemberData
             file_bytes = await message.bot.download_file(img_file.file_path)
             image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
             prediction = await asyncio.to_thread(nsfw_predict, np.asarray(image))
-            is_nsfw = is_nsfw_detected(prediction)
-            cache_nsfw_result(user_id, photo.file_unique_id, is_nsfw)
+            level = classify_nsfw_level(prediction)
+            cache_nsfw_result(user_id, photo.file_unique_id, level)
         else:
-            is_nsfw = cached
+            level = cached
             prediction = None
 
-        if is_nsfw:
+        if level != NSFW_NONE:
             extra = f"<i>Scores:</i> {_format_nsfw_scores(prediction)}" if prediction else None
+            hard = level == NSFW_HARD
             await _report_nsfw(
-                message, msg_text, member, "🔞 NSFW (фото)", extra,
-                cleanup_recent=True,
+                message, msg_text, member,
+                "🔞 NSFW (фото)" if hard else "⚠️ Софт-NSFW (фото)",
+                extra,
+                cleanup_recent=hard,
             )
             return True
 
@@ -775,24 +811,60 @@ async def check_for_unwanted(message: Message, msg_text: str, member: MemberData
                 file_bytes = await message.bot.download_file(img_file.file_path)
                 image = Image.open(io.BytesIO(file_bytes.getvalue())).convert("RGB")
                 prediction = await asyncio.to_thread(nsfw_predict, np.asarray(image))
-                is_nsfw = is_nsfw_detected(prediction)
-                cache_nsfw_result(user_id, photo.file_unique_id, is_nsfw)
+                level = classify_nsfw_level(prediction)
+                cache_nsfw_result(user_id, photo.file_unique_id, level)
             else:
-                is_nsfw = cached
+                level = cached
                 prediction = None
 
-            if is_nsfw:
+            if level != NSFW_NONE:
                 mark_nsfw_profile_checked(user_id)
                 extra = f"<i>Scores:</i> {_format_nsfw_scores(prediction)}" if prediction else None
+                hard = level == NSFW_HARD
                 await _report_nsfw(
-                    message, msg_text, member, "🔞 NSFW (профиль)", extra,
-                    cleanup_recent=True,
+                    message, msg_text, member,
+                    "🔞 NSFW (профиль)" if hard else "⚠️ Софт-NSFW (профиль)",
+                    extra,
+                    cleanup_recent=hard,
                 )
                 return True
 
         mark_nsfw_profile_checked(user_id)
 
     return False
+
+
+async def _check_newcomer_burst(
+    message: Message, msg_text: Optional[str], member: MemberData, cohort_size: int
+) -> bool:
+    """Surface coordinated waves of fresh low-rep accounts.
+
+    ``cohort_size`` comes from the tracker in _process_user_message. Returns True
+    only when the message was deleted, so a logged-but-kept message still counts
+    toward the author's reputation.
+    """
+    if not burst.is_burst(cohort_size):
+        return False
+
+    enforcing = config.spam.burst_action == "delete"
+
+    if enforcing:
+        with suppress(TelegramBadRequest):
+            await message.delete()
+
+    if burst.should_alert(message.chat.id) or enforcing:
+        await write_log(
+            message.bot,
+            f"{escape_html(msg_text or '[медиа без текста]')}\n\n"
+            f"<i>Аккаунтов в окне:</i> {cohort_size} "
+            f"за {config.spam.burst_window_seconds}с\n"
+            f"<i>Автор:</i> {user_mention(message.from_user)}\n"
+            f"<i>Репутация:</i> {member.reputation_points}",
+            "👥 Наплыв новых аккаунтов" + ("" if enforcing else " (наблюдение)"),
+            message.chat.title
+        )
+
+    return enforcing
 
 
 async def _maybe_autoban(
@@ -955,6 +1027,46 @@ def _contains_chinese(text: str) -> bool:
             0xF900 <= cp <= 0xFAFF):       # CJK Compatibility
             return True
     return False
+
+
+NSFW_NONE = "none"
+NSFW_SOFT = "soft"
+NSFW_HARD = "hard"
+
+
+def _is_soft_nsfw(prediction: dict) -> bool:
+    """Catch suggestive-but-clothed images that is_nsfw_detected deliberately skips.
+
+    That function requires explicit companion signals, so softcore avatars
+    (cleavage/lingerie selfies scoring sensual ~0.4-0.6 with pornography ~0.02-0.10)
+    fall straight through it.
+    Spam accounts posing as women live in exactly that band.
+    """
+    if not config.nsfw.soft_enabled:
+        return False
+
+    normal = float(prediction["Normal"])
+    sensual = float(prediction["Enticing or Sensual"])
+    porn = float(prediction["Pornography"])
+    hentai = float(prediction["Hentai"])
+
+    if normal >= config.nsfw.soft_normal_ceiling:
+        return False
+
+    return (
+        sensual > config.nsfw.soft_sensual_threshold
+        or porn > config.nsfw.soft_pornography_threshold
+        or hentai > config.nsfw.soft_hentai_threshold
+    )
+
+
+def classify_nsfw_level(prediction: dict) -> str:
+    """Return NSFW_HARD, NSFW_SOFT or NSFW_NONE for a prediction."""
+    if is_nsfw_detected(prediction):
+        return NSFW_HARD
+    if _is_soft_nsfw(prediction):
+        return NSFW_SOFT
+    return NSFW_NONE
 
 
 def is_nsfw_detected(prediction: dict) -> bool:
