@@ -33,9 +33,10 @@ def register_all_middlewares(
     dp.callback_query.middleware(i18n_middleware)
     dp.edited_message.middleware(i18n_middleware)
 
-    # Track all group message types, including those consumed by specialized
-    # handlers, so retrospective NSFW cleanup can be maade
-    dp.message.middleware(RecentMessagesMiddleware())
+    # Run before filters, including updates with no matching handler
+    recent_messages = RecentMessagesMiddleware()
+    dp.message.outer_middleware(recent_messages)
+    dp.edited_message.outer_middleware(recent_messages)
     
     # Throttling middleware - rate limiting for private chats
     if enable_throttling:

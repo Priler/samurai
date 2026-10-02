@@ -5,10 +5,16 @@ import logging
 import databases
 import ormar
 import sqlalchemy
-from pymysql.err import InterfaceError, OperationalError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from config import config
+
+try:
+    from pymysql.err import InterfaceError, OperationalError
+except ImportError:
+    _MYSQL_ERRORS = ()
+else:
+    _MYSQL_ERRORS = (OperationalError, InterfaceError)
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +41,7 @@ _TRANSIENT_DB_CODES = {2006, 2013}
 
 
 def _is_transient_db_error(exc: Exception) -> bool:
-    if isinstance(exc, (OperationalError, InterfaceError)):
+    if isinstance(exc, _MYSQL_ERRORS):
         code = exc.args[0] if exc.args else None
         return code in _TRANSIENT_DB_CODES
     # WinError 121 etc. surface as a bare OSError underneath.

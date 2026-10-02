@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 _recent_reports: dict[int, deque] = {}
 _state_lock = asyncio.Lock()
 _pending_reports: set[tuple[int, int]] = set()
+_processing_report_actions: set[tuple[int, int]] = set()
 _resolved_reports: TTLCache = TTLCache(maxsize=5000, ttl=86400)
 _active_report_by_user: TTLCache = TTLCache(maxsize=5000, ttl=86400)
 _report_users: TTLCache = TTLCache(maxsize=5000, ttl=86400)
@@ -72,16 +73,27 @@ async def finish_report(group_id: int, message_id: int, success: bool) -> None:
 
 
 async def claim_report_action(group_id: int, message_id: int) -> bool:
-    """Claim a moderation action exactly once for a report."""
+    """Reserve an action until it succeeds or is released for retry."""
     key = (group_id, message_id)
     async with _state_lock:
-        if key in _resolved_reports:
+        if key in _resolved_reports or key in _processing_report_actions:
             return False
+        _processing_report_actions.add(key)
+        return True
+
+
+async def finish_report_action(group_id: int, message_id: int, success: bool) -> None:
+    """Commit successful moderation; failed actions remain retryable."""
+    key = (group_id, message_id)
+    async with _state_lock:
+        _processing_report_actions.discard(key)
+        if not success:
+            return
         _resolved_reports[key] = True
         user_id = _report_users.pop(key, None)
         if user_id is not None and _active_report_by_user.get(user_id) == key:
             _active_report_by_user.pop(user_id, None)
-        return True
+        remove_report(group_id, message_id)
 
 
 def remove_report(group_id: int, message_id: int) -> None:

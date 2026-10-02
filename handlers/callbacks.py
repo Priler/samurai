@@ -13,12 +13,13 @@ from functools import wraps
 
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, ChatPermissions
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 
 from config import config
 from db.models import Member, Spam
-from services.reports import claim_report_action, remove_report
-from services.cache import queue_member_update
+from services.reports import claim_report_action, finish_report_action
+from services.cache import queue_member_update, invalidate_nsfw_cache, mark_nsfw_profile_checked
+from services.recent_messages import ban_and_cleanup
 from utils import get_string, _random
 from handlers.personal_actions import pending_messages
 
@@ -30,6 +31,7 @@ def safe_callback(func):
     """Catch malformed callback data so bad payloads don't crash handlers."""
     @wraps(func)
     async def wrapper(call: CallbackQuery) -> None:
+        report_key = None
         try:
             report_prefixes = (
                 "rdel_", "rdelban_", "rmute_", "rmute2_",
@@ -40,10 +42,15 @@ def safe_callback(func):
                 if not await claim_report_action(int(parts[1]), int(parts[2])):
                     await call.answer("Уже обработано", show_alert=True)
                     return
+                report_key = (int(parts[1]), int(parts[2]))
             return await func(call)
         except (ValueError, IndexError) as e:
             logger.warning(f"Malformed callback data in {func.__name__}: {call.data!r} ({e})")
             await call.answer("❌ Ошибка данных", show_alert=True)
+        finally:
+            if report_key is not None:
+                # Committed actions stay resolved
+                await finish_report_action(*report_key, success=False)
     return wrapper
 
 
@@ -138,6 +145,15 @@ async def _reward_reporter(reporter_id: int, points: int) -> None:
     await queue_member_update(reporter_id, reputation_points=points)
 
 
+async def _delete_report_message(bot, chat_id: int, message_id: int) -> None:
+    """An already deleted message is harmless; other failures must be retried."""
+    try:
+        await bot.delete_message(chat_id, message_id)
+    except TelegramBadRequest as exc:
+        if "message to delete not found" not in str(exc).lower():
+            raise
+
+
 @router.callback_query(F.data.startswith("rdel_"))
 @safe_callback
 async def callback_report_delete(call: CallbackQuery) -> None:
@@ -149,14 +165,11 @@ async def callback_report_delete(call: CallbackQuery) -> None:
     reporter_id = int(parts[3])
     bot_reply_id = int(parts[4])
 
-    with suppress(TelegramBadRequest):
-        await call.bot.delete_message(chat_id, message_id)
-
-    # remove from tracking
-    remove_report(chat_id, message_id)
+    await _delete_report_message(call.bot, chat_id, message_id)
     
     # reward reporter (+10 for delete)
     await _reward_reporter(reporter_id, 10)
+    await finish_report_action(chat_id, message_id, success=True)
     
     # update bot's reply in original chat
     await _update_bot_reply(call.bot, chat_id, bot_reply_id)
@@ -179,16 +192,13 @@ async def callback_report_delete_and_ban(call: CallbackQuery) -> None:
     reporter_id = int(parts[4])
     bot_reply_id = int(parts[5])
 
-    with suppress(TelegramBadRequest):
-        await call.bot.delete_message(chat_id, message_id)
+    await _delete_report_message(call.bot, chat_id, message_id)
 
     await call.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
 
-    # remove from tracking
-    remove_report(chat_id, message_id)
-    
     # reward reporter (+20 for ban)
     await _reward_reporter(reporter_id, 20)
+    await finish_report_action(chat_id, message_id, success=True)
     
     # update bot's reply in original chat
     await _update_bot_reply(call.bot, chat_id, bot_reply_id)
@@ -211,8 +221,7 @@ async def callback_report_delete_and_mute_24h(call: CallbackQuery) -> None:
     reporter_id = int(parts[4])
     bot_reply_id = int(parts[5])
 
-    with suppress(TelegramBadRequest):
-        await call.bot.delete_message(chat_id, message_id)
+    await _delete_report_message(call.bot, chat_id, message_id)
 
     await call.bot.restrict_chat_member(
         chat_id=chat_id,
@@ -221,11 +230,9 @@ async def callback_report_delete_and_mute_24h(call: CallbackQuery) -> None:
         until_date=datetime.now(timezone.utc) + timedelta(hours=24)
     )
 
-    # remove from tracking
-    remove_report(chat_id, message_id)
-    
     # reward reporter (+10 for mute)
     await _reward_reporter(reporter_id, 10)
+    await finish_report_action(chat_id, message_id, success=True)
     
     # update bot's reply in original chat
     await _update_bot_reply(call.bot, chat_id, bot_reply_id)
@@ -248,8 +255,7 @@ async def callback_report_delete_and_mute_7d(call: CallbackQuery) -> None:
     reporter_id = int(parts[4])
     bot_reply_id = int(parts[5])
 
-    with suppress(TelegramBadRequest):
-        await call.bot.delete_message(chat_id, message_id)
+    await _delete_report_message(call.bot, chat_id, message_id)
 
     await call.bot.restrict_chat_member(
         chat_id=chat_id,
@@ -258,11 +264,9 @@ async def callback_report_delete_and_mute_7d(call: CallbackQuery) -> None:
         until_date=datetime.now(timezone.utc) + timedelta(days=7)
     )
 
-    # remove from tracking
-    remove_report(chat_id, message_id)
-    
     # reward reporter (+15 for 7d mute)
     await _reward_reporter(reporter_id, 15)
+    await finish_report_action(chat_id, message_id, success=True)
     
     # update bot's reply in original chat
     await _update_bot_reply(call.bot, chat_id, bot_reply_id)
@@ -285,8 +289,7 @@ async def callback_report_dismiss(call: CallbackQuery) -> None:
     # reporter_id = int(parts[4])
     bot_reply_id = int(parts[5])
 
-    # remove from tracking
-    remove_report(chat_id, message_id)
+    await finish_report_action(chat_id, message_id, success=True)
     
     # delete bot's reply in original chat (false alarm, no need to show completion)
     with suppress(TelegramBadRequest):
@@ -310,9 +313,6 @@ async def callback_report_dismiss_mute_reporter_1d(call: CallbackQuery) -> None:
     reporter_id = int(parts[4])
     bot_reply_id = int(parts[5])
 
-    # remove from tracking
-    remove_report(chat_id, message_id)
-
     # mute reporter
     await call.bot.restrict_chat_member(
         chat_id=chat_id,
@@ -323,6 +323,7 @@ async def callback_report_dismiss_mute_reporter_1d(call: CallbackQuery) -> None:
     
     # punish reporter
     await queue_member_update(reporter_id, reputation_points=-10)
+    await finish_report_action(chat_id, message_id, success=True)
     
     # delete bot's reply
     with suppress(TelegramBadRequest):
@@ -346,9 +347,6 @@ async def callback_report_dismiss_mute_reporter_7d(call: CallbackQuery) -> None:
     reporter_id = int(parts[4])
     bot_reply_id = int(parts[5])
 
-    # remove from tracking
-    remove_report(chat_id, message_id)
-
     # mute reporter
     await call.bot.restrict_chat_member(
         chat_id=chat_id,
@@ -359,6 +357,7 @@ async def callback_report_dismiss_mute_reporter_7d(call: CallbackQuery) -> None:
     
     # punish reporter
     await queue_member_update(reporter_id, reputation_points=-20)
+    await finish_report_action(chat_id, message_id, success=True)
     
     # delete bot's reply
     with suppress(TelegramBadRequest):
@@ -382,11 +381,9 @@ async def callback_report_dismiss_ban_reporter(call: CallbackQuery) -> None:
     reporter_id = int(parts[4])
     bot_reply_id = int(parts[5])
 
-    # remove from tracking
-    remove_report(chat_id, message_id)
-
     # ban reporter
     await call.bot.ban_chat_member(chat_id=chat_id, user_id=reporter_id)
+    await finish_report_action(chat_id, message_id, success=True)
     
     # delete bot's reply
     with suppress(TelegramBadRequest):
@@ -586,8 +583,7 @@ async def callback_spam_test(call: CallbackQuery) -> None:
     # increase member messages count
     try:
         member = await Member.objects.get(id=member_id)
-        member.messages_count += 1
-        await member.update()
+        await queue_member_update(member.user_id, messages_count=1)
     except Exception:
         pass
 
@@ -611,13 +607,17 @@ async def callback_spam_ban(call: CallbackQuery) -> None:
         spam_rec = await Spam.objects.get(id=spam_id)
         chat_id = spam_rec.chat_id
         
-        with suppress(TelegramBadRequest):
-            await call.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+        if chat_id is None:
+            await call.answer("❌ В записи спама отсутствует ID чата", show_alert=True)
+            return
+        await ban_and_cleanup(call.bot, chat_id, user_id)
             
         spam_rec.is_blocked = True
         await spam_rec.update()
     except Exception:
-        pass
+        logger.exception("Failed to ban spam user %s", user_id)
+        await call.answer("❌ Не удалось выполнить действие. Проверьте права бота и повторите.", show_alert=True)
+        return
 
     await call.message.edit_text(
         call.message.html_text + "\n\n❌ <b>Юзер забанен, сообщение помечено как спам</b>"
@@ -645,9 +645,7 @@ async def callback_spam_not_spam(call: CallbackQuery) -> None:
     if member_id:
         try:
             member = await Member.objects.get(id=member_id)
-            member.messages_count += 1
-            member.reputation_points += 10
-            await member.update()
+            await queue_member_update(member.user_id, messages_count=1, reputation_points=10)
         except Exception:
             pass
 
@@ -668,9 +666,15 @@ async def callback_nsfw_ban(call: CallbackQuery) -> None:
     # chat_id is included in callback data
     chat_id = int(parts[3]) if len(parts) > 3 else None
     
-    if chat_id:
-        with suppress(TelegramBadRequest):
-            await call.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+    if chat_id is None:
+        await call.answer("❌ В кнопке отсутствует ID чата", show_alert=True)
+        return
+    try:
+        await ban_and_cleanup(call.bot, chat_id, user_id)
+    except TelegramAPIError:
+        logger.exception("Failed to ban NSFW user %s in chat %s", user_id, chat_id)
+        await call.answer("❌ Не удалось забанить. Проверьте права бота и повторите.", show_alert=True)
+        return
 
     await call.message.edit_text(
         call.message.html_text + "\n\n❌ <b>Юзер забанен за NSFW изображение профиля.</b>"
@@ -686,9 +690,9 @@ async def callback_nsfw_safe(call: CallbackQuery) -> None:
 
     try:
         member = await Member.objects.get(id=member_id)
-        member.messages_count += 1
-        member.reputation_points += 10
-        await member.update()
+        await queue_member_update(member.user_id, messages_count=1, reputation_points=10)
+        invalidate_nsfw_cache(member.user_id)
+        mark_nsfw_profile_checked(member.user_id)
     except Exception:
         pass
 

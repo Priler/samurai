@@ -106,8 +106,8 @@ burst_action = "log"
 
 # Display-name blacklists
 # appended to the built-in lists (porn/18+/onlyfans/etc)
-name_blacklist_ru = []
-name_blacklist_en = []
+name_blacklist_ru = ["🎀", "впн", "🌼", "лс", "личк"]
+name_blacklist_en = ["🎀", "vpn", "🌼", "pm"]
 
 
 # auto-ban users who exceed spam violations threshold

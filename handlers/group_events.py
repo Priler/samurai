@@ -36,18 +36,17 @@ from services.spam import predict as ruspam_predict
 from services.nsfw import classify_explicit_content as nsfw_predict
 from services.cache import (
     queue_member_update, 
-    invalidate_member_cache,
     is_trusted_user,
     get_cached_nsfw_result,
     cache_nsfw_result,
-    is_nsfw_profile_on_cooldown,
+    get_cached_nsfw_profile_result,
     mark_nsfw_profile_checked,
-    get_member_orm,
+    edit_member,
     MemberData
 )
 from services.announcements import track_message
 from services import burst
-from services.recent_messages import delete_recent_messages
+from services.recent_messages import delete_recent_messages, delete_message_if_present, ban_and_cleanup
 from utils import (
     get_string, _random, user_mention, write_log, 
     generate_log_message, remove_prefix, get_message_text,
@@ -262,11 +261,9 @@ async def on_setlvl(message: Message) -> None:
         if value > 100000:
             await message.reply("Что куришь, другалёк? :3")
         else:
-            member = await get_member_orm(message.reply_to_message.from_user.id)
-            member.messages_count = value
-            member.reputation_points += value
-            await member.update()
-            invalidate_member_cache(message.reply_to_message.from_user.id)
+            async with edit_member(message.reply_to_message.from_user.id) as member:
+                member.messages_count = value
+                member.reputation_points += value
             await message.reply("Ладно :3")
     except ValueError:
         await message.reply("O_o Мда")
@@ -300,10 +297,8 @@ async def on_rep_reset(message: Message) -> None:
         return
 
     try:
-        member = await get_member_orm(message.reply_to_message.from_user.id)
-        member.reputation_points = member.messages_count
-        await member.update()
-        invalidate_member_cache(message.reply_to_message.from_user.id)
+        async with edit_member(message.reply_to_message.from_user.id) as member:
+            member.reputation_points = member.messages_count
         await message.reply("☯ Уровень репутации участника <i><b>сброшен</b>.</i>")
     except Exception:
         logging.getLogger(__name__).exception("Failed to reset reputation")
@@ -784,16 +779,30 @@ async def check_for_unwanted(message: Message, msg_text: Optional[str], member: 
             )
             return True
 
-    # profile-based checks with per-user cooldown
-    if is_low_rep and not is_nsfw_profile_on_cooldown(user_id):
+    # Name checks are cheap and must also notice changes during cooldown.
+    if is_low_rep:
         # name violation check (spam names like "посмотри мой профиль")
         if not check_name_for_violations(message.from_user.full_name):
-            mark_nsfw_profile_checked(user_id)
             await _report_nsfw(
                 message, msg_text, member, "🚫 Антиспам (имя)",
-                f"<i>Имя:</i> {escape_html(message.from_user.full_name)}"
+                f"<i>Имя:</i> {escape_html(message.from_user.full_name)}",
+                cleanup_recent=True,
             )
             return True
+
+        # Reuse the verdict during cooldown without allowing unsafe profiles
+        # to send subsequent messages
+        profile_level = get_cached_nsfw_profile_result(user_id)
+        if profile_level is not None:
+            if profile_level != NSFW_NONE:
+                hard = profile_level == NSFW_HARD
+                await _report_nsfw(
+                    message, msg_text, member,
+                    "🔞 NSFW (профиль)" if hard else "⚠️ Софт-NSFW (профиль)",
+                    cleanup_recent=True,
+                )
+                return True
+            return False
 
         # profile photo nsfw check
         try:
@@ -818,14 +827,14 @@ async def check_for_unwanted(message: Message, msg_text: Optional[str], member: 
                 prediction = None
 
             if level != NSFW_NONE:
-                mark_nsfw_profile_checked(user_id)
+                mark_nsfw_profile_checked(user_id, level)
                 extra = f"<i>Scores:</i> {_format_nsfw_scores(prediction)}" if prediction else None
                 hard = level == NSFW_HARD
                 await _report_nsfw(
                     message, msg_text, member,
                     "🔞 NSFW (профиль)" if hard else "⚠️ Софт-NSFW (профиль)",
                     extra,
-                    cleanup_recent=hard,
+                    cleanup_recent=True,
                 )
                 return True
 
@@ -880,10 +889,7 @@ async def _maybe_autoban(
     if (new_violations >= config.spam.autoban_threshold and
             new_rep < config.spam.autoban_rep_threshold):
         try:
-            await message.bot.ban_chat_member(
-                chat_id=message.chat.id,
-                user_id=message.from_user.id
-            )
+            await ban_and_cleanup(message.bot, message.chat.id, message.from_user.id)
             await write_log(
                 message.bot,
                 f"Автобан ({reason}): {new_violations} нарушений\n"
@@ -903,13 +909,18 @@ async def _report_nsfw(
     log_label: str, extra_info: str = None, *, cleanup_recent: bool = False
 ) -> None:
     """Delete message and report to log channel with action buttons."""
+    # Enforce first so an unavailable logs channel cannot leave content up
+    await delete_message_if_present(message)
     if cleanup_recent:
-        await delete_recent_messages(
-            message.bot,
-            message.chat.id,
-            message.from_user.id,
-            exclude_message_id=message.message_id,
-        )
+        try:
+            await delete_recent_messages(
+                message.bot,
+                message.chat.id,
+                message.from_user.id,
+                exclude_message_id=message.message_id,
+            )
+        except TelegramAPIError:
+            logging.getLogger(__name__).exception("Failed to clean up recent NSFW messages")
     log_msg = escape_html(msg_text) if msg_text else "[медиа без текста]"
     if extra_info:
         log_msg += f"\n\n{extra_info}"
@@ -926,12 +937,14 @@ async def _report_nsfw(
         )]
     ])
 
-    await message.bot.send_message(
-        config.groups.logs,
-        generate_log_message(log_msg, log_label, message.chat.title),
-        reply_markup=keyboard
-    )
-    await message.delete()
+    try:
+        await message.bot.send_message(
+            config.groups.logs,
+            generate_log_message(log_msg, log_label, message.chat.title),
+            reply_markup=keyboard
+        )
+    except TelegramAPIError:
+        logging.getLogger(__name__).exception("Failed to log NSFW moderation")
 
 
 def _format_nsfw_scores(prediction: dict) -> str:

@@ -118,7 +118,8 @@ class NSFWConfig(BaseModel):
     anime_prediction_threshold: float = 0.7
 
     # Softcore tier: suggestive-but-clothed avatars that the strict rules above miss.
-    # Deletes + logs for review, never auto-bans and never triggers recent-message cleanup.
+    # Never auto-bans. Unsafe profiles trigger recent-message cleanup; a soft
+    # in-chat image alone only removes that image.
     soft_enabled: bool = True
     soft_sensual_threshold: float = 0.35
     soft_pornography_threshold: float = 0.05
@@ -129,6 +130,7 @@ class NSFWConfig(BaseModel):
     profile_check_cooldown: int = 3600
     recent_cleanup_seconds: int = Field(default=300, gt=0)
     recent_messages_max: int = Field(default=100, gt=0)
+    recent_users_max: int = Field(default=10000, gt=0)
 
 
 class DatabaseConfig(BaseModel):

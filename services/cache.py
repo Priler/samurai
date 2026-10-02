@@ -11,6 +11,7 @@ Features:
 """
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from functools import wraps
 from typing import Optional
@@ -144,14 +145,18 @@ async def flush_member_updates() -> int:
         return await _flush_member_updates_locked()
 
 
-async def _flush_member_updates_locked() -> int:
+async def _flush_member_updates_locked(target_user_id: int | None = None) -> int:
     """Flush implementation; caller must hold ``_flush_lock``."""
     async with _batch_lock:
         if not _pending_updates:
             return 0
 
-        updates_copy = {user_id: dict(changes) for user_id, changes in _pending_updates.items()}
-        _pending_updates.clear()
+        if target_user_id is None:
+            updates_copy = {uid: dict(changes) for uid, changes in _pending_updates.items()}
+            _pending_updates.clear()
+        else:
+            changes = _pending_updates.pop(target_user_id, {})
+            updates_copy = {target_user_id: changes} if changes else {}
     
     count = 0
     failed_updates: dict[int, dict[str, int]] = {}
@@ -179,6 +184,8 @@ async def _flush_member_updates_locked() -> int:
                     current = _pending_updates[user_id].get(field, 0)
                     _pending_updates[user_id][field] = current + delta
         logger.warning(f"Re-queued {len(failed_updates)} failed member updates")
+        if target_user_id is not None:
+            raise RuntimeError(f"Cannot edit member {target_user_id}: pending updates failed to flush")
     
     return count
 
@@ -301,6 +308,15 @@ async def retrieve_or_create_member(user_id: int) -> MemberData:
     """
     if user_id in members_cache:
         return members_cache[user_id]
+
+    # A flush removes deltas from the queue while writing them
+    async with _flush_lock:
+        return await _retrieve_or_create_member_locked(user_id)
+
+
+async def _retrieve_or_create_member_locked(user_id: int) -> MemberData:
+    if user_id in members_cache:
+        return members_cache[user_id]
     
     try:
         member = await Member.objects.get(user_id=user_id)
@@ -329,8 +345,8 @@ async def get_member_orm(user_id: int) -> Member:
     """
     Get actual ORM Member object for direct updates.
     
-    Use this ONLY for admin commands that need to set absolute values.
-    For delta updates (add/subtract), use queue_member_update() instead.
+    For absolute changes use edit_member(), which coordinates with flushing.
+    For deltas use queue_member_update().
     
     Note: Does not use cache - always fetches fresh from DB.
     """
@@ -342,6 +358,20 @@ async def get_member_orm(user_id: int) -> Member:
         except IntegrityError:
             # race condition: another request created the user first
             return await Member.objects.get(user_id=user_id)
+
+
+@asynccontextmanager
+async def edit_member(user_id: int):
+    """Flush prior deltas and serialize an absolute edit with batch writes."""
+    async with _flush_lock:
+        await _flush_member_updates_locked(user_id)
+        invalidate_member_cache(user_id)
+        member = await get_member_orm(user_id)
+        try:
+            yield member
+            await member.update()
+        finally:
+            invalidate_member_cache(user_id)
 
 
 def invalidate_member_cache(user_id: int) -> None:
@@ -407,6 +437,7 @@ def cache_nsfw_result(user_id: int, photo_file_unique_id: str, level: str) -> No
 
 def invalidate_nsfw_cache(user_id: int) -> None:
     """Invalidate all NSFW cache entries for a user."""
+    nsfw_profile_cooldown.pop(user_id, None)
     if user_id not in _nsfw_user_keys:
         return
     for key in list(_nsfw_user_keys[user_id]):
@@ -420,9 +451,14 @@ def is_nsfw_profile_on_cooldown(user_id: int) -> bool:
     return user_id in nsfw_profile_cooldown
 
 
-def mark_nsfw_profile_checked(user_id: int) -> None:
-    """Mark user's profile as recently checked."""
-    nsfw_profile_cooldown[user_id] = True
+def get_cached_nsfw_profile_result(user_id: int) -> Optional[str]:
+    """Return the profile severity during cooldown, including unsafe results."""
+    return nsfw_profile_cooldown.get(user_id)
+
+
+def mark_nsfw_profile_checked(user_id: int, level: str = "none") -> None:
+    """Cache the verdict so cooldown skips inference, not enforcement."""
+    nsfw_profile_cooldown[user_id] = level
 
 
 ### UTILITY FUNCTIONS ###
