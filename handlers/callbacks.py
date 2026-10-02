@@ -20,7 +20,8 @@ from db.models import Member, Spam
 from services.reports import claim_report_action, finish_report_action
 from services.cache import queue_member_update, invalidate_nsfw_cache, mark_nsfw_profile_checked
 from services.recent_messages import ban_and_cleanup
-from utils import get_string, _random
+from services import bot_names
+from utils import get_string, _random, MemberStatus
 from handlers.personal_actions import pending_messages
 
 router = Router(name="callbacks")
@@ -154,6 +155,17 @@ async def _delete_report_message(bot, chat_id: int, message_id: int) -> None:
             raise
 
 
+async def _is_chat_moderator(call: CallbackQuery, chat_id: int) -> bool:
+    if call.from_user.id == config.bot.owner:
+        return True
+    try:
+        role = await call.bot.get_chat_member(chat_id, call.from_user.id)
+        return role.status in MemberStatus.admin_statuses()
+    except TelegramAPIError:
+        logger.exception("Failed to check moderator permissions in chat %s", chat_id)
+        return False
+
+
 @router.callback_query(F.data.startswith("rdel_"))
 @safe_callback
 async def callback_report_delete(call: CallbackQuery) -> None:
@@ -192,9 +204,31 @@ async def callback_report_delete_and_ban(call: CallbackQuery) -> None:
     reporter_id = int(parts[4])
     bot_reply_id = int(parts[5])
 
+    if not await _is_chat_moderator(call, chat_id):
+        await call.answer("⛔ Только для администратора чата", show_alert=True)
+        return
+    reported_name = None
+    try:
+        reported_name = await bot_names.store.report_name(chat_id, message_id, user_id)
+        if reported_name is None:  # Reports posted before name snapshots existed
+            target = await call.bot.get_chat_member(chat_id, user_id)
+            name = target.user.full_name
+            if isinstance(name, str):
+                reported_name = name
+    except (TelegramAPIError, OSError, ValueError):
+        logger.exception("Could not retrieve the reported user's display name")
+
     await _delete_report_message(call.bot, chat_id, message_id)
 
     await call.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+
+    name_saved = reported_name is not None
+    if reported_name is not None:
+        try:
+            await bot_names.store.learn(reported_name)
+        except (OSError, ValueError):
+            name_saved = False
+            logger.exception("Report ban succeeded but learning its name failed")
 
     # reward reporter (+20 for ban)
     await _reward_reporter(reporter_id, 20)
@@ -205,8 +239,28 @@ async def callback_report_delete_and_ban(call: CallbackQuery) -> None:
 
     await call.message.edit_text(
         call.message.html_text + "\n\n" + get_string("action_deleted_banned")
+        + ("\n⚠️ Имя не удалось сохранить." if not name_saved else "")
     )
     await call.answer(text="Done")
+
+
+@router.callback_query(F.data.startswith("notbot_"))
+@safe_callback
+async def callback_not_a_bot(call: CallbackQuery) -> None:
+    """Permanently exempt this Telegram user from learned-name checks."""
+    parts = call.data.split("_")
+    chat_id, user_id = int(parts[1]), int(parts[2])
+    if not await _is_chat_moderator(call, chat_id):
+        await call.answer("⛔ Только для администратора чата", show_alert=True)
+        return
+    try:
+        await bot_names.store.exempt(user_id)
+    except (OSError, ValueError):
+        logger.exception("Failed to save learned-name exemption for user %s", user_id)
+        await call.answer("❌ Не удалось сохранить исключение. Повторите.", show_alert=True)
+        return
+    await call.message.edit_text(call.message.html_text + "\n\n✅ Пользователь исключён из проверки имён.")
+    await call.answer("Исключение сохранено")
 
 
 @router.callback_query(F.data.startswith("rmute_"))

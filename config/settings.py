@@ -92,6 +92,10 @@ class SpamConfig(BaseModel):
     name_blacklist_ru: List[str] = Field(default_factory=list)
     name_blacklist_en: List[str] = Field(default_factory=list)
 
+    # Exact display names learning from moderator-confirmed report bans
+    learned_name_rep_threshold: int = Field(default=30, ge=0)
+    learned_name_autoban_threshold: int = Field(default=5, gt=0)
+
     # auto-ban for repeat spam offenders
     autoban_enabled: bool = True  # enable auto-ban for spam violations
     autoban_threshold: int = 100  # ban user when violations exceed this

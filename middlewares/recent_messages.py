@@ -9,6 +9,7 @@ from aiogram.types import Message, TelegramObject
 from config import config
 from services.recent_messages import track_recent_message, delete_recent_messages, delete_message_if_present
 from services.cache import get_cached_nsfw_profile_result, retrieve_tgmember
+from services.bot_names import enforce_learned_name
 from utils.enums import MemberStatus
 
 
@@ -48,5 +49,7 @@ class RecentMessagesMiddleware(BaseMiddleware):
                             event.bot, *key, exclude_message_id=event.message_id,
                         )
                         return None
+                if await enforce_learned_name(event):
+                    return None
                 return await handler(event, data)
         return await handler(event, data)

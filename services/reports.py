@@ -10,6 +10,7 @@ import logging
 from cachetools import TTLCache
 
 from config import config
+from services import bot_names
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ def track_report(group_id: int, message_id: int) -> None:
     logger.debug(f"Tracked report: group={group_id}, msg={message_id}")
 
 
-async def begin_report(group_id: int, message_id: int, reported_user_id: int) -> bool:
+async def begin_report(group_id: int, message_id: int, reported_user_id: int, reported_name: str | None = None) -> bool:
     """Atomically reserve a report while it is delivered to moderators."""
     key = (group_id, message_id)
     async with _state_lock:
@@ -56,7 +57,13 @@ async def begin_report(group_id: int, message_id: int, reported_user_id: int) ->
         _pending_reports.add(key)
         _active_report_by_user[reported_user_id] = key
         _report_users[key] = reported_user_id
-        return True
+    try:
+        if reported_name is not None:
+            await bot_names.store.remember_report(group_id, message_id, reported_user_id, reported_name)
+    except (OSError, ValueError, asyncio.CancelledError):
+        await finish_report(group_id, message_id, success=False)
+        raise
+    return True
 
 
 async def finish_report(group_id: int, message_id: int, success: bool) -> None:
@@ -70,6 +77,8 @@ async def finish_report(group_id: int, message_id: int, success: bool) -> None:
             user_id = _report_users.pop(key, None)
             if user_id is not None and _active_report_by_user.get(user_id) == key:
                 _active_report_by_user.pop(user_id, None)
+    if not success:
+        await _forget_report_name(group_id, message_id)
 
 
 async def claim_report_action(group_id: int, message_id: int) -> bool:
@@ -94,6 +103,14 @@ async def finish_report_action(group_id: int, message_id: int, success: bool) ->
         if user_id is not None and _active_report_by_user.get(user_id) == key:
             _active_report_by_user.pop(user_id, None)
         remove_report(group_id, message_id)
+    await _forget_report_name(group_id, message_id)
+
+
+async def _forget_report_name(group_id: int, message_id: int) -> None:
+    try:
+        await bot_names.store.forget_report(group_id, message_id)
+    except (OSError, ValueError):
+        logger.exception("Failed to remove resolved report's name snapshot")
 
 
 def remove_report(group_id: int, message_id: int) -> None:

@@ -7,6 +7,7 @@ from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
 from aiogram.methods import BanChatMember, DeleteMessage
 
 from handlers import callbacks
+from config import config
 from services import reports
 
 
@@ -27,6 +28,7 @@ class ReportActionTests(unittest.IsolatedAsyncioTestCase):
     def call(self, action="rdelban"):
         return SimpleNamespace(
             data=f"{action}_-100123_10_123_456_11",
+            from_user=SimpleNamespace(id=config.bot.owner),
             bot=AsyncMock(), answer=AsyncMock(),
             message=SimpleNamespace(html_text="report", edit_text=AsyncMock()),
         )
