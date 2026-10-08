@@ -8,11 +8,13 @@ from aiogram.methods import BanChatMember, DeleteMessage
 
 from handlers import callbacks
 from config import config
-from services import reports
+from services import recent_messages, reports
 
 
 class ReportActionTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        recent_messages.clear_recent_messages()
+        self.addCleanup(recent_messages.clear_recent_messages)
         reports._state_lock = asyncio.Lock()
         reports._recent_reports.clear()
         reports._pending_reports.clear()
@@ -34,6 +36,7 @@ class ReportActionTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_failed_ban_remains_tracked_and_can_be_retried(self):
+        recent_messages.track_recent_message(-100123, 123, 9)
         await reports.begin_report(-100123, 10, 123)
         await reports.finish_report(-100123, 10, success=True)
         call = self.call()
@@ -45,12 +48,33 @@ class ReportActionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(reports.is_already_reported(-100123, 10))
         self.assertIn(123, reports._active_report_by_user)
         self.reward.assert_not_awaited()
+        call.bot.delete_messages.assert_not_awaited()
         call.bot.ban_chat_member.side_effect = None
         await callbacks.callback_report_delete_and_ban(call)
+        call.bot.delete_messages.assert_awaited_once_with(-100123, [9])
         self.reward.assert_awaited_once_with(456, reputation_points=20)
         self.assertFalse(reports.is_already_reported(-100123, 10))
         self.assertNotIn(123, reports._active_report_by_user)
         self.assertFalse(await reports.claim_report_action(-100123, 10))
+
+    async def test_report_ban_cleans_only_target_user_in_reported_chat(self):
+        for message_id in (9, 10, 12):
+            recent_messages.track_recent_message(-100123, 123, message_id)
+        recent_messages.track_recent_message(-100123, 789, 13)
+        recent_messages.track_recent_message(-100456, 123, 20)
+        call = self.call()
+
+        await callbacks.callback_report_delete_and_ban(call)
+
+        call.bot.delete_message.assert_awaited_once_with(-100123, 10)
+        call.bot.ban_chat_member.assert_awaited_once_with(
+            chat_id=-100123, user_id=123, revoke_messages=True,
+        )
+        call.bot.delete_messages.assert_awaited_once_with(-100123, [9, 10, 12])
+        self.assertNotIn((-100123, 123), recent_messages._recent_messages)
+        self.assertIn((-100123, 789), recent_messages._recent_messages)
+        self.assertIn((-100456, 123), recent_messages._recent_messages)
+        self.reward.assert_awaited_once_with(456, reputation_points=20)
 
     async def test_concurrent_clicks_do_not_duplicate_actions_or_rewards(self):
         started, release = asyncio.Event(), asyncio.Event()

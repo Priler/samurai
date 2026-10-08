@@ -182,14 +182,20 @@ class ModerationBurstTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(middleware._user_locks), 0)
 
     async def test_nsfw_ban_requests_revocation_and_cleans_tracked_comments(self):
-        recent_messages.track_recent_message(-100123, 123, 1)
+        for message_id in (1, 2, 3):
+            recent_messages.track_recent_message(-100123, 123, message_id)
+        recent_messages.track_recent_message(-100123, 456, 4)
+        recent_messages.track_recent_message(-100456, 123, 5)
         call = SimpleNamespace(
             data="nsfw_ban_123_-100123", bot=self.bot, answer=AsyncMock(),
             message=SimpleNamespace(html_text="report", edit_text=AsyncMock()),
         )
         await callbacks.callback_nsfw_ban(call)
         self.bot.ban_chat_member.assert_awaited_once_with(chat_id=-100123, user_id=123, revoke_messages=True)
-        self.bot.delete_messages.assert_awaited_once_with(-100123, [1])
+        self.bot.delete_messages.assert_awaited_once_with(-100123, [1, 2, 3])
+        self.assertNotIn((-100123, 123), recent_messages._recent_messages)
+        self.assertIn((-100123, 456), recent_messages._recent_messages)
+        self.assertIn((-100456, 123), recent_messages._recent_messages)
 
     async def test_failed_nsfw_ban_keeps_button_and_does_not_claim_success(self):
         self.bot.ban_chat_member.side_effect = TelegramBadRequest(

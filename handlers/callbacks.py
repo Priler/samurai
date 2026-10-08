@@ -195,7 +195,7 @@ async def callback_report_delete(call: CallbackQuery) -> None:
 @router.callback_query(F.data.startswith("rdelban_"))
 @safe_callback
 async def callback_report_delete_and_ban(call: CallbackQuery) -> None:
-    """Delete message and ban user. Reward more rep."""
+    """Ban the reported user and remove their recent chat messages. Reward rep."""
     # format: rdelban_chatId_msgId_userId_reporterId_botReplyId
     parts = call.data.split("_")
     chat_id = int(parts[1])
@@ -220,7 +220,7 @@ async def callback_report_delete_and_ban(call: CallbackQuery) -> None:
 
     await _delete_report_message(call.bot, chat_id, message_id)
 
-    await call.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+    await ban_and_cleanup(call.bot, chat_id, user_id)
 
     name_saved = reported_name is not None
     if reported_name is not None:
