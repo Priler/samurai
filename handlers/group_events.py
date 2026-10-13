@@ -24,6 +24,7 @@ from aiogram.filters import Command
 
 from PIL import Image
 import numpy as np
+from cachetools import TTLCache
 
 from config import config
 from filters import IsOwnerFilter, InMainGroups, ThrottleFilter
@@ -510,13 +511,31 @@ async def _handle_user_forward(message: Message) -> bool:
 # media restriction
 ### CHANNEL AUTO-FORWARD (bot comments on posts) ###
 
+# Album identifiers are unique within a chat
+_commented_albums: TTLCache = TTLCache(maxsize=10000, ttl=24 * 60 * 60)
+
+
 @router.message(InMainGroups(), F.is_automatic_forward)
 async def on_channel_post(message: Message) -> None:
-    """Reply to auto-forwarded channel posts with a random comment."""
+    """Reply once to each auto-forwarded post, including multi-message albums."""
+    album_key = None
+    if message.media_group_id is not None:
+        album_key = (message.chat.id, message.media_group_id)
+        if album_key in _commented_albums:
+            return
+        # Reserve before awaiting Telegram so concurrent attachments cannot reply.
+        _commented_albums[album_key] = True
+
+    replied = False
     try:
         await message.reply(_random("bot-comments"))
+        replied = True
     except TelegramBadRequest as e:
         logging.getLogger(__name__).warning(f"Failed to reply to channel post: {e}")
+    finally:
+        if album_key is not None and not replied:
+            # Allow a later attachment to retry after failure or cancellation.
+            _commented_albums.pop(album_key, None)
 
 
 ### CATCH-ALL MESSAGE HANDLER (must be last!) ###
