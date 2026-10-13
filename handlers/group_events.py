@@ -33,7 +33,7 @@ from services import (
     retrieve_or_create_member, retrieve_tgmember, detect_gender,
     check_for_profanity_all, check_name_for_violations, Gender
 )
-from services.spam import predict as ruspam_predict
+from services.spam import predict as ruspam_predict, is_drug_spam
 from services.nsfw import classify_explicit_content as nsfw_predict
 from services.cache import (
     queue_member_update, 
@@ -600,6 +600,21 @@ async def _process_user_message(message: Message, count_clean_message: bool) -> 
     user_id = message.from_user.id
 
     if msg_text is not None:
+        # Drug-shop bots often post only a sample request or a gram quantity.
+        if (config.spam.drug_spam_enabled
+                and member.reputation_points < config.spam.drug_spam_rep_threshold
+                and is_drug_spam(msg_text)):
+            await delete_message_if_present(message)
+            if count_clean_message:
+                await queue_member_update(user_id, violations_count_spam=1, reputation_points=-5)
+                await _maybe_autoban(message, member, 5, "пробы / вес")
+            await write_log(
+                message.bot,
+                f"{escape_html(msg_text)}\n\n<i>Автор:</i> {user_mention(message.from_user)}",
+                "🤖 Антиспам (пробы / вес)", message.chat.title,
+            )
+            return
+
         # chinese spam bots
         if _contains_chinese(msg_text):
             await message.delete()

@@ -71,6 +71,10 @@ class SpamConfig(BaseModel):
     # link spam (t.me invites, external URLs)
     links_rep_threshold: int = 50  # delete messages with links below this rep
 
+    # Standalone drug bait comments from low-reputation accounts
+    drug_spam_enabled: bool = True
+    drug_spam_rep_threshold: int = Field(default=30, ge=0)
+
     # cross-chat replies ("Reply in Another Chat")
     external_reply_rep_threshold: int = 50  # delete cross-chat replies below this rep
 

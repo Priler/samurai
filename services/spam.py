@@ -11,6 +11,8 @@ import logging
 import threading
 import time
 import gc
+import re
+import unicodedata
 
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -38,6 +40,34 @@ SPAM_SUBSTRINGS = [
 
 # precompute lowercase versions for faster matching
 _SPAM_SUBSTRINGS_LOWER = [s.lower() for s in SPAM_SUBSTRINGS]
+
+
+# Match entire short comments, not ordinary sentences mentioning drugs relates stuff
+_SAMPLE_BAIT = r"(?:на\s+)?проб[ау]"
+_GRAM_BAIT = r"[0-9]{1,2}(?:[.,][0-9]{1,2})?\s*(?:гр|г|gr|g)"
+_DRUG_SPAM_PATTERN = re.compile(
+    rf"(?:{_SAMPLE_BAIT}|{_GRAM_BAIT}|{_SAMPLE_BAIT}\s+{_GRAM_BAIT}|{_GRAM_BAIT}\s+{_SAMPLE_BAIT})"
+)
+_DRUG_CONFUSABLES = str.maketrans({"a": "а", "o": "о", "p": "р"})
+
+
+def is_drug_spam(text: str) -> bool:
+    """Recognize short sample/weight bait; caller must apply reputation gating."""
+    if not text or len(text) > 80:
+        return False
+    normalized = unicodedata.normalize("NFKC", text).casefold()
+    normalized = "".join(char for char in normalized if unicodedata.category(char) != "Cf")
+    normalized = normalized.translate(_DRUG_CONFUSABLES).strip()
+
+    def decoration(char: str) -> bool:
+        return char.isspace() or unicodedata.category(char)[0] in ("P", "S") or char == "\ufe0f"
+
+    # Ignore punctuation/emoji around the bait while preserving decimal separators.
+    while normalized and decoration(normalized[0]):
+        normalized = normalized[1:]
+    while normalized and decoration(normalized[-1]):
+        normalized = normalized[:-1]
+    return _DRUG_SPAM_PATTERN.fullmatch(normalized) is not None
 
 
 def _get_tokenizer() -> AutoTokenizer:
