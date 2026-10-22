@@ -277,3 +277,9 @@ nsfw_ttl_minutes = 10
 
 # How often to check for models to unload (seconds)
 check_interval_seconds = 60
+
+
+[reactions]
+# Only non-admin members at or above this reputation can react in discussion groups
+enabled = true
+rep_threshold = 50

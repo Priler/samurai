@@ -6,6 +6,7 @@ from aiogram import Dispatcher
 from .i18n import I18nMiddleware
 from .throttling import ThrottlingMiddleware
 from .recent_messages import RecentMessagesMiddleware
+from .reactions import ReactionsMiddleware
 
 
 def register_all_middlewares(
@@ -34,6 +35,9 @@ def register_all_middlewares(
     dp.edited_message.middleware(i18n_middleware)
 
     # Run before filters, including updates with no matching handler
+    reactions = ReactionsMiddleware()
+    dp.message.outer_middleware(reactions)
+    dp.edited_message.outer_middleware(reactions)
     recent_messages = RecentMessagesMiddleware()
     dp.message.outer_middleware(recent_messages)
     dp.edited_message.outer_middleware(recent_messages)

@@ -2,7 +2,7 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 
 # Aiogram 3.x
-aiogram>=3.4.0
+aiogram>=3.31.0,<4
 
 # Async
 aiohttp>=3.9.0

@@ -123,6 +123,10 @@ async def queue_member_update(user_id: int, **changes: int) -> None:
                 if hasattr(cached, field):
                     setattr(cached, field, getattr(cached, field) + delta)
 
+    if "reputation_points" in changes:
+        from services.reactions import notify_reputation_change
+        notify_reputation_change(user_id)
+
 
 @db_retry()
 async def _apply_member_update(user_id: int, changes: dict[str, int]) -> None:
@@ -372,6 +376,8 @@ async def edit_member(user_id: int):
             await member.update()
         finally:
             invalidate_member_cache(user_id)
+    from services.reactions import notify_reputation_change
+    notify_reputation_change(user_id)
 
 
 def invalidate_member_cache(user_id: int) -> None:

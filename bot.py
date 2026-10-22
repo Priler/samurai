@@ -24,6 +24,7 @@ from services.announcements import set_bot as set_announcements_bot, run_schedul
 from services.healthcheck import start_health_server, stop_health_server, get_health_server
 from services.cache import start_batch_flush_task, stop_batch_flush_task, flush_member_updates
 from services import ml_manager
+from services import reactions
 
 # Configure logging
 logging.basicConfig(
@@ -46,6 +47,7 @@ async def on_startup(bot: Bot) -> None:
     # Initialize database
     await init_db()
     logger.info("Database connected")
+    await reactions.start(bot)
 
     # Start batch member update flush task (interval from config)
     start_batch_flush_task()
@@ -87,6 +89,8 @@ async def on_shutdown(bot: Bot) -> None:
         with suppress(asyncio.CancelledError):
             await _scheduler_task
         logger.info("Scheduler stopped")
+
+    await reactions.stop()
 
     # Stop batch flush task and flush remaining updates
     await stop_batch_flush_task()
@@ -145,7 +149,7 @@ async def main() -> None:
 
     try:
         # Start polling (aiogram handles SIGINT/SIGTERM internally)
-        await dp.start_polling(bot, skip_updates=True)
+        await dp.start_polling(bot, skip_updates=True, allowed_updates=dp.resolve_used_update_types())
     finally:
         # Close bot session
         await bot.session.close()

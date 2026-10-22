@@ -47,6 +47,7 @@ from services.cache import (
 )
 from services.announcements import track_message
 from services import burst
+from services import reactions
 from services.recent_messages import delete_recent_messages, delete_message_if_present, ban_and_cleanup
 from utils import (
     get_string, _random, user_mention, write_log, 
@@ -335,6 +336,8 @@ async def on_user_join(message: Message) -> None:
     with suppress(TelegramBadRequest):
         await message.delete()
     for joined_user in message.new_chat_members or []:
+        if message.chat.type == "supergroup" and not joined_user.is_bot:
+            await reactions.sync_member(message.bot, message.chat.id, joined_user.id)
         await write_log(
             message.bot,
             f"Присоединился пользователь {user_mention(joined_user)}",

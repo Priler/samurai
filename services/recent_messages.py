@@ -110,11 +110,8 @@ async def delete_message_if_present(message) -> None:
 
 async def ban_and_cleanup(bot, chat_id: int, user_id: int) -> int:
     """Ban with server-side revocation, then clean tracked messages as well."""
-    await bot.ban_chat_member(chat_id=chat_id, user_id=user_id, revoke_messages=True)
-    
-    # Role checks must not keep returning the pre-ban membership
-    from services.cache import invalidate_tgmember_cache
-    invalidate_tgmember_cache(chat_id, user_id)
+    from services.reactions import ban_member
+    await ban_member(bot, chat_id=chat_id, user_id=user_id, revoke_messages=True)
     return await delete_recent_messages(bot, chat_id, user_id)
 
 

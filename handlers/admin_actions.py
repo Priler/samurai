@@ -7,6 +7,7 @@ from aiogram.types import Message
 
 from config import config
 from db.models import Member
+from services.reactions import ban_member
 from filters import MemberCanRestrictFilter, InMainGroups, IsOwnerFilter
 from utils import get_string, MemberStatus, user_mention_by_id
 
@@ -37,7 +38,7 @@ async def cmd_ban(message: Message) -> None:
     await message.delete()
 
     # ban
-    await message.bot.ban_chat_member(
+    await ban_member(message.bot,
         chat_id=message.chat.id,
         user_id=message.reply_to_message.from_user.id
     )

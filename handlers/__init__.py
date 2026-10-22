@@ -9,12 +9,14 @@ from . import user_actions
 from . import personal_actions  # Must be before callbacks (callbacks imports from it)
 from . import callbacks
 from . import group_events
+from . import reactions
 
 
 def register_all_handlers(dp: Dispatcher) -> None:
     """Register all routers with the dispatcher."""
     # Error handler should be first
     dp.include_router(exceptions.router)
+    dp.include_router(reactions.router)
     
     # Admin actions
     dp.include_router(admin_actions.router)

@@ -232,6 +232,11 @@ class MLConfig(BaseModel):
     check_interval_seconds: int = 60
 
 
+class ReactionsConfig(BaseModel):
+    enabled: bool = True
+    rep_threshold: int = Field(default=50, ge=0)
+
+
 class Config(BaseModel):
     bot: BotConfig = BotConfig()
     locale: LocaleConfig = LocaleConfig()
@@ -245,6 +250,7 @@ class Config(BaseModel):
     cache: CacheConfig = CacheConfig()
     announcements: AnnouncementsConfig = AnnouncementsConfig()
     ml: MLConfig = MLConfig()
+    reactions: ReactionsConfig = ReactionsConfig()
 
 
 def get_config_path() -> Path:

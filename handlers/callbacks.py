@@ -20,6 +20,7 @@ from db.models import Member, Spam
 from services.reports import claim_report_action, finish_report_action
 from services.cache import queue_member_update, invalidate_nsfw_cache, mark_nsfw_profile_checked
 from services.recent_messages import ban_and_cleanup
+from services.reactions import restrict_member, ban_member
 from services import bot_names
 from utils import get_string, _random, MemberStatus
 from handlers.personal_actions import pending_messages
@@ -277,7 +278,7 @@ async def callback_report_delete_and_mute_24h(call: CallbackQuery) -> None:
 
     await _delete_report_message(call.bot, chat_id, message_id)
 
-    await call.bot.restrict_chat_member(
+    await restrict_member(call.bot,
         chat_id=chat_id,
         user_id=user_id,
         permissions=ChatPermissions(can_send_messages=False),
@@ -311,7 +312,7 @@ async def callback_report_delete_and_mute_7d(call: CallbackQuery) -> None:
 
     await _delete_report_message(call.bot, chat_id, message_id)
 
-    await call.bot.restrict_chat_member(
+    await restrict_member(call.bot,
         chat_id=chat_id,
         user_id=user_id,
         permissions=ChatPermissions(can_send_messages=False),
@@ -368,7 +369,7 @@ async def callback_report_dismiss_mute_reporter_1d(call: CallbackQuery) -> None:
     bot_reply_id = int(parts[5])
 
     # mute reporter
-    await call.bot.restrict_chat_member(
+    await restrict_member(call.bot,
         chat_id=chat_id,
         user_id=reporter_id,
         permissions=ChatPermissions(can_send_messages=False),
@@ -402,7 +403,7 @@ async def callback_report_dismiss_mute_reporter_7d(call: CallbackQuery) -> None:
     bot_reply_id = int(parts[5])
 
     # mute reporter
-    await call.bot.restrict_chat_member(
+    await restrict_member(call.bot,
         chat_id=chat_id,
         user_id=reporter_id,
         permissions=ChatPermissions(can_send_messages=False),
@@ -436,7 +437,7 @@ async def callback_report_dismiss_ban_reporter(call: CallbackQuery) -> None:
     bot_reply_id = int(parts[5])
 
     # ban reporter
-    await call.bot.ban_chat_member(chat_id=chat_id, user_id=reporter_id)
+    await ban_member(call.bot, chat_id=chat_id, user_id=reporter_id)
     await finish_report_action(chat_id, message_id, success=True)
     
     # delete bot's reply
@@ -480,7 +481,7 @@ async def callback_delete_and_ban(call: CallbackQuery) -> None:
     with suppress(TelegramBadRequest):
         await call.bot.delete_message(chat_id, message_id)
 
-    await call.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+    await ban_member(call.bot, chat_id=chat_id, user_id=user_id)
 
     await call.message.edit_text(
         call.message.html_text + get_string("action_deleted_banned")
@@ -500,7 +501,7 @@ async def callback_delete_and_mute_24h(call: CallbackQuery) -> None:
     with suppress(TelegramBadRequest):
         await call.bot.delete_message(chat_id, message_id)
 
-    await call.bot.restrict_chat_member(
+    await restrict_member(call.bot,
         chat_id=chat_id,
         user_id=user_id,
         permissions=ChatPermissions(can_send_messages=False),
@@ -525,7 +526,7 @@ async def callback_delete_and_mute_7d(call: CallbackQuery) -> None:
     with suppress(TelegramBadRequest):
         await call.bot.delete_message(chat_id, message_id)
 
-    await call.bot.restrict_chat_member(
+    await restrict_member(call.bot,
         chat_id=chat_id,
         user_id=user_id,
         permissions=ChatPermissions(can_send_messages=False),
@@ -560,7 +561,7 @@ async def callback_dismiss_mute_reporter_1d(call: CallbackQuery) -> None:
     with suppress(TelegramBadRequest):
         await call.bot.delete_message(chat_id, message_id)
 
-    await call.bot.restrict_chat_member(
+    await restrict_member(call.bot,
         chat_id=chat_id,
         user_id=user_id,
         permissions=ChatPermissions(can_send_messages=False),
@@ -585,7 +586,7 @@ async def callback_dismiss_mute_reporter_7d(call: CallbackQuery) -> None:
     with suppress(TelegramBadRequest):
         await call.bot.delete_message(chat_id, message_id)
 
-    await call.bot.restrict_chat_member(
+    await restrict_member(call.bot,
         chat_id=chat_id,
         user_id=user_id,
         permissions=ChatPermissions(can_send_messages=False),
@@ -610,7 +611,7 @@ async def callback_dismiss_ban_reporter(call: CallbackQuery) -> None:
     with suppress(TelegramBadRequest):
         await call.bot.delete_message(chat_id, message_id)
 
-    await call.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+    await ban_member(call.bot, chat_id=chat_id, user_id=user_id)
 
     await call.message.edit_text(
         call.message.html_text + get_string("action_deleted_dismissed4")
