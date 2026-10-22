@@ -52,9 +52,24 @@ def is_running() -> bool:
     return _bot is not None
 
 
+async def lookup_member(bot, chat_id: int, user_id: int):
+    """An invalid participant lookup is expected when scanning historical users."""
+    try:
+        return await bot.get_chat_member(chat_id, user_id)
+    except TelegramBadRequest as exc:
+        if exc.message.rsplit(":", 1)[-1].strip().upper() != "PARTICIPANT_ID_INVALID":
+            raise
+        logger.debug("Skipping unavailable participant %s in chat %s", user_id, chat_id)
+        return None
+
+
 async def _sync_member(bot, chat_id: int, user_id: int) -> bool:
     """Caller holds the member lock. Return whether policy disallows reactions."""
-    role = await bot.get_chat_member(chat_id, user_id)
+    role = await lookup_member(bot, chat_id, user_id)
+    if role is None:
+        # A failed lookup does not prove that the user left. Preserve ownership
+        # so a later successful lookup can still restore our restriction.
+        return False
     if role.status in MemberStatus.admin_statuses():
         return False
     if role.status not in ("member", "restricted") or (

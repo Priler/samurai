@@ -11,7 +11,7 @@ import sqlalchemy
 from sqlalchemy.ext.asyncio import create_async_engine
 from aiogram import Dispatcher, Router
 from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError, TelegramRetryAfter
-from aiogram.methods import RestrictChatMember
+from aiogram.methods import GetChatMember, RestrictChatMember
 from aiogram.types import (
     Chat, ChatPermissions, Message, MessageReactionUpdated, ReactionTypeEmoji, Update, User,
 )
@@ -243,6 +243,65 @@ class ReactionPolicyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await ReactionRestriction.objects.count(), 0)
         self.bot.restrict_chat_member.side_effect = actual
         self.assertTrue(await self.sync())
+        self.assertEqual(await ReactionRestriction.objects.count(), 1)
+
+    async def test_invalid_participant_lookup_is_quiet_and_preserves_policy_ownership(self):
+        await self.sync()
+        self.bot.restrict_chat_member.reset_mock()
+        actual = self.bot.get_chat_member.side_effect
+        self.bot.get_chat_member.side_effect = TelegramBadRequest(
+            method=GetChatMember(chat_id=-100123, user_id=123),
+            message="Bad Request: PARTICIPANT_ID_INVALID",
+        )
+        with self.assertNoLogs("services.reactions", level="WARNING"):
+            self.assertFalse(await self.sync(force=True))
+        self.bot.restrict_chat_member.assert_not_awaited()
+        self.assertEqual(await ReactionRestriction.objects.count(), 1)
+        # An unavailable lookup does not permanently exempt the user or strand
+        # a restriction when lookup starts working again.
+        self.bot.get_chat_member.side_effect = actual
+        await cache.queue_member_update(123, reputation_points=1)
+        self.assertFalse(await self.sync(force=True))
+        self.assertTrue(self.role.can_react_to_messages)
+        self.assertEqual(await ReactionRestriction.objects.count(), 0)
+
+    async def test_invalid_lookup_does_not_hide_other_membership_errors(self):
+        for description in ("chat not found", "not enough rights", "CHAT_ADMIN_REQUIRED"):
+            with self.subTest(description=description):
+                self.bot.get_chat_member.side_effect = TelegramBadRequest(
+                    method=GetChatMember(chat_id=-100123, user_id=123), message=description,
+                )
+                with self.assertLogs("services.reactions", level="ERROR"):
+                    self.assertFalse(await self.sync(force=True))
+
+    async def test_reaction_from_invalid_participant_is_quietly_skipped(self):
+        self.bot.get_chat_member.side_effect = TelegramBadRequest(
+            method=GetChatMember(chat_id=-100123, user_id=123),
+            message="Bad Request: PARTICIPANT_ID_INVALID",
+        )
+        with self.assertNoLogs("services.reactions", level="WARNING"), \
+             self.assertNoLogs("handlers.reactions", level="WARNING"):
+            await reaction_handlers.on_reaction(self.reaction())
+        self.bot.restrict_chat_member.assert_not_awaited()
+        self.bot.delete_message_reaction.assert_not_awaited()
+
+    async def test_initial_scan_continues_after_invalid_participant(self):
+        await Member.objects.create(user_id=456, reputation_points=0)
+
+        async def lookup(chat_id, user_id):
+            if user_id == 123:
+                raise TelegramBadRequest(
+                    method=GetChatMember(chat_id=chat_id, user_id=user_id),
+                    message="Bad Request: PARTICIPANT_ID_INVALID",
+                )
+            return SimpleNamespace(status="member", user=User(id=456, is_bot=False, first_name="Other"))
+
+        self.bot.get_chat_member.side_effect = lookup
+        with self.assertNoLogs("services.reactions", level="WARNING"), \
+             patch.object(reactions.asyncio, "sleep", new_callable=AsyncMock):
+            await reactions.reconcile_known_members(self.bot)
+        self.bot.restrict_chat_member.assert_awaited_once()
+        self.assertEqual(self.bot.restrict_chat_member.await_args.kwargs["user_id"], 456)
         self.assertEqual(await ReactionRestriction.objects.count(), 1)
 
     async def test_rate_limit_is_deferred_without_breaking_moderation(self):

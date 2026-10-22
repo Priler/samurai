@@ -31,13 +31,13 @@ async def on_reaction(event: MessageReactionUpdated) -> None:
             or not config.groups.is_main_group(event.chat.id)
             or event.user is None or event.user.is_bot or not event.new_reaction):
         return
-    member = await retrieve_or_create_member(event.user.id)
-    await reactions.sync_member(event.bot, event.chat.id, event.user.id, force=True)
-    if member.reputation_points >= config.reactions.rep_threshold:
-        return
     try:
-        role = await event.bot.get_chat_member(event.chat.id, event.user.id)
-        if role.status in MemberStatus.admin_statuses():
+        role = await reactions.lookup_member(event.bot, event.chat.id, event.user.id)
+        if role is None or role.status in MemberStatus.admin_statuses():
+            return
+        member = await retrieve_or_create_member(event.user.id)
+        await reactions.sync_member(event.bot, event.chat.id, event.user.id, force=True)
+        if member.reputation_points >= config.reactions.rep_threshold:
             return
         # Remove the reaction even if applying the future restriction failed.
         await event.bot.delete_message_reaction(
