@@ -274,6 +274,29 @@ class ReactionPolicyTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertLogs("services.reactions", level="ERROR"):
                     self.assertFalse(await self.sync(force=True))
 
+    async def test_missing_member_lookup_variants_are_quiet_without_losing_ownership(self):
+        await self.sync()
+        self.bot.restrict_chat_member.reset_mock()
+        actual = self.bot.get_chat_member.side_effect
+        for description in ("Bad Request: member not found", "member not found",
+                            "Bad Request: user not found", "Bad Request: USER_ID_INVALID"):
+            with self.subTest(description=description):
+                self.bot.get_chat_member.side_effect = TelegramBadRequest(
+                    method=GetChatMember(chat_id=-100123, user_id=123), message=description,
+                )
+                with self.assertNoLogs("services.reactions", level="WARNING"), \
+                     self.assertNoLogs("handlers.reactions", level="WARNING"):
+                    self.assertFalse(await self.sync(force=True))
+                    await reaction_handlers.on_reaction(self.reaction())
+                self.bot.restrict_chat_member.assert_not_awaited()
+                self.bot.delete_message_reaction.assert_not_awaited()
+                self.assertEqual(await ReactionRestriction.objects.count(), 1)
+        self.bot.get_chat_member.side_effect = actual
+        await cache.queue_member_update(123, reputation_points=1)
+        self.assertFalse(await self.sync(force=True))
+        self.assertTrue(self.role.can_react_to_messages)
+        self.assertEqual(await ReactionRestriction.objects.count(), 0)
+
     async def test_reaction_from_invalid_participant_is_quietly_skipped(self):
         self.bot.get_chat_member.side_effect = TelegramBadRequest(
             method=GetChatMember(chat_id=-100123, user_id=123),

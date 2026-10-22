@@ -25,6 +25,9 @@ _dirty_users: set[int] = set()
 _rescan = False
 _retry_until = 0.0
 _synced: TTLCache = TTLCache(maxsize=10000, ttl=30)
+_UNAVAILABLE_MEMBER_ERRORS = frozenset({
+    "PARTICIPANT_ID_INVALID", "USER_ID_INVALID", "MEMBER NOT FOUND", "USER NOT FOUND",
+})
 
 
 def _lock(chat_id: int, user_id: int) -> asyncio.Lock:
@@ -57,7 +60,8 @@ async def lookup_member(bot, chat_id: int, user_id: int):
     try:
         return await bot.get_chat_member(chat_id, user_id)
     except TelegramBadRequest as exc:
-        if exc.message.rsplit(":", 1)[-1].strip().upper() != "PARTICIPANT_ID_INVALID":
+        description = exc.message.rsplit(":", 1)[-1].strip().upper()
+        if description not in _UNAVAILABLE_MEMBER_ERRORS:
             raise
         logger.debug("Skipping unavailable participant %s in chat %s", user_id, chat_id)
         return None
