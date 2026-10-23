@@ -68,6 +68,9 @@ class SpamConfig(BaseModel):
     # single-emoji spam (bots spamming lone emojis)
     single_emoji_rep_threshold: int = 30  # delete single-emoji messages below this rep
 
+    # Custom emoji artwork is carried by text entities, outside photo NSFW checks.
+    custom_emoji_rep_threshold: int = Field(default=50, ge=0)
+
     # link spam (t.me invites, external URLs)
     links_rep_threshold: int = 50  # delete messages with links below this rep
 

@@ -61,7 +61,7 @@ router = Router(name="group_events")
 MEDIA_CONTENT_TYPES = {
     ContentType.PHOTO, ContentType.VIDEO, ContentType.AUDIO,
     ContentType.DOCUMENT, ContentType.VOICE, ContentType.VIDEO_NOTE,
-    ContentType.ANIMATION
+    ContentType.ANIMATION, ContentType.STICKER
 }
 
 # media types only handled by on_user_media (not covered by on_user_message)
@@ -593,7 +593,25 @@ async def _process_user_message(message: Message, count_clean_message: bool) -> 
             and member.reputation_points < config.spam.burst_rep_threshold):
         burst_cohort = burst.record_newcomer(message.chat.id, message.from_user.id)
 
-    # media restriction for low-rep users (photos, videos, documents)
+    # Telegram embeds custom emoji artwork in text/caption entities, so the
+    # usual media-type and Unicode single-emoji checks do not cover it.
+    if (member.reputation_points < config.spam.custom_emoji_rep_threshold
+            and _contains_custom_emoji(message)):
+        await delete_message_if_present(message)
+        if count_clean_message:
+            await queue_member_update(
+                message.from_user.id, violations_count_spam=1, reputation_points=-5,
+            )
+            await _maybe_autoban(message, member, 5, "кастомные эмодзи")
+        await write_log(
+            message.bot,
+            f"{escape_html(get_message_text(message) or '[кастомный эмодзи]')}\n\n"
+            f"<i>Автор:</i> {user_mention(message.from_user)}",
+            "🤖 Антиспам (кастомные эмодзи)", message.chat.title,
+        )
+        return
+
+    # media restriction for low-rep users (including stickers)
     if message.content_type != ContentType.TEXT:
         if member.reputation_points < config.spam.allow_media_threshold:
             await message.delete()
@@ -991,6 +1009,21 @@ def _format_nsfw_scores(prediction: dict) -> str:
         "Hentai": "H", "Anime Picture": "A"
     }
     return " | ".join(f"{labels.get(k, k)}: {v}" for k, v in prediction.items())
+
+
+def _contains_custom_emoji(message: Message) -> bool:
+    """Identify custom emoji by Telegram metadata, regardless of fallback text."""
+    sticker = getattr(message, "sticker", None)
+    if sticker is not None and (
+        getattr(sticker, "type", None) == "custom_emoji"
+        or getattr(sticker, "custom_emoji_id", None)
+    ):
+        return True
+    return any(
+        entity.type == "custom_emoji"
+        for entities in (getattr(message, "entities", None), getattr(message, "caption_entities", None))
+        for entity in entities or ()
+    )
 
 
 def _contains_link(message: Message) -> bool:

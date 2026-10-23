@@ -64,6 +64,9 @@ allow_comments_rep_threshold__woman = 10
 # reputation points below which single-emoji messages are deleted (bot spam pattern)
 single_emoji_rep_threshold = 15
 
+# Reputation required for custom emoji in text, captions, and emoji stickers.
+custom_emoji_rep_threshold = 50
+
 # reputation points required to post any links (URLs, t.me invites, etc.)
 links_rep_threshold = 20
 
